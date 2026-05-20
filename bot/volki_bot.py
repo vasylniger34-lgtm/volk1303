@@ -6,6 +6,11 @@ VOLKI 13:03 — Telegram Bot
 
 Підписники зберігаються у Supabase (таблиця bot_subscribers) —
 не губляться при перезапуску бота!
+
+АДМІН-ФУНКЦІЇ (тільки для адмінів):
+  /broadcast <текст>   — Розсилка повідомлення всім підписникам
+  /stats               — Статистика підписників
+  /admins              — Список адмін-чатів
 """
 
 import os
@@ -27,8 +32,18 @@ API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 SUPABASE_URL = "https://nbjnmzrjlvjbejgeogce.supabase.co"
 SUPABASE_KEY = "sb_publishable_wqRcNT9yKJNi16EIeqpwnQ_bfiaA_vv"
 
+# ─── ADMIN CHAT IDs ───────────────────────────────────────────────────────────
+# Це список Telegram chat_id які мають доступ до адмін-команд.
+# Щоб дізнатися свій chat_id — напишіть /myid боту.
+# Зберігаємо також у файлі для зручності (admin_chat_ids.json).
+ADMIN_IDS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "admin_chat_ids.json")
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Fallback local file for announced tournament IDs
 ANNOUNCED_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announced_tournaments.json")
+
+# State for multi-step broadcast
+pending_broadcasts = {}  # chat_id -> {"step": "waiting_text", "preview": str}
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +70,38 @@ def save_json(filepath, data):
     except Exception as e:
         log.error(f"Error saving JSON to {filepath}: {e}")
 
+# ─── Admin ID Management ───
+
+def load_admin_ids() -> set:
+    """Load admin chat IDs from file + env variable"""
+    ids = set()
+    # From file
+    file_ids = load_json(ADMIN_IDS_FILE, [])
+    for i in file_ids:
+        try:
+            ids.add(int(i))
+        except (ValueError, TypeError):
+            pass
+    # From env variable (comma separated)
+    env_ids = os.environ.get("ADMIN_CHAT_IDS", "")
+    for i in env_ids.split(","):
+        i = i.strip()
+        if i:
+            try:
+                ids.add(int(i))
+            except ValueError:
+                pass
+    return ids
+
+def save_admin_id(chat_id: int):
+    """Add a new admin ID to the file"""
+    current = set(load_json(ADMIN_IDS_FILE, []))
+    current.add(chat_id)
+    save_json(ADMIN_IDS_FILE, list(current))
+
+def is_admin(chat_id: int) -> bool:
+    return chat_id in load_admin_ids()
+
 # ─── Telegram API Helpers ───
 
 def tg_request(method: str, data: dict = None):
@@ -73,6 +120,18 @@ def tg_request(method: str, data: dict = None):
     except Exception as e:
         log.error(f"Telegram API error [{method}]: {e}")
         return None
+
+def send_msg(chat_id: int, text: str, parse_mode="HTML", reply_markup=None, disable_preview=True):
+    """Shortcut to send a message"""
+    data = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": parse_mode,
+        "disable_web_page_preview": disable_preview
+    }
+    if reply_markup:
+        data["reply_markup"] = reply_markup
+    return tg_request("sendMessage", data)
 
 # ─── Supabase REST Helpers ───
 
@@ -113,7 +172,6 @@ def add_subscriber_to_db(chat_id: int, first_name: str, username: str):
         "username": username,
         "is_active": True
     }
-    # Use upsert (INSERT ... ON CONFLICT DO UPDATE)
     url = f"{SUPABASE_URL}/rest/v1/bot_subscribers"
     headers = {
         "apikey": SUPABASE_KEY,
@@ -131,7 +189,7 @@ def add_subscriber_to_db(chat_id: int, first_name: str, username: str):
         return True
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace")
-        log.warning(f"Could not upsert subscriber to DB (table may not exist yet?): {e.code} — {err_body}")
+        log.warning(f"Could not upsert subscriber to DB: {e.code} — {err_body}")
         return False
     except Exception as e:
         log.warning(f"Could not upsert subscriber to DB: {e}")
@@ -181,7 +239,7 @@ def fetch_all_subscribers():
         log.info(f"Loaded {len(chat_ids)} subscribers from bot_subscribers table")
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace")
-        log.warning(f"Could not load bot_subscribers (table may not exist): {e.code} — {err_body}")
+        log.warning(f"Could not load bot_subscribers: {e.code} — {err_body}")
     except Exception as e:
         log.warning(f"Could not load bot_subscribers: {e}")
 
@@ -198,11 +256,35 @@ def fetch_all_subscribers():
                         chat_ids.add(int(tg_id))
                     except (ValueError, TypeError):
                         pass
-        log.info(f"Total after merging with profiles fallback: {len(chat_ids)} unique subscribers")
+        log.info(f"Total subscribers after fallback merge: {len(chat_ids)}")
     except Exception as e:
         log.warning(f"Could not load profiles fallback: {e}")
 
     return list(chat_ids)
+
+def fetch_subscribers_count() -> tuple:
+    """Returns (bot_subscribers_count, profiles_with_tg_count)"""
+    bot_count = 0
+    profile_count = 0
+    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Prefer": "count=exact"}
+    ctx = ssl.create_default_context()
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/bot_subscribers?is_active=eq.true&select=chat_id"
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+            rows = json.loads(resp.read().decode("utf-8"))
+            bot_count = len(rows)
+    except:
+        pass
+    try:
+        url2 = f"{SUPABASE_URL}/rest/v1/profiles?select=id"
+        req2 = urllib.request.Request(url2, headers=headers)
+        with urllib.request.urlopen(req2, context=ctx, timeout=10) as resp:
+            rows2 = json.loads(resp.read().decode("utf-8"))
+            profile_count = len(rows2)
+    except:
+        pass
+    return bot_count, profile_count
 
 # ─── Supabase Data Fetchers ───
 
@@ -228,7 +310,6 @@ def format_tournament(t: dict) -> str:
     """Format tournament details into a premium Telegram message"""
     tourney_name = t.get("name", "Без назви").upper()
     
-    # Emoji mappings for tournament types
     tourney_type = t.get("type", "2X2")
     type_emoji = "⚔️"
     if tourney_type == "2X2":
@@ -245,7 +326,6 @@ def format_tournament(t: dict) -> str:
     elif status == "completed":
         status_str = "🏁 Завершений"
 
-    # Process rules list
     rules_text = ""
     rules = t.get("rules", [])
     if rules:
@@ -268,6 +348,123 @@ def format_tournament(t: dict) -> str:
     )
     return msg
 
+# ─── Broadcast Sender ───
+
+def do_broadcast(text: str, sender_chat_id: int = None) -> tuple:
+    """
+    Send a broadcast message to ALL active subscribers.
+    Returns (sent_count, failed_count).
+    """
+    all_chat_ids = fetch_all_subscribers()
+    sent = 0
+    failed = 0
+    
+    inline_kb = {
+        "inline_keyboard": [[{
+            "text": "🎮 Відкрити VOLKI 13:03",
+            "web_app": {"url": WEBAPP_URL}
+        }]]
+    }
+    
+    log.info(f"Starting broadcast to {len(all_chat_ids)} subscribers...")
+    
+    for chat_id in all_chat_ids:
+        try:
+            result = tg_request("sendMessage", {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+                "reply_markup": inline_kb
+            })
+            if result and result.get("ok"):
+                sent += 1
+            else:
+                err_desc = result.get("description", "") if result else ""
+                if any(word in err_desc.lower() for word in ["blocked", "chat not found", "forbidden", "deactivated"]):
+                    mark_subscriber_inactive(chat_id)
+                    log.warning(f"Subscriber {chat_id} blocked bot — marked inactive")
+                failed += 1
+            time.sleep(0.05)  # Rate limit protection
+        except Exception as ex:
+            log.error(f"Broadcast error for {chat_id}: {ex}")
+            failed += 1
+    
+    # Also post to channel
+    channel_id = os.environ.get("TELEGRAM_CHANNEL", "@volki1303")
+    try:
+        ch_result = tg_request("sendMessage", {
+            "chat_id": channel_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+            "reply_markup": inline_kb
+        })
+        if ch_result and ch_result.get("ok"):
+            log.info(f"✅ Also posted to channel {channel_id}")
+    except Exception as ex:
+        log.warning(f"Could not post to channel: {ex}")
+    
+    log.info(f"Broadcast complete: ✅ {sent} sent, ❌ {failed} failed")
+    return sent, failed
+
+# ─── Admin Menu Keyboards ───
+
+def admin_main_menu():
+    return {
+        "keyboard": [
+            [{"text": "📢 Зробити розсилку"}],
+            [{"text": "📊 Статистика підписників"}, {"text": "👥 Список адмінів"}],
+            [{"text": "🏆 Активні турніри"}, {"text": "🎮 Відкрити VOLKI", "web_app": {"url": WEBAPP_URL}}],
+            [{"text": "⬅️ Головне меню"}]
+        ],
+        "resize_keyboard": True
+    }
+
+def main_menu():
+    return {
+        "keyboard": [
+            [{"text": "🎮 Відкрити VOLKI 13:03", "web_app": {"url": WEBAPP_URL}}],
+            [{"text": "🏆 Активні турніри"}, {"text": "📱 Наш канал"}]
+        ],
+        "resize_keyboard": True
+    }
+
+def broadcast_templates_keyboard():
+    return {
+        "inline_keyboard": [
+            [{"text": "🏆 Шаблон: Новий турнір", "callback_data": "tmpl_tournament"}],
+            [{"text": "⚙️ Шаблон: Тех. роботи", "callback_data": "tmpl_maintenance"}],
+            [{"text": "🎉 Шаблон: Результати турніру", "callback_data": "tmpl_results"}],
+            [{"text": "✍️ Написати своє", "callback_data": "tmpl_custom"}],
+            [{"text": "❌ Скасувати", "callback_data": "broadcast_cancel"}]
+        ]
+    }
+
+BROADCAST_TEMPLATES = {
+    "tmpl_tournament": (
+        "🚨 <b>АНОНС ТУРНІРУ!</b>\n\n"
+        "🏆 Незабаром відбудеться новий турнір VOLKI 1303!\n"
+        "📅 Дата: [ВКАЖІТЬ ДАТУ]\n"
+        "💰 Призовий фонд: [ВКАЖІТЬ ФОНД]\n"
+        "🗺️ Карта: [ВКАЖІТЬ КАРТУ]\n\n"
+        "Реєструйся зараз у додатку! 👇\n#volki1303"
+    ),
+    "tmpl_maintenance": (
+        "⚙️ <b>Технічні роботи</b>\n\n"
+        "Платформа VOLKI 1303 тимчасово недоступна для профілактичних робіт.\n"
+        "Очікуваний час відновлення: [ЧАС]\n\n"
+        "Дякуємо за розуміння! 🐺\n#volki1303"
+    ),
+    "tmpl_results": (
+        "🎉 <b>РЕЗУЛЬТАТИ ТУРНІРУ!</b>\n\n"
+        "🥇 Переможець: [КОМАНДА]\n"
+        "🥈 2-е місце: [КОМАНДА]\n"
+        "🥉 3-є місце: [КОМАНДА]\n\n"
+        "Вітаємо всіх учасників! 🏆\n#volki1303"
+    )
+}
+
 # ─── Welcome and Interactive Messages ───
 
 def send_welcome(chat_id: int, first_name: str = "Гравець"):
@@ -283,26 +480,125 @@ def send_welcome(chat_id: int, first_name: str = "Гравець"):
         f"Натискай кнопку <b>Відкрити VOLKI</b> нижче, щоб увірватися в гру! 👇"
     )
     
-    # Persistent keyboard at the bottom
-    reply_keyboard = {
-        "keyboard": [
-            [{"text": "🎮 Відкрити VOLKI 13:03", "web_app": {"url": WEBAPP_URL}}],
-            [{"text": "🏆 Активні турніри"}, {"text": "📱 Наш канал"}]
-        ],
-        "resize_keyboard": True
-    }
-    
     return tg_request("sendMessage", {
         "chat_id": chat_id,
         "text": text,
         "parse_mode": "HTML",
-        "reply_markup": reply_keyboard
+        "reply_markup": main_menu()
     })
 
 # ─── Update Handler ───
 
+def handle_callback_query(update: dict):
+    """Handle inline keyboard button clicks"""
+    cq = update.get("callback_query")
+    if not cq:
+        return
+    
+    chat_id = cq["from"]["id"]
+    first_name = cq["from"].get("first_name", "Адмін")
+    data = cq.get("data", "")
+    message_id = cq["message"]["message_id"]
+    
+    # Always answer the callback query to remove loading indicator
+    tg_request("answerCallbackQuery", {"callback_query_id": cq["id"]})
+    
+    if not is_admin(chat_id):
+        send_msg(chat_id, "⛔ У вас немає прав для цієї дії.")
+        return
+    
+    if data == "broadcast_cancel":
+        pending_broadcasts.pop(chat_id, None)
+        tg_request("editMessageText", {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": "❌ Розсилку скасовано.",
+            "parse_mode": "HTML"
+        })
+        send_msg(chat_id, "↩️ Повернення до адмін-меню.", reply_markup=admin_main_menu())
+        return
+    
+    if data in BROADCAST_TEMPLATES:
+        template_text = BROADCAST_TEMPLATES[data]
+        pending_broadcasts[chat_id] = {"step": "confirm", "text": template_text}
+        
+        preview = f"📋 <b>Прев'ю повідомлення:</b>\n\n{template_text}\n\n─────────────────────\n⚠️ Надіслати це повідомлення <b>всім підписникам</b>?"
+        tg_request("editMessageText", {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": preview,
+            "parse_mode": "HTML",
+            "reply_markup": {
+                "inline_keyboard": [
+                    [{"text": "✅ Так, надіслати всім!", "callback_data": "broadcast_confirm"}],
+                    [{"text": "✏️ Редагувати текст", "callback_data": "broadcast_edit"}],
+                    [{"text": "❌ Скасувати", "callback_data": "broadcast_cancel"}]
+                ]
+            }
+        })
+        return
+    
+    if data == "tmpl_custom":
+        pending_broadcasts[chat_id] = {"step": "waiting_text"}
+        tg_request("editMessageText", {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": (
+                "✍️ <b>Введіть текст розсилки:</b>\n\n"
+                "Підтримується HTML форматування:\n"
+                "• <code>&lt;b&gt;жирний&lt;/b&gt;</code>\n"
+                "• <code>&lt;i&gt;курсив&lt;/i&gt;</code>\n"
+                "• <code>&lt;code&gt;код&lt;/code&gt;</code>\n\n"
+                "Просто напишіть наступне повідомлення 👇"
+            ),
+            "parse_mode": "HTML"
+        })
+        return
+    
+    if data == "broadcast_edit":
+        pending_broadcasts[chat_id] = {"step": "waiting_text"}
+        send_msg(chat_id, "✍️ Введіть новий текст розсилки (HTML підтримується):")
+        return
+    
+    if data == "broadcast_confirm":
+        state = pending_broadcasts.get(chat_id, {})
+        broadcast_text = state.get("text", "")
+        if not broadcast_text:
+            send_msg(chat_id, "❌ Текст розсилки порожній. Почніть спочатку.")
+            return
+        
+        pending_broadcasts.pop(chat_id, None)
+        
+        # Send progress notification
+        tg_request("editMessageText", {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": "⏳ <b>Розсилку запущено...</b>\n\nЗачекайте, йде надсилання всім підписникам.",
+            "parse_mode": "HTML"
+        })
+        
+        # Run in background thread so bot doesn't freeze
+        def run_broadcast():
+            sent, failed = do_broadcast(broadcast_text, sender_chat_id=chat_id)
+            send_msg(
+                chat_id,
+                f"✅ <b>Розсилку завершено!</b>\n\n"
+                f"📤 Надіслано: <b>{sent}</b> підписників\n"
+                f"❌ Помилок: <b>{failed}</b>\n\n"
+                f"Повідомлення також опубліковано в каналі @volki1303",
+                reply_markup=admin_main_menu()
+            )
+        
+        threading.Thread(target=run_broadcast, daemon=True).start()
+        return
+
 def handle_update(update: dict):
     """Process incoming Telegram update"""
+    # Handle callback queries (inline button clicks)
+    if "callback_query" in update:
+        handle_callback_query(update)
+        return
+    
     if "message" not in update:
         return
     
@@ -310,84 +606,191 @@ def handle_update(update: dict):
     chat_id = message["chat"]["id"]
     first_name = message["from"].get("first_name", "Гравець")
     username = message["from"].get("username", "")
-    text = message.get("text", "")
+    text = message.get("text", "").strip()
     
     # Auto-subscribe every user who writes to the bot
     add_subscriber_to_db(chat_id, first_name, username)
     
-    if text == "/start":
-        send_welcome(chat_id, first_name)
-    elif text == "/help":
-        tg_request("sendMessage", {
-            "chat_id": chat_id,
-            "text": (
-                "🐺 <b>VOLKI 13:03 — Довідка по командах</b>\n\n"
-                "• Натисніть кнопку <b>Відкрити VOLKI</b> для входу в додаток\n"
-                "• <b>🏆 Активні турніри</b> — перегляд списку турнірів\n"
-                "• <b>📱 Наш канал</b> — перехід до нашого Telegram-каналу\n\n"
-                "З будь-яких питань пишіть менеджерам у нашому каналі!"
-            ),
-            "parse_mode": "HTML",
-            "reply_markup": {
-                "inline_keyboard": [[{
-                    "text": "🎮 Відкрити VOLKI",
-                    "web_app": {"url": WEBAPP_URL}
-                }]]
-            }
+    # ─── Check if we're in a pending broadcast state ───
+    state = pending_broadcasts.get(chat_id)
+    if state and state.get("step") == "waiting_text" and text and not text.startswith("/"):
+        # User is typing their broadcast message
+        pending_broadcasts[chat_id] = {"step": "confirm", "text": text}
+        preview = f"📋 <b>Прев'ю повідомлення:</b>\n\n{text}\n\n─────────────────────\n⚠️ Надіслати це повідомлення <b>всім підписникам</b>?"
+        send_msg(chat_id, preview, reply_markup={
+            "inline_keyboard": [
+                [{"text": "✅ Так, надіслати всім!", "callback_data": "broadcast_confirm"}],
+                [{"text": "✏️ Редагувати", "callback_data": "broadcast_edit"}],
+                [{"text": "❌ Скасувати", "callback_data": "broadcast_cancel"}]
+            ]
         })
+        return
+    
+    # ─── Command handlers ───
+    
+    if text == "/start":
+        if is_admin(chat_id):
+            send_msg(
+                chat_id,
+                f"🐺 <b>Вітаємо, {first_name}! Ви увійшли як адміністратор.</b>\n\n"
+                f"У вас є доступ до розширеного меню:\n"
+                f"• 📢 Розсилки підписникам\n"
+                f"• 📊 Статистика платформи\n"
+                f"• 👥 Управління адмінами",
+                reply_markup=admin_main_menu()
+            )
+        else:
+            send_welcome(chat_id, first_name)
+    
+    elif text == "/help":
+        help_text = (
+            "🐺 <b>VOLKI 13:03 — Довідка</b>\n\n"
+            "• Натисніть <b>Відкрити VOLKI</b> для входу в додаток\n"
+            "• <b>🏆 Активні турніри</b> — перегляд списку турнірів\n"
+            "• <b>📱 Наш канал</b> — перехід до нашого каналу\n\n"
+        )
+        if is_admin(chat_id):
+            help_text += (
+                "🔑 <b>Команди адміна:</b>\n"
+                "• /broadcast — Розсилка всім підписникам\n"
+                "• /stats — Статистика підписників\n"
+                "• /addadmin &lt;chat_id&gt; — Додати адміна\n"
+                "• /myid — Дізнатися свій chat_id\n"
+            )
+        send_msg(chat_id, help_text, reply_markup=admin_main_menu() if is_admin(chat_id) else main_menu())
+    
+    elif text == "/myid":
+        send_msg(
+            chat_id,
+            f"🆔 Ваш Telegram chat_id: <code>{chat_id}</code>\n\n"
+            f"Скопіюйте цей ID і збережіть в <code>admin_chat_ids.json</code> або додайте через /addadmin",
+        )
+    
+    elif text.startswith("/addadmin"):
+        if not is_admin(chat_id):
+            send_msg(chat_id, "⛔ Недостатньо прав.")
+            return
+        parts = text.split()
+        if len(parts) < 2:
+            send_msg(chat_id, "❌ Використання: /addadmin &lt;chat_id&gt;\n\nНаприклад: <code>/addadmin 123456789</code>")
+            return
+        try:
+            new_admin_id = int(parts[1])
+            save_admin_id(new_admin_id)
+            send_msg(chat_id, f"✅ Адміна <code>{new_admin_id}</code> додано успішно!")
+            log.info(f"New admin added: {new_admin_id} (by {chat_id})")
+        except ValueError:
+            send_msg(chat_id, "❌ Некоректний chat_id. Введіть число.")
+    
+    # ─── BROADCAST COMMAND ───
+    
+    elif text == "/broadcast" or text == "📢 Зробити розсилку":
+        if not is_admin(chat_id):
+            send_msg(chat_id, "⛔ Ця функція доступна тільки для адміністраторів.\n\nЯкщо ви адмін — зверніться до розробника для отримання доступу.")
+            return
+        
+        pending_broadcasts.pop(chat_id, None)  # Clear any existing state
+        
+        send_msg(
+            chat_id,
+            "📢 <b>Меню Розсилок VOLKI 1303</b>\n\n"
+            "Оберіть шаблон або напишіть своє повідомлення.\n"
+            "Розсилка буде надіслана <b>всім активним підписникам</b> бота та опублікована в каналі @volki1303.\n\n"
+            "Підтримується HTML: <code>&lt;b&gt;жирний&lt;/b&gt;</code>, <code>&lt;i&gt;курсив&lt;/i&gt;</code>, <code>&lt;code&gt;код&lt;/code&gt;</code>",
+            reply_markup=broadcast_templates_keyboard()
+        )
+    
+    # ─── STATS COMMAND ───
+    
+    elif text == "/stats" or text == "📊 Статистика підписників":
+        if not is_admin(chat_id):
+            send_msg(chat_id, "⛔ Недостатньо прав.")
+            return
+        
+        send_msg(chat_id, "⏳ Завантажую статистику...")
+        bot_subs, profile_count = fetch_subscribers_count()
+        all_subs = fetch_all_subscribers()
+        admin_ids = load_admin_ids()
+        
+        send_msg(
+            chat_id,
+            f"📊 <b>Статистика VOLKI 1303</b>\n\n"
+            f"📱 Підписників бота (активних): <b>{bot_subs}</b>\n"
+            f"👤 Гравців на платформі: <b>{profile_count}</b>\n"
+            f"📤 Охоплення розсилки: <b>{len(all_subs)}</b>\n"
+            f"🔑 Адміністраторів: <b>{len(admin_ids)}</b>\n\n"
+            f"🌐 <a href='{WEBAPP_URL}'>Відкрити платформу</a>",
+            reply_markup=admin_main_menu()
+        )
+    
+    elif text == "👥 Список адмінів":
+        if not is_admin(chat_id):
+            send_msg(chat_id, "⛔ Недостатньо прав.")
+            return
+        
+        admin_ids = load_admin_ids()
+        if not admin_ids:
+            send_msg(chat_id, "Список адмінів порожній.\n\nВикористайте /addadmin &lt;chat_id&gt; щоб додати першого адміна.")
+            return
+        
+        admin_list = "\n".join([f"• <code>{aid}</code>" for aid in admin_ids])
+        send_msg(
+            chat_id,
+            f"👥 <b>Адміністратори ({len(admin_ids)}):</b>\n\n{admin_list}\n\n"
+            f"➕ Додати: /addadmin &lt;chat_id&gt;",
+            reply_markup=admin_main_menu()
+        )
+    
+    # ─── ADMIN PANEL BUTTON ───
+    
+    elif text == "⬅️ Головне меню":
+        send_welcome(chat_id, first_name)
+    
+    # ─── STANDARD MENU BUTTONS ───
+    
     elif text == "🏆 Активні турніри" or text == "/tournaments":
         tourneys = fetch_tournaments_from_db()
         if tourneys is None:
-            tg_request("sendMessage", {
-                "chat_id": chat_id,
-                "text": "❌ <b>Не вдалося зв'язатися з базою даних.</b> Спробуйте пізніше або зверніться до підтримки.",
-                "parse_mode": "HTML"
-            })
+            send_msg(chat_id, "❌ <b>Не вдалося зв'язатися з базою даних.</b> Спробуйте пізніше або зверніться до підтримки.")
             return
         
-        # Filter active and upcoming tournaments
         active_tourneys = [t for t in tourneys if t.get("status") in ("upcoming", "active")]
         
         if not active_tourneys:
-            tg_request("sendMessage", {
-                "chat_id": chat_id,
-                "text": "🐺 <b>Наразі немає активних або запланованих турнірів.</b>\n\nСлідкуйте за оновленнями або створіть новий турнір через Панель Керування на сайті! ⚔️",
-                "parse_mode": "HTML"
-            })
+            send_msg(
+                chat_id,
+                "🐺 <b>Наразі немає активних або запланованих турнірів.</b>\n\nСлідкуйте за оновленнями або зареєструйтесь у застосунку! ⚔️",
+                reply_markup={"inline_keyboard": [[{"text": "🎮 Відкрити VOLKI", "web_app": {"url": WEBAPP_URL}}]]}
+            )
             return
-            
-        # Format list
+        
         response_text = f"🐺 <b>АКТИВНІ ТУРНІРИ VOLKI 13:03:</b>\n\n"
-        for t in active_tourneys[:3]:  # Max 3 latest for readable output
+        for t in active_tourneys[:3]:
             response_text += format_tournament(t) + "\n\n"
         
-        tg_request("sendMessage", {
-            "chat_id": chat_id,
-            "text": response_text,
-            "parse_mode": "HTML",
-            "reply_markup": {
-                "inline_keyboard": [[
-                    {
-                        "text": "🎮 Відкрити додаток",
-                        "web_app": {"url": WEBAPP_URL}
-                    }
-                ]]
-            }
-        })
+        send_msg(
+            chat_id,
+            response_text,
+            reply_markup={"inline_keyboard": [[{"text": "🎮 Відкрити додаток", "web_app": {"url": WEBAPP_URL}}]]}
+        )
+    
     elif text == "📱 Наш канал":
-        tg_request("sendMessage", {
-            "chat_id": chat_id,
-            "text": "📱 Приєднуйтесь до нашого офіційного каналу, щоб не пропустити важливі новини, розіграші та стріми матчів!",
-            "reply_markup": {
-                "inline_keyboard": [[{
-                    "text": "🐺 Наш канал",
-                    "url": "https://t.me/volki1303"
-                }]]
-            }
-        })
+        send_msg(
+            chat_id,
+            "📱 Приєднуйтесь до нашого офіційного каналу, щоб не пропустити важливі новини, розіграші та стріми матчів!",
+            reply_markup={"inline_keyboard": [[{"text": "🐺 Наш канал", "url": "https://t.me/volki1303"}]]}
+        )
+    
     else:
-        # Any other message — show welcome (keeps bot responsive)
-        send_welcome(chat_id, first_name)
+        # Any other message — show appropriate welcome
+        if is_admin(chat_id):
+            send_msg(
+                chat_id,
+                f"🐺 Привіт, {first_name}! Ви в адмін-панелі.\nОберіть дію з меню нижче:",
+                reply_markup=admin_main_menu()
+            )
+        else:
+            send_welcome(chat_id, first_name)
 
 
 # ─── Background Supabase Sync Thread ───
@@ -396,7 +799,6 @@ def monitor_new_tournaments():
     """Background loop that polls Supabase and broadcasts new tournaments"""
     log.info("Background Supabase Tournament Monitor thread started successfully!")
     
-    # Load previously announced tournament IDs (from local file)
     announced_ids = set(load_json(ANNOUNCED_FILE, []))
     
     # Initial load: do not announce existing tournaments on startup
@@ -409,88 +811,26 @@ def monitor_new_tournaments():
     
     while True:
         try:
-            # Poll tournaments every 15 seconds
             tourneys = fetch_tournaments_from_db()
             if tourneys:
-                # Find which tournaments are NOT announced yet
                 new_tourneys = [t for t in tourneys if t["id"] not in announced_ids]
                 
-                # Announce oldest first
                 for t in reversed(new_tourneys):
                     tourney_name = t.get("name", "Без назви")
                     log.info(f"🎉 New tournament detected in DB: {tourney_name} (ID: {t['id']})")
                     
-                    # Beautiful custom announcement
                     announcement = (
                         f"🚨 <b>АНОНС НОВОГО ТУРНІРУ!</b> 🚨\n\n"
                         f"{format_tournament(t)}\n"
                         f"🔥 <b>Реєстрація відкрита!</b> Заходь у додаток та подавай заявку зі своєю командою прямо зараз! 👇"
                     )
                     
-                    inline_keyboard = {
-                        "inline_keyboard": [
-                            [
-                                {
-                                    "text": "🎮 Реєстрація / Грати",
-                                    "web_app": {"url": WEBAPP_URL}
-                                }
-                            ]
-                        ]
-                    }
+                    sent, failed = do_broadcast(announcement)
+                    log.info(f"Tournament '{tourney_name}' broadcast: ✅ {sent} sent, ❌ {failed} failed")
                     
-                    # ─── Send to all bot subscribers from Supabase ───
-                    all_chat_ids = fetch_all_subscribers()
-                    sub_count = 0
-                    blocked_count = 0
-                    
-                    log.info(f"Broadcasting to {len(all_chat_ids)} subscribers...")
-                    
-                    for chat_id in all_chat_ids:
-                        try:
-                            result = tg_request("sendMessage", {
-                                "chat_id": chat_id,
-                                "text": announcement,
-                                "parse_mode": "HTML",
-                                "reply_markup": inline_keyboard
-                            })
-                            if result and result.get("ok"):
-                                sub_count += 1
-                            else:
-                                # Failed — check if it's a "blocked by user" error
-                                err_desc = result.get("description", "") if result else ""
-                                if "blocked" in err_desc.lower() or "chat not found" in err_desc.lower() or "forbidden" in err_desc.lower():
-                                    log.warning(f"Subscriber {chat_id} has blocked the bot — marking inactive")
-                                    mark_subscriber_inactive(chat_id)
-                                    blocked_count += 1
-                                else:
-                                    log.warning(f"Failed to send to {chat_id}: {err_desc}")
-                            time.sleep(0.05)  # Prevent Telegram rate limiting
-                        except Exception as ex:
-                            log.error(f"Could not send announcement to subscriber {chat_id}: {ex}")
-                    
-                    log.info(f"Broadcast complete: ✅ {sub_count} sent, ❌ {blocked_count} blocked")
-                    
-                    # ─── Also post to channel ───
-                    channel_id = os.environ.get("TELEGRAM_CHANNEL", "@volki1303")
-                    try:
-                        channel_result = tg_request("sendMessage", {
-                            "chat_id": channel_id,
-                            "text": announcement,
-                            "parse_mode": "HTML",
-                            "reply_markup": inline_keyboard
-                        })
-                        if channel_result and channel_result.get("ok"):
-                            log.info(f"✅ Successfully posted tournament announcement to channel {channel_id}")
-                        else:
-                            err = channel_result.get("description", "unknown error") if channel_result else "no response"
-                            log.warning(f"Could not post to channel {channel_id}: {err}")
-                    except Exception as ex:
-                        log.warning(f"Could not post announcement to channel {channel_id}: {ex}")
-                        
-                    # Save ID to avoid duplicates
                     announced_ids.add(t["id"])
                     save_json(ANNOUNCED_FILE, list(announced_ids))
-                    
+                        
         except Exception as e:
             log.error(f"Error in background monitor loop: {e}")
             
@@ -504,7 +844,6 @@ def run_polling():
     log.info(f"WebApp URL: {WEBAPP_URL}")
     log.info(f"Supabase URL: {SUPABASE_URL}")
     
-    # Verify bot token
     me = tg_request("getMe")
     if not me or not me.get("ok"):
         log.error("Invalid bot token! Check BOT_TOKEN.")
@@ -512,6 +851,9 @@ def run_polling():
     
     bot_name = me["result"]["username"]
     log.info(f"Bot connected: @{bot_name}")
+    
+    admin_ids = load_admin_ids()
+    log.info(f"Admin IDs loaded: {admin_ids if admin_ids else 'None (use /myid to get your chat_id, then add to admin_chat_ids.json)'}")
     
     # Delete any existing webhook
     tg_request("deleteWebhook", {"drop_pending_updates": True})
@@ -528,7 +870,7 @@ def run_polling():
             updates = tg_request("getUpdates", {
                 "offset": offset,
                 "timeout": 30,
-                "allowed_updates": ["message"]
+                "allowed_updates": ["message", "callback_query"]
             })
             
             if updates and updates.get("ok"):
