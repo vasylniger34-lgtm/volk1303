@@ -3,12 +3,14 @@
 VOLKI 13:03 — Telegram Bot
 Надсилає привітання, WebApp кнопку, список турнірів та автоматично
 анонсує нові турніри, створені на сайті!
+
+Підписники зберігаються у Supabase (таблиця bot_subscribers) —
+не губляться при перезапуску бота!
 """
 
 import os
 import json
 import logging
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import urllib.request
 import urllib.parse
 import ssl
@@ -21,12 +23,11 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "8873845823:AAErjQiXP7InePLKku-MOhbqNPe-
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://volk1303.vercel.app")
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# Credentials for Supabase
+# Supabase credentials
 SUPABASE_URL = "https://nbjnmzrjlvjbejgeogce.supabase.co"
 SUPABASE_KEY = "sb_publishable_wqRcNT9yKJNi16EIeqpwnQ_bfiaA_vv"
 
-# Files for persistence
-SUBSCRIBERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "subscribed_users.json")
+# Fallback local file for announced tournament IDs
 ANNOUNCED_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announced_tournaments.json")
 
 logging.basicConfig(
@@ -72,6 +73,136 @@ def tg_request(method: str, data: dict = None):
     except Exception as e:
         log.error(f"Telegram API error [{method}]: {e}")
         return None
+
+# ─── Supabase REST Helpers ───
+
+def supabase_request(method: str, table: str, payload: dict = None, query: str = ""):
+    """Generic Supabase REST API call"""
+    url = f"{SUPABASE_URL}/rest/v1/{table}{query}"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+    ctx = ssl.create_default_context()
+    try:
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        else:
+            req = urllib.request.Request(url, headers=headers, method=method)
+        with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw) if raw.strip() else []
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        log.error(f"Supabase HTTP error [{method} {table}]: {e.code} — {body}")
+        return None
+    except Exception as e:
+        log.error(f"Supabase request error [{method} {table}]: {e}")
+        return None
+
+# ─── Subscriber Storage (Supabase Cloud) ───
+
+def add_subscriber_to_db(chat_id: int, first_name: str, username: str):
+    """Upsert a subscriber into Supabase bot_subscribers table"""
+    data = {
+        "chat_id": chat_id,
+        "first_name": first_name,
+        "username": username,
+        "is_active": True
+    }
+    # Use upsert (INSERT ... ON CONFLICT DO UPDATE)
+    url = f"{SUPABASE_URL}/rest/v1/bot_subscribers"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=representation"
+    }
+    ctx = ssl.create_default_context()
+    try:
+        body = json.dumps(data).encode("utf-8")
+        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+            resp.read()
+        log.info(f"Subscriber upserted to DB: {first_name} (chat_id={chat_id})")
+        return True
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        log.warning(f"Could not upsert subscriber to DB (table may not exist yet?): {e.code} — {err_body}")
+        return False
+    except Exception as e:
+        log.warning(f"Could not upsert subscriber to DB: {e}")
+        return False
+
+def mark_subscriber_inactive(chat_id: int):
+    """Mark a subscriber as inactive (they blocked the bot)"""
+    url = f"{SUPABASE_URL}/rest/v1/bot_subscribers?chat_id=eq.{chat_id}"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+    ctx = ssl.create_default_context()
+    try:
+        body = json.dumps({"is_active": False}).encode("utf-8")
+        req = urllib.request.Request(url, data=body, headers=headers, method="PATCH")
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+            resp.read()
+    except Exception as e:
+        log.warning(f"Could not mark subscriber {chat_id} inactive: {e}")
+
+def fetch_all_subscribers():
+    """
+    Get all active subscribers from Supabase.
+    Falls back to profiles table where telegram_id is set.
+    Returns list of chat_ids (integers).
+    """
+    chat_ids = set()
+
+    # Primary: bot_subscribers table
+    url = f"{SUPABASE_URL}/rest/v1/bot_subscribers?is_active=eq.true&select=chat_id"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    ctx = ssl.create_default_context()
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
+            rows = json.loads(resp.read().decode("utf-8"))
+            for row in rows:
+                try:
+                    chat_ids.add(int(row["chat_id"]))
+                except (KeyError, ValueError):
+                    pass
+        log.info(f"Loaded {len(chat_ids)} subscribers from bot_subscribers table")
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        log.warning(f"Could not load bot_subscribers (table may not exist): {e.code} — {err_body}")
+    except Exception as e:
+        log.warning(f"Could not load bot_subscribers: {e}")
+
+    # Secondary fallback: profiles with telegram_id set
+    try:
+        url2 = f"{SUPABASE_URL}/rest/v1/profiles?telegram_id=not.is.null&select=telegram_id"
+        req2 = urllib.request.Request(url2, headers=headers)
+        with urllib.request.urlopen(req2, context=ctx, timeout=15) as resp:
+            rows2 = json.loads(resp.read().decode("utf-8"))
+            for row in rows2:
+                tg_id = row.get("telegram_id")
+                if tg_id:
+                    try:
+                        chat_ids.add(int(tg_id))
+                    except (ValueError, TypeError):
+                        pass
+        log.info(f"Total after merging with profiles fallback: {len(chat_ids)} unique subscribers")
+    except Exception as e:
+        log.warning(f"Could not load profiles fallback: {e}")
+
+    return list(chat_ids)
 
 # ─── Supabase Data Fetchers ───
 
@@ -130,7 +261,7 @@ def format_tournament(t: dict) -> str:
         f"📅 <b>Дата:</b> {t.get('date', 'Не вказано')}\n"
         f"⚡ <b>Формат:</b> {type_emoji} ({t.get('system', 'Single Elimination')})\n"
         f"🗺️ <b>Карта:</b> <code>{t.get('map', 'Невідомо')}</code>\n"
-        f"💰 <b>Призовий фонд:</b> 🪙 {t.get('prize_pool', '0 🪙')}\n"
+        f"💰 <b>Призовий фонд:</b> {t.get('prize_pool', '0')}\n"
         f"👥 <b>Команди:</b> {t.get('participants_count', 0)} / {t.get('max_participants', 16)}\n"
         f"📊 <b>Статус:</b> {status_str}\n"
         f"{rules_text}"
@@ -178,19 +309,11 @@ def handle_update(update: dict):
     message = update["message"]
     chat_id = message["chat"]["id"]
     first_name = message["from"].get("first_name", "Гравець")
+    username = message["from"].get("username", "")
     text = message.get("text", "")
     
-    # Save/Subscribe user
-    chat_id_str = str(chat_id)
-    subscribers = load_json(SUBSCRIBERS_FILE, {})
-    if chat_id_str not in subscribers:
-        subscribers[chat_id_str] = {
-            "first_name": first_name,
-            "username": message["from"].get("username", ""),
-            "subscribed_at": time.time()
-        }
-        save_json(SUBSCRIBERS_FILE, subscribers)
-        log.info(f"New subscriber registered: {first_name} (chat_id={chat_id_str})")
+    # Auto-subscribe every user who writes to the bot
+    add_subscriber_to_db(chat_id, first_name, username)
     
     if text == "/start":
         send_welcome(chat_id, first_name)
@@ -235,7 +358,7 @@ def handle_update(update: dict):
             
         # Format list
         response_text = f"🐺 <b>АКТИВНІ ТУРНІРИ VOLKI 13:03:</b>\n\n"
-        for t in active_tourneys[:3]: # Max 3 latest for readable output
+        for t in active_tourneys[:3]:  # Max 3 latest for readable output
             response_text += format_tournament(t) + "\n\n"
         
         tg_request("sendMessage", {
@@ -273,7 +396,7 @@ def monitor_new_tournaments():
     """Background loop that polls Supabase and broadcasts new tournaments"""
     log.info("Background Supabase Tournament Monitor thread started successfully!")
     
-    # Load previously announced tournament IDs
+    # Load previously announced tournament IDs (from local file)
     announced_ids = set(load_json(ANNOUNCED_FILE, []))
     
     # Initial load: do not announce existing tournaments on startup
@@ -282,11 +405,11 @@ def monitor_new_tournaments():
         for t in initial_tourneys:
             announced_ids.add(t["id"])
         save_json(ANNOUNCED_FILE, list(announced_ids))
-        log.info(f"Initialized with {len(announced_ids)} existing tournament IDs.")
+        log.info(f"Initialized with {len(announced_ids)} existing tournament IDs (will not re-announce these).")
     
     while True:
         try:
-            # Poll tournaments
+            # Poll tournaments every 15 seconds
             tourneys = fetch_tournaments_from_db()
             if tourneys:
                 # Find which tournaments are NOT announced yet
@@ -315,36 +438,54 @@ def monitor_new_tournaments():
                         ]
                     }
                     
-                    # Send to all bot subscribers
-                    subscribers = load_json(SUBSCRIBERS_FILE, {})
+                    # ─── Send to all bot subscribers from Supabase ───
+                    all_chat_ids = fetch_all_subscribers()
                     sub_count = 0
-                    for chat_id_str in list(subscribers.keys()):
+                    blocked_count = 0
+                    
+                    log.info(f"Broadcasting to {len(all_chat_ids)} subscribers...")
+                    
+                    for chat_id in all_chat_ids:
                         try:
-                            tg_request("sendMessage", {
-                                "chat_id": int(chat_id_str),
+                            result = tg_request("sendMessage", {
+                                "chat_id": chat_id,
                                 "text": announcement,
                                 "parse_mode": "HTML",
                                 "reply_markup": inline_keyboard
                             })
-                            sub_count += 1
-                            time.sleep(0.05) # Prevent spamming limits
+                            if result and result.get("ok"):
+                                sub_count += 1
+                            else:
+                                # Failed — check if it's a "blocked by user" error
+                                err_desc = result.get("description", "") if result else ""
+                                if "blocked" in err_desc.lower() or "chat not found" in err_desc.lower() or "forbidden" in err_desc.lower():
+                                    log.warning(f"Subscriber {chat_id} has blocked the bot — marking inactive")
+                                    mark_subscriber_inactive(chat_id)
+                                    blocked_count += 1
+                                else:
+                                    log.warning(f"Failed to send to {chat_id}: {err_desc}")
+                            time.sleep(0.05)  # Prevent Telegram rate limiting
                         except Exception as ex:
-                            log.error(f"Could not send announcement to subscriber {chat_id_str}: {ex}")
+                            log.error(f"Could not send announcement to subscriber {chat_id}: {ex}")
                     
-                    log.info(f"Successfully broadcasted to {sub_count} subscribers.")
+                    log.info(f"Broadcast complete: ✅ {sub_count} sent, ❌ {blocked_count} blocked")
                     
-                    # Send to channel
+                    # ─── Also post to channel ───
                     channel_id = os.environ.get("TELEGRAM_CHANNEL", "@volki1303")
                     try:
-                        tg_request("sendMessage", {
+                        channel_result = tg_request("sendMessage", {
                             "chat_id": channel_id,
                             "text": announcement,
                             "parse_mode": "HTML",
                             "reply_markup": inline_keyboard
                         })
-                        log.info(f"Successfully posted tournament announcement to channel {channel_id}")
+                        if channel_result and channel_result.get("ok"):
+                            log.info(f"✅ Successfully posted tournament announcement to channel {channel_id}")
+                        else:
+                            err = channel_result.get("description", "unknown error") if channel_result else "no response"
+                            log.warning(f"Could not post to channel {channel_id}: {err}")
                     except Exception as ex:
-                        log.warning(f"Could not post announcement to channel {channel_id} (make sure the bot is an admin there): {ex}")
+                        log.warning(f"Could not post announcement to channel {channel_id}: {ex}")
                         
                     # Save ID to avoid duplicates
                     announced_ids.add(t["id"])
@@ -353,7 +494,7 @@ def monitor_new_tournaments():
         except Exception as e:
             log.error(f"Error in background monitor loop: {e}")
             
-        time.sleep(15) # Poll database every 15 seconds
+        time.sleep(15)  # Poll database every 15 seconds
 
 # ─── Polling Mode ───
 
@@ -361,6 +502,7 @@ def run_polling():
     """Long-polling mode for the bot"""
     log.info(f"Starting VOLKI bot in POLLING mode...")
     log.info(f"WebApp URL: {WEBAPP_URL}")
+    log.info(f"Supabase URL: {SUPABASE_URL}")
     
     # Verify bot token
     me = tg_request("getMe")
@@ -377,6 +519,8 @@ def run_polling():
     # Start the background sync monitor thread
     monitor_thread = threading.Thread(target=monitor_new_tournaments, daemon=True)
     monitor_thread.start()
+    
+    log.info("🐺 VOLKI bot is fully running! Listening for messages...")
     
     offset = 0
     while True:
@@ -399,7 +543,6 @@ def run_polling():
             break
         except Exception as e:
             log.error(f"Polling error: {e}")
-            import time
             time.sleep(5)
 
 
