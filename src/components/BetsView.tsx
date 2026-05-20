@@ -22,7 +22,7 @@ export const BetsView: React.FC = () => {
         fontFamily: 'Outfit, sans-serif',
         marginBottom: '16px'
       }}>
-        Мої предикти
+        Мої ставки (монетки)
       </h2>
 
       {/* Tabs */}
@@ -115,7 +115,7 @@ export const BetsView: React.FC = () => {
                 }}>
                   <div>
                     <span style={{ fontSize: '9px', color: '#51515E', textTransform: 'uppercase', display: 'block' }}>
-                      Сума предикту
+                      Сума ставки
                     </span>
                     <span style={{ fontSize: '12px', fontWeight: '700', color: 'white', fontFamily: 'Outfit, sans-serif' }}>
                       {pred.wager.toLocaleString('uk-UA')} 🪙
@@ -161,8 +161,8 @@ export const BetsView: React.FC = () => {
             <Landmark size={36} />
             <span style={{ fontSize: '12px' }}>
               {activeTab === 'ACTIVE' 
-                ? 'У вас немає активних предиктів. Поставте на LIVE матч!' 
-                : 'Історія предиктів порожня.'}
+                ? 'У вас немає активних ставок. Поставте на LIVE матч!' 
+                : 'Історія ставок порожня.'}
             </span>
           </div>
         )}

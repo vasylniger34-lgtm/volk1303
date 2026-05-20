@@ -570,7 +570,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
                   {/* Input wager */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#8F8F9B' }}>
-                      <span>Сума предикту</span>
+                      <span>Сума ставки (монетки)</span>
                       <span>Доступно: {user.balance.toLocaleString('uk-UA')} 🪙</span>
                     </div>
                     

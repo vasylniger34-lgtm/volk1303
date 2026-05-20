@@ -8,7 +8,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
-  const { user, addFunds } = useApp();
+  const { user, addFunds, showToast } = useApp();
 
   return (
     <header className="glass-panel" style={{
@@ -117,9 +117,9 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
             padding: '4px',
             position: 'relative'
           }}
-          onClick={() => onNavigate('admin')}
+          onClick={() => showToast('Немає нових сповіщень', 'info')}
         >
-          <Bell size={20} className={currentView === 'admin' ? 'nav-item-active' : ''} />
+          <Bell size={20} />
           <span style={{
             position: 'absolute',
             top: '2px',

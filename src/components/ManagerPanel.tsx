@@ -39,7 +39,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     tournaments, matches, teams,
     setMatchLive, setMatchScore, createTournament, 
     generateBracketForTournament, deleteTournament, updateTournament,
-    showToast, resetAllData
+    showToast, resetAllData, updateMatchOdds
   } = useApp();
 
   const useSupabase = isSupabaseConfigured();
@@ -84,6 +84,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [editScoreA, setEditScoreA] = useState(0);
   const [editScoreB, setEditScoreB] = useState(0);
+  const [editOddsA, setEditOddsA] = useState(1.85);
+  const [editOddsB, setEditOddsB] = useState(1.85);
   const [customLog, setCustomLog] = useState('');
 
   // Live Terminal Log System state
@@ -1111,9 +1113,29 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               
               {/* Tournaments list cover section */}
               <div>
-                <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '16px' }}>
-                  Активні Турнірні Сітки ({tournaments.length})
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', margin: 0 }}>
+                    Активні Турнірні Сітки ({tournaments.length})
+                  </h3>
+                  {tournaments.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (confirm('Ви впевнені, що хочете видалити ВСІ турніри? Це також видалить усі пов\'язані матчі, команди та ставки.')) {
+                          tournaments.forEach(t => deleteTournament(t.id));
+                          setTerminalLogs(prev => [...prev, [] Deleted all tournaments.]);
+                          showToast('Усі турніри видалено', 'info');
+                        }
+                      }}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)',
+                        borderRadius: '6px', padding: '4px 10px', fontSize: '11px', color: '#EF4444', fontWeight: '700',
+                        fontFamily: 'Outfit', cursor: 'pointer'
+                      }}
+                    >
+                      Видалити всі
+                    </button>
+                  )}
+                </div>
 
                 {tournaments.length === 0 ? (
                   <div className="esports-card" style={{ padding: '60px', textAlign: 'center', color: '#51515E' }}>
@@ -1468,6 +1490,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                             setSelectedMatchId(m.id);
                             setEditScoreA(m.scoreA);
                             setEditScoreB(m.scoreB);
+                            setEditOddsA(m.oddsA || 1.85);
+                            setEditOddsB(m.oddsB || 1.85);
                           }}
                           style={{
                             background: isSelected ? 'rgba(255, 92, 0, 0.05)' : 'rgba(255,255,255,0.01)',
@@ -1635,6 +1659,69 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           <Save size={14} /> Оновити рахунок на платформі
                         </button>
                       )}
+
+                      {/* Match Odds (Coefficients) Editor */}
+                      <div style={{
+                        background: '#040406',
+                        border: '1px solid rgba(255,255,255,0.03)',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}>
+                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>
+                          Коефіцієнти матчу (ставки на монетки)
+                        </span>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                          {/* Odds A */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '10px', color: '#8F8F9B' }}>Коеф. на {activeMatch.teamA?.name || 'Team A'}</label>
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              min="1.01"
+                              value={editOddsA}
+                              onChange={e => setEditOddsA(Math.max(1.01, parseFloat(e.target.value) || 0))}
+                              style={{
+                                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                              }}
+                            />
+                          </div>
+
+                          {/* Odds B */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '10px', color: '#8F8F9B' }}>Коеф. на {activeMatch.teamB?.name || 'Team B'}</label>
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              min="1.01"
+                              value={editOddsB}
+                              onChange={e => setEditOddsB(Math.max(1.01, parseFloat(e.target.value) || 0))}
+                              style={{
+                                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={() => {
+                            updateMatchOdds(activeMatch.id, editOddsA, editOddsB);
+                            setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Updated match odds: ${editOddsA} vs ${editOddsB}`]);
+                          }}
+                          style={{
+                            background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)',
+                            borderRadius: '10px', padding: '10px', fontSize: '11px', color: '#3B82F6', fontWeight: '750', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '4px'
+                          }}
+                        >
+                          <Save size={12} /> Зберегти коефіцієнти
+                        </button>
+                      </div>
 
                       {/* Live commentary logger simulation injection */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '20px' }}>

@@ -118,6 +118,7 @@ interface AppContextType {
   placePrediction: (prediction: Omit<Prediction, 'id' | 'status' | 'payout' | 'date'>) => boolean;
   setMatchLive: (matchId: string) => void;
   setMatchScore: (matchId: string, scoreA: number, scoreB: number, status: 'live' | 'finished', winnerId?: string | null) => void;
+  updateMatchOdds: (matchId: string, oddsA: number, oddsB: number) => void;
   resetAllData: () => Promise<void>;
   addFunds: (amount: number) => void;
   createTournament: (tourney: Omit<Tournament, 'id' | 'participantsCount' | 'status'>) => void;
@@ -775,7 +776,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     setPredictions(prev => [newPrediction, ...prev]);
-    showToast('Ставку прийнято! 🍀', 'success');
+    showToast('Ставку на монетки прийнято! 🍀', 'success');
     return true;
   };
 
@@ -826,7 +827,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
       return m;
+  };
+
+  const updateMatchOdds = (matchId: string, oddsA: number, oddsB: number) => {
+    setMatches(prev => prev.map(m => {
+      if (m.id === matchId) {
+        if (useSupabase) {
+          supabase.from('matches').update({
+            odds_a: oddsA,
+            odds_b: oddsB
+          }).eq('id', matchId).then();
+        }
+        return { ...m, oddsA, oddsB };
+      }
+      return m;
     }));
+    showToast('Коефіцієнти матчу оновлено!', 'success');
   };
 
   // ─── Resolve Bets ───
@@ -1067,6 +1083,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       placePrediction,
       setMatchLive,
       setMatchScore,
+      updateMatchOdds,
       resetAllData,
       addFunds,
       createTournament,
