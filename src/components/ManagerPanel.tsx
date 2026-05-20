@@ -257,7 +257,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
       if (useSupabase) {
         try {
-          // 1. Try standard email sign up (best-effort)
+          // 1. Try standard email sign up (best-effort, not required for admin panel access)
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email: regEmail,
             password: regPass,
@@ -281,7 +281,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             }
           } else if (signUpError) {
             // Supabase auth failed — rate limit, anonymous disabled, SMTP error, etc.
-            // This is NOT fatal — admin panel uses localStorage session
+            // This is NOT fatal — admin panel uses localStorage-based session
             console.warn('[VOLKI Admin] Supabase signUp unavailable (rate limit / anonymous disabled / SMTP):', signUpError.message);
           }
         } catch (signError: any) {
