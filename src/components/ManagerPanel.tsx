@@ -664,7 +664,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
     try {
       // Call our Vercel serverless API proxy (avoids CORS issues with Telegram)
-      const resp = await fetch('/api/broadcast', {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.');
+      const apiUrl = isLocal ? 'https://volk1303.vercel.app/api/broadcast' : '/api/broadcast';
+
+      const resp = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: broadcastMsg })

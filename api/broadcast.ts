@@ -1,11 +1,9 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
 const BOT_TOKEN = process.env.BOT_TOKEN || '8873845823:AAErjQiXP7InePLKku-MOhbqNPe-bMvt3LU';
 const SUPABASE_URL = 'https://nbjnmzrjlvjbejgeogce.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_wqRcNT9yKJNi16EIeqpwnQ_bfiaA_vv';
 const CHANNEL_ID = process.env.TELEGRAM_CHANNEL || '@volki1303';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
