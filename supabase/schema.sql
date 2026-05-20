@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
   map TEXT NOT NULL,
   system TEXT DEFAULT 'Single Elimination' NOT NULL,
   rules TEXT[] DEFAULT '{}' NOT NULL,
+  image_url TEXT,
   created_by UUID REFERENCES profiles(id),
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );

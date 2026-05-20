@@ -10,6 +10,7 @@ import { MatchDetailView } from './components/MatchDetailView';
 import { BetsView } from './components/BetsView';
 import { ProfileView } from './components/ProfileView';
 import { AdminPanel } from './components/AdminPanel';
+import { ManagerPanel } from './components/ManagerPanel';
 import { AuthModal } from './components/AuthModal';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 
@@ -82,7 +83,7 @@ const AppContent: React.FC = () => {
   }
 
   // ─── Auth Gate ───
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !window.location.search.includes('manager=true') && !window.location.pathname.startsWith('/admin')) {
     return (
       <AuthModal 
         onLogin={authLogin}
@@ -140,9 +141,9 @@ const AppContent: React.FC = () => {
             </p>
             <HomeView 
               onNavigate={navigateTo}
-              onSelectTournament={(id) => setSelectedTournamentId(id)}
-              onSelectMatch={(id) => setSelectedMatchId(id)}
-              onOpenRegister={(id) => setRegisteringTournamentId(id)}
+              onSelectTournament={setSelectedTournamentId}
+              onSelectMatch={setSelectedMatchId}
+              onOpenRegister={setRegisteringTournamentId}
             />
           </div>
         );
@@ -157,7 +158,27 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const isManagerSite = window.location.pathname.startsWith('/admin') || window.location.search.includes('manager=true');
   const isAdminSite = window.location.search.includes('admin=true') || view === 'admin';
+
+  if (isManagerSite) {
+    return (
+      <div className="admin-site-container">
+        <ManagerPanel onExitAdmin={() => {
+          window.history.replaceState({}, document.title, '/');
+          navigateTo('home');
+        }} />
+
+        {/* Global Toast Alerts */}
+        <div className={`toast-msg ${toast.show ? 'show' : ''}`} style={{
+          borderColor: toast.type === 'success' ? '#10B981' : toast.type === 'error' ? '#EF4444' : '#FF5C00'
+        }}>
+          <ShieldCheck size={18} color={toast.type === 'success' ? '#10B981' : toast.type === 'error' ? '#EF4444' : '#FF5C00'} />
+          <span style={{ fontSize: '12px' }}>{toast.message}</span>
+        </div>
+      </div>
+    );
+  }
 
   if (isAdminSite) {
     return (

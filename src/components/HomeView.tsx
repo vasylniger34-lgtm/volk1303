@@ -29,11 +29,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
   return (
     <div className="scroll-container" style={{ padding: '16px 20px' }}>
       
-      {/* Featured Tournament Hero Banner */}
       <div 
         className="orange-glow"
         style={{
-          background: 'linear-gradient(180deg, rgba(10, 10, 14, 0.25) 0%, rgba(10, 10, 14, 0.9) 100%), url("/tactical_soldier.png") center/cover no-repeat',
+          background: `linear-gradient(180deg, rgba(10, 10, 14, 0.25) 0%, rgba(10, 10, 14, 0.9) 100%), url("${featuredTourney?.imageUrl || '/tactical_soldier.png'}") center/cover no-repeat`,
           border: '1px solid rgba(255, 92, 0, 0.15)',
           borderRadius: '24px',
           padding: '28px 24px',

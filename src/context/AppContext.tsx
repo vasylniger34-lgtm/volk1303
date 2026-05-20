@@ -35,6 +35,7 @@ export interface Tournament {
   map: string;
   system: string;
   rules: string[];
+  imageUrl?: string;
 }
 
 export interface Match {
@@ -123,29 +124,23 @@ interface AppContextType {
   resolveBetsForMatch: (matchId: string, winnerId: string, finalScoreA: number, finalScoreB: number) => void;
   generateBracketForTournament: (tournamentId: string) => void;
   updateProfile: (data: { username?: string; avatarGradient?: number }) => void;
+  deleteTournament: (tournamentId: string) => void;
+  updateTournament: (tournamentId: string, data: Partial<Tournament>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// ─── Default Mock Data ───
+function generateUUID() {
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
-const DEFAULT_TEAMS: Omit<Team, 'id'>[] = [
-  { name: 'Team 67', tag: '67', captain: '@volki_player', players: [{ username: '@volki_player' }, { username: '@volki_partner' }], logoText: '67', logoBg: '#4C1D95' },
-  { name: 'Team 52', tag: '52', captain: '@player_52', players: [{ username: '@player_52' }, { username: '@partner_52' }], logoText: '52', logoBg: '#1E293B' },
-  { name: 'Wild Wolves', tag: 'WW', captain: '@wolf_cap', players: [{ username: '@wolf_cap' }, { username: '@wolf_two' }], logoText: 'WW', logoBg: '#064E3B' },
-  { name: 'Exort', tag: 'EX', captain: '@exort_cap', players: [{ username: '@exort_cap' }, { username: '@exort_two' }], logoText: 'EX', logoBg: '#7F1D1D' },
-  { name: 'Next Gen', tag: 'NE', captain: '@next_cap', players: [{ username: '@next_cap' }, { username: '@next_two' }], logoText: 'NE', logoBg: '#1E3A8A' },
-  { name: 'Good Game', tag: 'GG', captain: '@gg_cap', players: [{ username: '@gg_cap' }, { username: '@gg_two' }], logoText: 'GG', logoBg: '#701A75' },
-  { name: 'Thirteen', tag: '13', captain: '@thirteen_cap', players: [{ username: '@thirteen_cap' }, { username: '@thirteen_two' }], logoText: '13', logoBg: '#78350F' },
-  { name: 'Kill Machine', tag: 'KM', captain: '@km_cap', players: [{ username: '@km_cap' }, { username: '@km_two' }], logoText: 'KM', logoBg: '#312E81' },
-  { name: 'King Rosters', tag: 'KR', captain: '@kr_cap', players: [{ username: '@kr_cap' }, { username: '@kr_two' }], logoText: 'KR', logoBg: '#0F172A' },
-  { name: 'Anarchy', tag: 'AN', captain: '@anarchy_cap', players: [{ username: '@anarchy_cap' }, { username: '@anarchy_two' }], logoText: 'AN', logoBg: '#854D0E' },
-  { name: 'Flash', tag: 'FL', captain: '@flash_cap', players: [{ username: '@flash_cap' }, { username: '@flash_two' }], logoText: 'FL', logoBg: '#14532D' },
-  { name: 'Zero Q', tag: 'ZQ', captain: '@zq_cap', players: [{ username: '@zq_cap' }, { username: '@zq_two' }], logoText: 'ZQ', logoBg: '#581C87' },
-  { name: 'Nexus', tag: 'NX', captain: '@nexus_cap', players: [{ username: '@nexus_cap' }, { username: '@nexus_two' }], logoText: 'NX', logoBg: '#164E63' },
-  { name: 'Qwert', tag: 'QT', captain: '@qt_cap', players: [{ username: '@qt_cap' }, { username: '@qt_two' }], logoText: 'QT', logoBg: '#581C87' },
-  { name: 'Rising Stars', tag: 'RS', captain: '@rs_cap', players: [{ username: '@rs_cap' }, { username: '@rs_two' }], logoText: 'RS', logoBg: '#111827' }
-];
+// ─── Default Data ───
 
 const DEFAULT_USER: UserProfile = {
   id: 'local_user',
@@ -212,88 +207,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isAdmin = user.role === 'admin';
 
-  // 2. Tournaments
+  // 2. Tournaments — starts empty, created via admin
   const [tournaments, setTournaments] = useState<Tournament[]>(() => {
     const saved = localStorage.getItem('volk_tournaments');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: '2x2_aim_cup', name: '2X2 AIM CUP', type: '2X2', date: 'Сьогодні, 20:00',
-        prizePool: '20 000 🪙', prizePlaces: { first: '10 000 🪙', second: '6 000 🪙', third: '4 000 🪙' },
-        participantsCount: 15, maxParticipants: 16, status: 'active', map: 'de_dust2',
-        system: 'Single Elimination', rules: ['Матчі проходять у форматі 2х2.', 'Single Elimination.', 'Використання сторонніх програм заборонено.']
-      },
-      {
-        id: '2x2_headshot', name: '2X2 HEADSHOT', type: '2X2', date: '30.05, 18:00',
-        prizePool: '15 000 🪙', prizePlaces: { first: '8 000 🪙', second: '4 500 🪙', third: '2 500 🪙' },
-        participantsCount: 8, maxParticipants: 16, status: 'upcoming', map: 'de_inferno',
-        system: 'Single Elimination', rules: ['Лише попадання в голову.', 'Формат 2х2, BO1.']
-      },
-      {
-        id: '2x2_fast_cup', name: '2X2 FAST CUP', type: '2X2', date: '31.05, 19:00',
-        prizePool: '10 000 🪙', prizePlaces: { first: '5 000 🪙', second: '3 000 🪙', third: '2 000 🪙' },
-        participantsCount: 4, maxParticipants: 16, status: 'upcoming', map: 'de_mirage',
-        system: 'Single Elimination', rules: ['Швидкий турнір за 2 години.']
-      },
-      {
-        id: '2x2_warmup', name: '2X2 WARMUP', type: '2X2', date: '01.06, 17:00',
-        prizePool: '10 000 🪙', prizePlaces: { first: '5 000 🪙', second: '3 000 🪙', third: '2 000 🪙' },
-        participantsCount: 0, maxParticipants: 16, status: 'upcoming', map: 'de_nuke',
-        system: 'Single Elimination', rules: ['Розминочний турнір.']
-      },
-      {
-        id: '4x4_night_battle', name: '4X4 NIGHT BATTLE', type: '4X4', date: 'Завтра, 19:00',
-        prizePool: '30 000 🪙', prizePlaces: { first: '15 000 🪙', second: '10 000 🪙', third: '5 000 🪙' },
-        participantsCount: 12, maxParticipants: 16, status: 'upcoming', map: 'de_ancient',
-        system: 'Single Elimination', rules: ['Нічний турнір у форматі 4х4.']
-      }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
-  // 3. Teams
+  // 3. Teams — starts empty, registered by users
   const [teams, setTeams] = useState<Record<string, Team[]>>(() => {
     const saved = localStorage.getItem('volk_teams');
-    if (saved) return JSON.parse(saved);
-    const aimCupTeams = DEFAULT_TEAMS.map((t, idx) => ({ ...t, id: `team_${idx + 1}` }));
-    return {
-      '2x2_aim_cup': aimCupTeams,
-      '2x2_headshot': aimCupTeams.slice(0, 8),
-      '2x2_fast_cup': aimCupTeams.slice(0, 4),
-      '2x2_warmup': [],
-      '4x4_night_battle': aimCupTeams.slice(0, 12)
-    };
+    return saved ? JSON.parse(saved) : {};
   });
 
-  // 4. Matches
+  // 4. Matches — starts empty, generated via admin bracket
   const [matches, setMatches] = useState<Match[]>(() => {
     const saved = localStorage.getItem('volk_matches');
-    if (saved) return JSON.parse(saved);
-    const list: Team[] = DEFAULT_TEAMS.map((t, idx) => ({ ...t, id: `team_${idx + 1}` }));
-    return [
-      {
-        id: 'match_aim_cup_semi_1', tournamentId: '2x2_aim_cup', tournamentName: '2X2 AIM CUP',
-        roundName: 'Semifinal', teamA: list[0], teamB: list[1], scoreA: 12, scoreB: 7,
-        status: 'live', winnerId: null, oddsA: 1.55, oddsB: 2.35, map: 'de_dust2', time: '12:45',
-        currentMap: 1, mapScores: [], liveLogs: ['Match started', 'Round 19: Team 67 wins (12:7)']
-      },
-      {
-        id: 'match_aim_cup_semi_2', tournamentId: '2x2_aim_cup', tournamentName: '2X2 AIM CUP',
-        roundName: 'Semifinal', teamA: list[2], teamB: list[3], scoreA: 0, scoreB: 0,
-        status: 'scheduled', winnerId: null, oddsA: 1.85, oddsB: 1.95, map: 'de_dust2', time: '14:30',
-        currentMap: 1, mapScores: [], liveLogs: []
-      },
-      {
-        id: 'match_aim_cup_quarter_1', tournamentId: '2x2_aim_cup', tournamentName: '2X2 AIM CUP',
-        roundName: 'Quarterfinal', teamA: list[0], teamB: list[4], scoreA: 16, scoreB: 9,
-        status: 'finished', winnerId: 'team_1', oddsA: 1.45, oddsB: 2.65, map: 'de_dust2', time: 'Вчора',
-        currentMap: 1, mapScores: [{ scoreA: 16, scoreB: 9 }], liveLogs: ['Team 67 advanced']
-      },
-      {
-        id: 'match_aim_cup_quarter_2', tournamentId: '2x2_aim_cup', tournamentName: '2X2 AIM CUP',
-        roundName: 'Quarterfinal', teamA: list[1], teamB: list[5], scoreA: 16, scoreB: 12,
-        status: 'finished', winnerId: 'team_2', oddsA: 1.70, oddsB: 2.10, map: 'de_dust2', time: 'Вчора',
-        currentMap: 1, mapScores: [{ scoreA: 16, scoreB: 12 }], liveLogs: ['Team 52 advanced']
-      }
-    ] as Match[];
+    return saved ? JSON.parse(saved) : [];
   });
 
   // 5. Predictions
@@ -397,7 +326,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           status: t.status as 'upcoming' | 'active' | 'completed',
           map: t.map,
           system: t.system,
-          rules: t.rules || []
+          rules: t.rules || [],
+          imageUrl: t.image_url || ''
         })));
       }
 
@@ -938,7 +868,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ─── Create Tournament ───
 
   const createTournament = (tourneyData: Omit<Tournament, 'id' | 'participantsCount' | 'status'>) => {
-    const newId = `tour_${Date.now()}`;
+    const newId = generateUUID();
     const newTourney: Tournament = {
       ...tourneyData,
       id: newId,
@@ -948,6 +878,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (useSupabase) {
       supabase.from('tournaments').insert({
+        id: newId,
         name: newTourney.name,
         type: newTourney.type,
         date: newTourney.date,
@@ -961,8 +892,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         map: newTourney.map,
         system: newTourney.system,
         rules: newTourney.rules,
+        image_url: newTourney.imageUrl || null,
         created_by: user.id
-      }).then();
+      }).then(({ error }) => {
+        if (error) {
+          console.error('[VOLKI] Error inserting tournament to Supabase:', error);
+        }
+      });
     }
 
     setTournaments(prev => [newTourney, ...prev]);
@@ -989,6 +925,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.avatarGradient !== undefined) {
       showToast('Аватар оновлено!', 'success');
     }
+  };
+
+  // ─── Tournament Management ───
+
+  const deleteTournament = (tournamentId: string) => {
+    if (useSupabase) {
+      const matchIds = matches.filter(m => m.tournamentId === tournamentId).map(m => m.id);
+      if (matchIds.length > 0) {
+        supabase.from('predictions').delete().in('match_id', matchIds).then();
+      }
+      supabase.from('matches').delete().eq('tournament_id', tournamentId).then();
+      supabase.from('teams').delete().eq('tournament_id', tournamentId).then();
+      supabase.from('tournaments').delete().eq('id', tournamentId).then(({ error }) => {
+        if (error) {
+          console.error('[VOLKI] Error deleting tournament in Supabase:', error);
+        }
+      });
+    }
+
+    setTournaments(prev => prev.filter(t => t.id !== tournamentId));
+    setTeams(prev => {
+      const copy = { ...prev };
+      delete copy[tournamentId];
+      return copy;
+    });
+    setMatches(prev => prev.filter(m => m.tournamentId !== tournamentId));
+    showToast('Турнір видалено', 'info');
+  };
+
+  const updateTournament = (tournamentId: string, data: Partial<Tournament>) => {
+    if (useSupabase) {
+      const dbUpdate: any = {};
+      if (data.name !== undefined) dbUpdate.name = data.name;
+      if (data.type !== undefined) dbUpdate.type = data.type;
+      if (data.date !== undefined) dbUpdate.date = data.date;
+      if (data.prizePool !== undefined) dbUpdate.prize_pool = data.prizePool;
+      if (data.prizePlaces !== undefined) {
+        if (data.prizePlaces.first !== undefined) dbUpdate.prize_first = data.prizePlaces.first;
+        if (data.prizePlaces.second !== undefined) dbUpdate.prize_second = data.prizePlaces.second;
+        if (data.prizePlaces.third !== undefined) dbUpdate.prize_third = data.prizePlaces.third;
+      }
+      if (data.maxParticipants !== undefined) dbUpdate.max_participants = data.maxParticipants;
+      if (data.status !== undefined) dbUpdate.status = data.status;
+      if (data.map !== undefined) dbUpdate.map = data.map;
+      if (data.system !== undefined) dbUpdate.system = data.system;
+      if (data.rules !== undefined) dbUpdate.rules = data.rules;
+      if (data.imageUrl !== undefined) dbUpdate.image_url = data.imageUrl;
+
+      supabase.from('tournaments').update(dbUpdate).eq('id', tournamentId).then(({ error }) => {
+        if (error) {
+          console.error('[VOLKI] Error updating tournament in Supabase:', error);
+        }
+      });
+    }
+
+    setTournaments(prev => prev.map(t => 
+      t.id === tournamentId ? { ...t, ...data } : t
+    ));
+    showToast('Турнір оновлено', 'success');
   };
 
   // ─── Reset ───
@@ -1027,7 +1022,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createTournament,
       resolveBetsForMatch,
       generateBracketForTournament,
-      updateProfile
+      updateProfile,
+      deleteTournament,
+      updateTournament
     }}>
       {children}
     </AppContext.Provider>

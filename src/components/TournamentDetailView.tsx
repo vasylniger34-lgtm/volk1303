@@ -33,10 +33,16 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
       
       {/* Cover / Hero header block */}
       <div style={{
-        background: 'linear-gradient(180deg, rgba(255, 92, 0, 0.04) 0%, rgba(10, 10, 14, 0) 100%)',
+        background: tourney.imageUrl 
+          ? `linear-gradient(180deg, rgba(10, 10, 14, 0.25) 0%, rgba(10, 10, 14, 0.95) 100%), url("${tourney.imageUrl}") center/cover no-repeat`
+          : 'linear-gradient(180deg, rgba(255, 92, 0, 0.04) 0%, rgba(10, 10, 14, 0) 100%)',
         position: 'relative',
         padding: '20px 20px 24px 20px',
-        borderBottom: '1px solid rgba(255,255,255,0.01)'
+        borderBottom: '1px solid rgba(255,255,255,0.01)',
+        minHeight: tourney.imageUrl ? '200px' : 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between'
       }}>
         {/* Navigation row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>

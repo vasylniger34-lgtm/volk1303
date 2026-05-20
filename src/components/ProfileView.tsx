@@ -243,45 +243,67 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
             <Shield size={16} color="#FF5C00" />
             <span style={{ fontSize: '13px', fontWeight: '800', color: '#FF5C00', textTransform: 'uppercase', letterSpacing: '0.5px', fontFamily: 'Outfit, sans-serif' }}>
-              Адмін-панель
+              Панелі Адміністрування
             </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button
+                onClick={() => onNavigate('admin')}
+                style={{
+                  backgroundColor: '#FF5C00',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  color: 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  textAlign: 'center'
+                }}
+              >
+                Адмінка (вбудована)
+              </button>
+              <button
+                onClick={() => window.open(window.location.origin + window.location.pathname + '?admin=true', '_blank')}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  color: 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  textAlign: 'center'
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#FF5C00'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'}
+              >
+                Адмінка ↗
+              </button>
+            </div>
+
             <button
-              onClick={() => onNavigate('admin')}
+              onClick={() => window.open(window.location.origin + '/admin', '_blank')}
               style={{
-                backgroundColor: '#FF5C00',
+                width: '100%',
+                background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
                 border: 'none',
                 borderRadius: '8px',
                 padding: '10px',
                 fontSize: '11px',
-                fontWeight: '700',
+                fontWeight: '800',
                 color: 'white',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
-                textAlign: 'center'
+                textAlign: 'center',
+                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)'
               }}
             >
-              У цьому вікні
-            </button>
-            <button
-              onClick={() => window.open(window.location.origin + window.location.pathname + '?admin=true', '_blank')}
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.05)',
-                borderRadius: '8px',
-                padding: '10px',
-                fontSize: '11px',
-                fontWeight: '700',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                textAlign: 'center'
-              }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#FF5C00'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'}
-            >
-              Як окремий сайт ↗
+              💼 ПАНЕЛЬ КЕРУВАННЯ (MANAGER) ↗
             </button>
           </div>
         </div>
