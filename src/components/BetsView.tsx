@@ -75,7 +75,7 @@ export const BetsView: React.FC = () => {
 
                 {/* Teams VS row */}
                 <h4 style={{ fontSize: '13px', fontWeight: '800', color: 'white', marginBottom: '8px' }}>
-                  {pred.teamA} VS {pred.teamB}
+                  {pred.predictionType === 'tournament_winner' ? '🏆 ПЕРЕМОЖЕЦЬ ТУРНІРУ' : `${pred.teamA} VS ${pred.teamB}`}
                 </h4>
 
                 {/* Bet selection details */}
@@ -93,7 +93,11 @@ export const BetsView: React.FC = () => {
                   <div>
                     <span style={{ color: '#8F8F9B', display: 'block', fontSize: '8px', textTransform: 'uppercase' }}>Прогноз</span>
                     <span style={{ fontWeight: '700', color: 'white' }}>
-                      {pred.predictionType === 'winner' ? `Перемога: ${pred.predictedValue}` : `Тотал: ${pred.predictedValue === 'over' ? 'Більше' : 'Менше'} 26.5`}
+                      {pred.predictionType === 'tournament_winner' 
+                        ? `Переможець: ${pred.predictedValue}`
+                        : pred.predictionType === 'winner' 
+                          ? `Перемога: ${pred.predictedValue}` 
+                          : `Тотал: ${pred.predictedValue === 'over' ? 'Більше' : 'Менше'} 26.5`}
                     </span>
                   </div>
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { ChevronLeft, Star, Swords, Trophy, FileText, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, Star, Swords, Trophy, FileText, CheckCircle2, Coins, Lock } from 'lucide-react';
 
 interface TournamentDetailViewProps {
   tournamentId: string;
@@ -15,15 +15,34 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   onSelectMatch,
   onOpenRegister
 }) => {
-  const { tournaments, teams, matches, user } = useApp();
+  const { tournaments, teams, matches, user, predictions, placePrediction } = useApp();
   const tourney = tournaments.find(t => t.id === tournamentId);
-  const [activeTab, setActiveTab] = useState<'INFO' | 'BRACKET' | 'PARTICIPANTS' | 'RULES'>('INFO');
+  const [activeTab, setActiveTab] = useState<'INFO' | 'BRACKET' | 'PARTICIPANTS' | 'BETS' | 'RULES'>('INFO');
   const [isFavorited, setIsFavorited] = useState(false);
+  const [selectedTeamForBet, setSelectedTeamForBet] = useState<any | null>(null);
+  const [selectedTeamOdds, setSelectedTeamOdds] = useState<number>(0);
+  const [wagerAmount, setWagerAmount] = useState<number>(100);
 
   if (!tourney) return <div style={{ padding: '20px', color: 'white' }}>Турнір не знайдено</div>;
 
   const tourneyTeams = teams[tournamentId] || [];
   const tourneyMatches = matches.filter(m => m.tournamentId === tournamentId);
+
+  const myOutrightBets = predictions.filter(
+    p => p.predictionType === 'tournament_winner' && 
+         (p.tournamentName === tourney.name || p.tournamentId === tournamentId)
+  );
+
+  const getTeamOdds = (teamId: string) => {
+    let hash = 0;
+    for (let i = 0; i < teamId.length; i++) {
+      hash = teamId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const minOdds = 2.0;
+    const maxOdds = 5.5;
+    const normalized = Math.abs(hash % 100) / 100;
+    return parseFloat((minOdds + normalized * (maxOdds - minOdds)).toFixed(2));
+  };
 
   // Check if user is registered by inspecting captain names in the team list
   const userHandle = user?.username ? (user.username.startsWith('@') ? user.username : `@${user.username}`) : '@volki_player';
@@ -167,6 +186,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
           { id: 'INFO', label: 'Інформація' },
           { id: 'BRACKET', label: 'Сітка' },
           { id: 'PARTICIPANTS', label: 'Учасники' },
+          { id: 'BETS', label: 'Ставки 🏆' },
           { id: 'RULES', label: 'Правила' }
         ].map((tab) => (
           <button
@@ -630,6 +650,358 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* TAB CONTENT: Bets */}
+      {activeTab === 'BETS' && (
+        <div style={{ padding: '0 20px 24px 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* Header section with User Balance */}
+          <div className="esports-card" style={{
+            padding: '16px',
+            background: 'linear-gradient(135deg, rgba(255, 92, 0, 0.05) 0%, rgba(10, 10, 14, 0.95) 100%)',
+            border: '1px solid rgba(255, 92, 0, 0.15)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Coins size={18} color="var(--primary-orange)" />
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Ваш баланс:</span>
+            </div>
+            <span style={{ fontSize: '16px', fontWeight: '900', color: 'white', fontFamily: 'Outfit, sans-serif' }}>
+              {(user?.balance || 0).toLocaleString('uk-UA')} 🪙
+            </span>
+          </div>
+
+          {/* Active bets by the user on this tournament */}
+          {myOutrightBets.length > 0 && (
+            <div>
+              <h4 style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', fontFamily: 'Outfit, sans-serif', fontWeight: '800', marginBottom: '10px' }}>
+                МОЇ СТАВКИ НА ПЕРЕМОЖЦЯ
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {myOutrightBets.map(b => (
+                  <div key={b.id} className="esports-card" style={{
+                    padding: '12px 14px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: b.status === 'won' 
+                      ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, #0e0e13 100%)' 
+                      : b.status === 'lost' 
+                        ? '#0e0e13'
+                        : 'linear-gradient(135deg, rgba(255, 92, 0, 0.03) 0%, #0e0e13 100%)',
+                    border: b.status === 'won' 
+                      ? '1px solid rgba(16, 185, 129, 0.2)' 
+                      : b.status === 'lost' 
+                        ? '1px solid rgba(255, 255, 255, 0.02)' 
+                        : '1px solid rgba(255, 92, 0, 0.15)'
+                  }}>
+                    <div>
+                      <span style={{ fontSize: '10px', color: '#8F8F9B', display: 'block' }}>
+                        Переможець: <strong style={{ color: 'white' }}>{b.predictedValue}</strong>
+                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: 'white', fontFamily: 'Outfit, sans-serif' }}>
+                        {b.wager.toLocaleString('uk-UA')} 🪙 × {b.odds}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      {b.status === 'pending' && (
+                        <span style={{ fontSize: '10px', color: '#FF5C00', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '750' }}>
+                          <CheckCircle2 size={10} color="#FF5C00" /> У грі
+                        </span>
+                      )}
+                      {b.status === 'won' && (
+                        <span style={{ fontSize: '10px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800' }}>
+                          ВИГРАШ +{b.payout.toLocaleString('uk-UA')} 🪙
+                        </span>
+                      )}
+                      {b.status === 'lost' && (
+                        <span style={{ fontSize: '10px', color: '#EF4444', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '750' }}>
+                          Програш
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* List of Teams and Outright Winner Betting Odds */}
+          <div>
+            <h4 style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', fontFamily: 'Outfit, sans-serif', fontWeight: '800', marginBottom: '12px' }}>
+              КОЕФІЦІЄНТИ НА ПЕРЕМОГУ В ТУРНІРІ
+            </h4>
+
+            {tourney.status === 'completed' || (tourneyMatches.find(m => m.roundName === 'Final')?.status === 'finished') ? (
+              <div className="esports-card" style={{
+                padding: '16px',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                background: 'rgba(255,255,255,0.01)',
+                border: '1px solid rgba(255,255,255,0.03)'
+              }}>
+                <Lock size={14} /> Прийом ставок на переможця турніру закрито
+              </div>
+            ) : tourneyTeams.length === 0 ? (
+              <div className="esports-card" style={{
+                padding: '30px 20px',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                fontSize: '12px'
+              }}>
+                Учасники ще не зареєструвались. Коефіцієнти з'являться після реєстрації команд.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {tourneyTeams.map((team) => {
+                  const odds = getTeamOdds(team.id);
+                  const hasBetOnThisTeam = myOutrightBets.some(b => b.predictedValue === team.name);
+
+                  return (
+                    <div 
+                      key={team.id}
+                      className="esports-card"
+                      style={{
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: 'var(--card-bg)',
+                        border: hasBetOnThisTeam ? '1px solid rgba(255,92,0,0.25)' : '1px solid var(--card-border)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: team.logoBg,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          fontWeight: '900',
+                          color: 'white',
+                          fontFamily: 'Outfit, sans-serif'
+                        }}>
+                          {team.logoText}
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: 'white', fontFamily: 'Outfit, sans-serif', display: 'block' }}>
+                            {team.name}
+                          </span>
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                            Капітан: {team.captain}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setSelectedTeamForBet(team);
+                          setSelectedTeamOdds(odds);
+                          setWagerAmount(100);
+                        }}
+                        style={{
+                          background: hasBetOnThisTeam ? 'rgba(255,92,0,0.1)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${hasBetOnThisTeam ? 'var(--primary-orange)' : 'rgba(255,255,255,0.06)'}`,
+                          borderRadius: '10px',
+                          color: 'white',
+                          padding: '8px 16px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {hasBetOnThisTeam && <CheckCircle2 size={12} color="var(--primary-orange)" />}
+                        <span style={{ fontSize: '14px', fontWeight: '900', color: 'var(--primary-orange)', fontFamily: 'Outfit, sans-serif' }}>
+                          ×{odds}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING BET BOTTOM SHEET / MODAL */}
+      {selectedTeamForBet && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setSelectedTeamForBet(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.7)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+              zIndex: 100,
+            }}
+          />
+
+          {/* Sheet */}
+          <div style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: '#0D0D14',
+            border: '1px solid rgba(255,92,0,0.2)',
+            borderRadius: '28px 28px 0 0',
+            padding: '24px 20px 40px',
+            zIndex: 101,
+            animation: 'slideUp 0.25s ease',
+          }}>
+            {/* Handle bar */}
+            <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.1)', margin: '0 auto 20px' }} />
+
+            {/* Bet summary header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', position: 'relative' }}>
+              <div>
+                <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ставка на переможця</span>
+                <p style={{ fontSize: '18px', fontWeight: '900', color: 'white', fontFamily: 'Outfit, sans-serif', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: selectedTeamForBet.logoBg }} />
+                  {selectedTeamForBet.name}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right', paddingRight: '30px' }}>
+                <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase' }}>Коефіцієнт</span>
+                <p style={{ fontSize: '24px', fontWeight: '950', color: '#FF5C00', fontFamily: 'Outfit, sans-serif', marginTop: '2px' }}>
+                  ×{selectedTeamOdds}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedTeamForBet(null)} 
+                style={{ 
+                  position: 'absolute', 
+                  top: '0', 
+                  right: '0', 
+                  background: 'none', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  color: '#8F8F9B',
+                  padding: '4px'
+                }}
+              >
+                <span style={{ fontSize: '20px', fontWeight: '300' }}>✕</span>
+              </button>
+            </div>
+
+            {/* Balance indicator */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#8F8F9B', marginBottom: '8px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Coins size={11} /> Ваш баланс</span>
+              <span style={{ fontWeight: '700', color: 'white' }}>{(user?.balance || 0).toLocaleString('uk-UA')} 🪙</span>
+            </div>
+
+            {/* Wager input */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <input
+                type="number"
+                className="form-input"
+                value={wagerAmount}
+                min={50}
+                max={user?.balance || 0}
+                onChange={e => setWagerAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                style={{ 
+                  flex: 1, 
+                  padding: '12px 14px', 
+                  fontSize: '16px', 
+                  fontWeight: '800', 
+                  fontFamily: 'Outfit, sans-serif',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '10px',
+                  color: 'white'
+                }}
+              />
+              {[100, 500, 1000].map(amt => (
+                <button 
+                  key={amt} 
+                  onClick={() => setWagerAmount(Math.min(user?.balance || 0, amt))}
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', color: 'white', fontSize: '11px', fontWeight: '700', padding: '0 12px', cursor: 'pointer' }}
+                >
+                  {amt >= 1000 ? `${amt/1000}K` : amt}
+                </button>
+              ))}
+              <button 
+                onClick={() => setWagerAmount(user?.balance || 0)}
+                style={{ background: 'rgba(255,92,0,0.08)', border: '1px solid rgba(255,92,0,0.2)', borderRadius: '10px', color: '#FF5C00', fontSize: '11px', fontWeight: '800', padding: '0 12px', cursor: 'pointer' }}
+              >
+                MAX
+              </button>
+            </div>
+
+            {/* Potential payout */}
+            <div style={{
+              background: 'rgba(16, 185, 129, 0.05)', 
+              border: '1px solid rgba(16, 185, 129, 0.12)',
+              borderRadius: '12px', 
+              padding: '12px 16px',
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '16px',
+            }}>
+              <span style={{ fontSize: '12px', color: '#8F8F9B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 size={13} color="#10B981" /> Можливий виграш
+              </span>
+              <span style={{ fontSize: '18px', fontWeight: '900', color: '#10B981', fontFamily: 'Outfit, sans-serif' }}>
+                {wagerAmount > 0 ? Math.round(wagerAmount * selectedTeamOdds).toLocaleString('uk-UA') : '–'} 🪙
+              </span>
+            </div>
+
+            {/* Confirm button */}
+            <button
+              className="btn-primary"
+              onClick={() => {
+                if (wagerAmount <= 0) return;
+                if (wagerAmount > (user?.balance || 0)) return;
+
+                const ok = placePrediction({
+                  matchId: null,
+                  tournamentId: tourney.id,
+                  tournamentName: tourney.name,
+                  teamA: selectedTeamForBet.name,
+                  teamB: 'Winner Prediction',
+                  predictionType: 'tournament_winner',
+                  predictedValue: selectedTeamForBet.name,
+                  odds: selectedTeamOdds,
+                  wager: wagerAmount,
+                });
+
+                if (ok) {
+                  setSelectedTeamForBet(null);
+                }
+              }}
+              disabled={wagerAmount < 50 || wagerAmount > (user?.balance || 0)}
+              style={{ width: '100%', padding: '16px', fontSize: '14px', fontWeight: '900', letterSpacing: '1px' }}
+            >
+              ПІДТВЕРДИТИ СТАВКУ
+            </button>
+          </div>
+        </>
+      )}
+
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
+        }
+      `}</style>
 
       {/* TAB CONTENT: Rules */}
       {activeTab === 'RULES' && (

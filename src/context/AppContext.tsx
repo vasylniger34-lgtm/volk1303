@@ -61,11 +61,12 @@ export interface Match {
 
 export interface Prediction {
   id: string;
-  matchId: string;
+  matchId: string | null;
+  tournamentId?: string;
   tournamentName: string;
   teamA: string;
   teamB: string;
-  predictionType: 'winner' | 'total_rounds';
+  predictionType: 'winner' | 'total_rounds' | 'tournament_winner';
   predictedValue: string;
   odds: number;
   wager: number;
@@ -511,6 +512,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('[VOLKI] Data load error:', err);
     }
   }, [useSupabase]);
+
+  // ─── 5-Second Background Sync Polling ───
+  useEffect(() => {
+    if (!useSupabase) return;
+
+    const interval = setInterval(async () => {
+      // 1. Refresh tournaments, matches, teams quietly in background
+      await loadSupabaseData();
+
+      // 2. Refresh current user's profile (balance, XP, level, wins, losses)
+      if (isAuthenticated && user.id && user.id !== 'local_user') {
+        try {
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+          if (profile && !error) {
+            setUser(profileToUser(profile as ProfileRow));
+          }
+        } catch (e) {
+          console.warn('[VOLKI] Quiet background profile sync failed:', e);
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [useSupabase, isAuthenticated, user.id, loadSupabaseData]);
 
   // ─── Supabase Realtime: subscribe to match updates ───
 
@@ -1210,9 +1240,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     if (useSupabase) {
-      supabase.from('predictions').insert({
+      const isTournamentBet = predictionData.predictionType === 'tournament_winner';
+      
+      const insertData: any = {
         user_id: user.id,
-        match_id: predictionData.matchId,
+        match_id: isTournamentBet ? null : predictionData.matchId,
         tournament_name: predictionData.tournamentName,
         team_a: predictionData.teamA,
         team_b: predictionData.teamB,
@@ -1220,7 +1252,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         predicted_value: predictionData.predictedValue,
         odds: predictionData.odds,
         wager: predictionData.wager
-      }).then();
+      };
+
+      if (isTournamentBet && predictionData.tournamentId) {
+        insertData.tournament_id = predictionData.tournamentId;
+      }
+
+      const attemptInsert = (payload: any) => {
+        supabase.from('predictions').insert(payload).then(({ error }) => {
+          if (error) {
+            console.warn('[VOLKI] Failed to save prediction to Supabase. Falling back to state/localStorage:', error);
+            
+            // If the failure is due to missing tournament_id column in database
+            const errorMsg = error.message || '';
+            const isMissingTournamentIdCol = error.code === 'PGRST204' || errorMsg.includes('tournament_id');
+            if (isMissingTournamentIdCol && 'tournament_id' in payload) {
+              console.log('[VOLKI] Retrying prediction insert without tournament_id...');
+              const cleaned = { ...payload };
+              delete cleaned.tournament_id;
+              attemptInsert(cleaned);
+            }
+          } else {
+            console.log('[VOLKI] Prediction saved to Supabase successfully!');
+          }
+        });
+      };
+
+      attemptInsert(insertData);
 
       supabase.from('profiles').update({
         balance: user.balance - predictionData.wager,
@@ -1317,8 +1375,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let totalPayout = 0;
     let wonBetsCount = 0;
 
+    const isFinalMatch = targetMatch.roundName === 'Final';
+
     // Offline / Local state update first
     setPredictions(prev => prev.map(pred => {
+      // 1. Resolve match bets
       if (pred.matchId === matchId && pred.status === 'pending') {
         let won = false;
         if (pred.predictionType === 'winner') {
@@ -1336,6 +1397,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return { ...pred, status: 'lost', payout: 0 };
       }
+
+      // 2. Resolve tournament outright bets (when Final match finishes)
+      if (isFinalMatch && 
+          pred.predictionType === 'tournament_winner' && 
+          pred.status === 'pending' &&
+          (pred.tournamentName === targetMatch.tournamentName || pred.tournamentId === targetMatch.tournamentId)) {
+        
+        const won = pred.predictedValue === winningTeamName;
+        if (won) {
+          const payoutAmount = Math.round(pred.wager * pred.odds);
+          totalPayout += payoutAmount;
+          wonBetsCount += 1;
+          return { ...pred, status: 'won', payout: payoutAmount };
+        }
+        return { ...pred, status: 'lost', payout: 0 };
+      }
+
       return pred;
     }));
 
@@ -1360,6 +1438,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Supabase DB update
     if (useSupabase) {
+      // 1. Resolve match bets
       supabase.from('predictions')
         .select('*')
         .eq('match_id', matchId)
@@ -1379,10 +1458,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const status = won ? 'won' : 'lost';
             const payout = won ? Math.round(pred.wager * pred.odds) : 0;
 
-            // 1. Update prediction status
+            // Update prediction status
             await supabase.from('predictions').update({ status, payout }).eq('id', pred.id);
 
-            // 2. Update user profile statistics and coins
+            // Update user profile statistics and coins
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', pred.user_id).single();
             if (profile) {
               const newBalance = profile.balance + payout;
@@ -1432,6 +1511,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           });
         });
+
+      // 2. Resolve tournament outright bets (if Final match)
+      if (isFinalMatch) {
+        supabase.from('predictions')
+          .select('*')
+          .eq('prediction_type', 'tournament_winner')
+          .eq('status', 'pending')
+          .eq('tournament_name', targetMatch.tournamentName)
+          .then(({ data: tourneyPreds, error: tourneyError }) => {
+            if (tourneyError || !tourneyPreds) return;
+
+            tourneyPreds.forEach(async (pred) => {
+              const won = pred.predicted_value === winningTeamName;
+              const status = won ? 'won' : 'lost';
+              const payout = won ? Math.round(pred.wager * pred.odds) : 0;
+
+              // Update prediction status
+              await supabase.from('predictions').update({ status, payout }).eq('id', pred.id);
+
+              // Update user profile statistics and coins
+              const { data: profile } = await supabase.from('profiles').select('*').eq('id', pred.user_id).single();
+              if (profile) {
+                const newBalance = profile.balance + payout;
+                const newWins = won ? profile.wins + 1 : profile.wins;
+                const newLosses = won ? profile.losses : profile.losses + 1;
+                const newPredsWon = won ? profile.predictions_won + 1 : profile.predictions_won;
+                const xpGain = won ? 150 : 50;
+                let newXp = profile.xp + xpGain;
+                let newLevel = profile.level;
+                let newXpNext = profile.xp_next;
+
+                if (newXp >= newXpNext) {
+                  newXp = newXp - newXpNext;
+                  newLevel += 1;
+                  newXpNext = Math.round(newXpNext * 1.5);
+                }
+
+                await supabase.from('profiles').update({
+                  balance: newBalance,
+                  wins: newWins,
+                  losses: newLosses,
+                  predictions_won: newPredsWon,
+                  xp: newXp,
+                  level: newLevel,
+                  xp_next: newXpNext
+                }).eq('id', pred.user_id);
+
+                // Update state if it's the current user
+                if (pred.user_id === user.id) {
+                  setUser(prev => ({
+                    ...prev,
+                    balance: newBalance,
+                    xp: newXp,
+                    level: newLevel,
+                    xpNext: newXpNext,
+                    stats: {
+                      ...prev.stats,
+                      wins: newWins,
+                      losses: newLosses,
+                      predictionsWon: newPredsWon
+                    }
+                  }));
+                  if (won) {
+                    showToast(`Виграш! +${payout} 🪙!`, 'success');
+                  }
+                }
+              }
+            });
+          });
+      }
     }
 
     // Auto-advance bracket or complete tournament
@@ -1623,10 +1772,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ─── Tournament Management ───
 
   const deleteTournament = (tournamentId: string) => {
+    const tourneyObj = tournaments.find(t => t.id === tournamentId);
+    const matchIds = matches.filter(m => m.tournamentId === tournamentId).map(m => m.id);
+
     if (useSupabase) {
-      const matchIds = matches.filter(m => m.tournamentId === tournamentId).map(m => m.id);
       if (matchIds.length > 0) {
         supabase.from('predictions').delete().in('match_id', matchIds).then();
+      }
+      if (tourneyObj) {
+        supabase.from('predictions').delete().eq('tournament_name', tourneyObj.name).then();
       }
       supabase.from('matches').delete().eq('tournament_id', tournamentId).then();
       supabase.from('teams').delete().eq('tournament_id', tournamentId).then();
@@ -1644,6 +1798,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return copy;
     });
     setMatches(prev => prev.filter(m => m.tournamentId !== tournamentId));
+    
+    // Clean up local predictions state as well
+    setPredictions(prev => prev.filter(pred => {
+      const isRelatedToMatch = matchIds.includes(pred.matchId || '');
+      const isRelatedToTourneyName = pred.tournamentName === tourneyObj?.name;
+      return !isRelatedToMatch && !isRelatedToTourneyName;
+    }));
+
     showToast('Турнір видалено', 'info');
   };
 
