@@ -12,17 +12,122 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
   const [activeTab, setActiveTab] = useState<'BCI' | '2X2' | '4X4'>('BCI');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Filtering
-  const filteredTourneys = tournaments.filter(t => {
-    // Type tab filter
-    const matchesTab = activeTab === 'BCI' || t.type === activeTab;
+  const parseTourneyDate = (dateStr: string): number => {
+    if (!dateStr) return Infinity;
+    const lower = dateStr.trim().toLowerCase();
     
-    // Search query filter
-    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          t.map.toLowerCase().includes(searchQuery.toLowerCase());
+    // Try standard JS Date parsing first
+    const parsedTime = Date.parse(dateStr);
+    if (!isNaN(parsedTime)) return parsedTime;
 
-    return matchesTab && matchesSearch;
-  });
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth();
+    let day = now.getDate();
+    let hours = 12;
+    let minutes = 0;
+
+    let dateParsed = false;
+
+    // Time matching
+    const timeMatch = lower.match(/(?:^|\s|,)(\d{1,2}):(\d{2})\b/);
+    if (timeMatch) {
+      hours = parseInt(timeMatch[1], 10);
+      minutes = parseInt(timeMatch[2], 10);
+    }
+
+    // Relative date matching
+    if (lower.includes('сьогодні') || lower.includes('сегодня')) {
+      dateParsed = true;
+    } else if (lower.includes('завтра')) {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      year = tomorrow.getFullYear();
+      month = tomorrow.getMonth();
+      day = tomorrow.getDate();
+      dateParsed = true;
+    }
+
+    // Numerical date parsing
+    if (!dateParsed) {
+      const numericMatch = lower.match(/\b(\d{1,2})[\.\-\/](\d{1,2})(?:[\.\-\/](\d{2,4}))?\b/);
+      if (numericMatch) {
+        day = parseInt(numericMatch[1], 10);
+        month = parseInt(numericMatch[2], 10) - 1;
+        if (numericMatch[3]) {
+          let yr = parseInt(numericMatch[3], 10);
+          if (yr < 100) yr += 2000;
+          year = yr;
+        } else {
+          year = now.getFullYear();
+        }
+        dateParsed = true;
+      }
+    }
+
+    // Ukrainian/Russian month names
+    if (!dateParsed) {
+      const monthsMap: Record<string, number> = {
+        'січ': 0, 'янв': 0, 'лют': 1, 'фев': 1, 'бер': 2, 'мар': 2,
+        'кві': 3, 'апр': 3, 'тра': 4, 'мая': 4, 'май': 4, 'чер': 5, 'июн': 5,
+        'лип': 6, 'июл': 6, 'сер': 7, 'авг': 7, 'вер': 8, 'сен': 8,
+        'жов': 9, 'окт': 9, 'лис': 10, 'ноя': 10, 'гру': 11, 'дек': 11
+      };
+
+      const dayMatch = lower.match(/\b(\d{1,2})\b/);
+      if (dayMatch) {
+        day = parseInt(dayMatch[1], 10);
+        let foundMonth = -1;
+        for (const key of Object.keys(monthsMap)) {
+          if (lower.includes(key)) {
+            foundMonth = monthsMap[key];
+            break;
+          }
+        }
+        if (foundMonth !== -1) {
+          month = foundMonth;
+          const yearMatch = lower.match(/\b(20\d{2})\b/);
+          if (yearMatch) {
+            year = parseInt(yearMatch[1], 10);
+          } else {
+            year = now.getFullYear();
+          }
+          dateParsed = true;
+        }
+      }
+    }
+
+    const resultDate = new Date(year, month, day, hours, minutes, 0, 0);
+    if (dateParsed && !lower.match(/\b\d{4}\b/) && !lower.includes('сьогодні') && !lower.includes('сегодня') && !lower.includes('завтра')) {
+      const timeDiff = resultDate.getTime() - now.getTime();
+      if (timeDiff < -24 * 60 * 60 * 1000) {
+        resultDate.setFullYear(year + 1);
+      }
+    }
+
+    return resultDate.getTime();
+  };
+
+  const getSortScore = (t: any): number => {
+    const timestamp = parseTourneyDate(t.date);
+    if (t.status === 'active') return -1000000000000 + timestamp;
+    if (t.status === 'upcoming') return timestamp;
+    return 1000000000000 - timestamp;
+  };
+
+  // Filtering and sorting
+  const filteredTourneys = tournaments
+    .filter(t => {
+      // Type tab filter
+      const matchesTab = activeTab === 'BCI' || t.type === activeTab;
+      
+      // Search query filter
+      const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            t.map.toLowerCase().includes(searchQuery.toLowerCase());
+
+      return matchesTab && matchesSearch;
+    })
+    .sort((a, b) => getSortScore(a) - getSortScore(b));
 
   return (
     <div className="scroll-container" style={{ padding: '16px 20px' }}>

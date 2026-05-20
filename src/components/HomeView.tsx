@@ -19,20 +19,64 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const parseTourneyDate = (dateStr: string): number => {
     if (!dateStr) return Infinity;
-    const lower = dateStr.toLowerCase();
+    const lower = dateStr.trim().toLowerCase();
     
-    // Try to parse standard ISO format first
+    // 1. Try standard JS Date parsing (ISO formats like YYYY-MM-DD etc.)
     const parsedTime = Date.parse(dateStr);
     if (!isNaN(parsedTime)) return parsedTime;
 
     const now = new Date();
-    let baseDate = new Date(now);
+    let year = now.getFullYear();
+    let month = now.getMonth();
+    let day = now.getDate();
+    let hours = 12;
+    let minutes = 0;
+
+    let dateParsed = false;
+
+    // Extract time (HH:mm) if present
+    const timeMatch = lower.match(/(?:^|\s|,)(\d{1,2}):(\d{2})\b/);
+    if (timeMatch) {
+      hours = parseInt(timeMatch[1], 10);
+      minutes = parseInt(timeMatch[2], 10);
+    }
+
+    // Relative dates: "сьогодні" (today) or "завтра" (tomorrow)
     if (lower.includes('сьогодні') || lower.includes('сегодня')) {
-      // keep today
+      dateParsed = true;
     } else if (lower.includes('завтра')) {
-      baseDate.setDate(baseDate.getDate() + 1);
-    } else {
-      const months: Record<string, number> = {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      year = tomorrow.getFullYear();
+      month = tomorrow.getMonth();
+      day = tomorrow.getDate();
+      dateParsed = true;
+    }
+
+    // If it's not relative, try to parse numerical formats (e.g. DD.MM.YYYY, DD.MM.YY, DD.MM)
+    if (!dateParsed) {
+      // Look for DD.MM.YYYY or DD.MM.YY or DD.MM (separated by dots, slashes, or dashes)
+      // Matches DD.MM.YYYY or DD.MM.YY or DD.MM
+      const numericMatch = lower.match(/\b(\d{1,2})[\.\-\/](\d{1,2})(?:[\.\-\/](\d{2,4}))?\b/);
+      if (numericMatch) {
+        day = parseInt(numericMatch[1], 10);
+        month = parseInt(numericMatch[2], 10) - 1; // Month is 0-indexed in JS Date
+        if (numericMatch[3]) {
+          let yr = parseInt(numericMatch[3], 10);
+          if (yr < 100) {
+            yr += 2000; // Handle 2-digit years
+          }
+          year = yr;
+        } else {
+          year = now.getFullYear();
+        }
+        dateParsed = true;
+      }
+    }
+
+    // If still not parsed, try to parse textual Ukrainian/Russian dates (e.g., "22 травня", "22 травня 2026")
+    if (!dateParsed) {
+      const monthsMap: Record<string, number> = {
         'січ': 0, 'янв': 0,
         'лют': 1, 'фев': 1,
         'бер': 2, 'мар': 2,
@@ -47,31 +91,48 @@ export const HomeView: React.FC<HomeViewProps> = ({
         'гру': 11, 'дек': 11
       };
 
+      // Match the first number as day, followed by some text (presumably month)
       const dayMatch = lower.match(/\b(\d{1,2})\b/);
-      const day = dayMatch ? parseInt(dayMatch[1]) : 1;
-
-      let month = now.getMonth();
-      for (const key of Object.keys(months)) {
-        if (lower.includes(key)) {
-          month = months[key];
-          break;
+      if (dayMatch) {
+        day = parseInt(dayMatch[1], 10);
+        
+        // Find which month is mentioned
+        let foundMonth = -1;
+        for (const key of Object.keys(monthsMap)) {
+          if (lower.includes(key)) {
+            foundMonth = monthsMap[key];
+            break;
+          }
+        }
+        
+        if (foundMonth !== -1) {
+          month = foundMonth;
+          
+          // Try to extract a year if specified (4-digit year, usually starting with 20)
+          const yearMatch = lower.match(/\b(20\d{2})\b/);
+          if (yearMatch) {
+            year = parseInt(yearMatch[1], 10);
+          } else {
+            year = now.getFullYear();
+          }
+          dateParsed = true;
         }
       }
-
-      baseDate.setMonth(month);
-      baseDate.setDate(day);
     }
 
-    const timeMatch = lower.match(/(\d{1,2}):(\d{2})/);
-    if (timeMatch) {
-      const hours = parseInt(timeMatch[1]);
-      const minutes = parseInt(timeMatch[2]);
-      baseDate.setHours(hours, minutes, 0, 0);
-    } else {
-      baseDate.setHours(12, 0, 0, 0);
+    // Create the date object
+    const resultDate = new Date(year, month, day, hours, minutes, 0, 0);
+    
+    // If we only parsed DD.MM and the parsed date is in the past by more than a day,
+    // it probably refers to next year
+    if (dateParsed && !lower.match(/\b\d{4}\b/) && !lower.includes('сьогодні') && !lower.includes('сегодня') && !lower.includes('завтра')) {
+      const timeDiff = resultDate.getTime() - now.getTime();
+      if (timeDiff < -24 * 60 * 60 * 1000) { // More than 24 hours in the past
+        resultDate.setFullYear(year + 1);
+      }
     }
 
-    return baseDate.getTime();
+    return resultDate.getTime();
   };
 
   const getSortScore = (t: any): number => {
