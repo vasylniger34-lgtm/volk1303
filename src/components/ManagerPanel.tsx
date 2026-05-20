@@ -667,7 +667,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Запуск розсилки в Telegram...`]);
 
     try {
-      let chatIds: number[] = [];
+      let chatIds: number[] = [8472692319, 6239669001]; // Hardcoded fallbacks so user and managers always receive it
 
       // 1. Fetch active subscribers from Supabase bot_subscribers
       try {
@@ -677,7 +677,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           .eq('is_active', true);
         
         if (!subErr && subs) {
-          chatIds = subs.map(s => Number(s.chat_id)).filter(Boolean);
+          const dbIds = subs.map(s => Number(s.chat_id)).filter(Boolean);
+          for (const id of dbIds) {
+            if (!chatIds.includes(id)) {
+              chatIds.push(id);
+            }
+          }
         }
       } catch (e) {
         console.error('Failed to fetch subscribers:', e);
