@@ -97,10 +97,18 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
   // Tournament creation form state
   const [tourneyForm, setTourneyForm] = useState({
-    name: '', type: '2X2' as '2X2' | '4X4' | 'BCI', prize: '25 000',
-    map: 'de_dust2', date: '', maxParticipants: 16,
+    name: '',
+    type: '2X2' as '2X2' | '4X4' | 'BCI',
+    prize: '25 000',
+    prizeFirst: '',
+    prizeSecond: '',
+    prizeThird: '',
+    map: 'de_dust2',
+    date: '',
+    maxParticipants: 16,
     rules: 'Format: Single Elimination\nNo cheats permitted\nMatches are streamed live\nCaptain must report scores',
-    imageUrl: ''
+    imageUrl: '',
+    status: 'upcoming' as 'upcoming' | 'active' | 'completed'
   });
 
   // Tournament Editing states
@@ -415,21 +423,53 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
     const prizeNum = parseInt(tourneyForm.prize.replace(/\D/g, '')) || 25000;
     
+    const pFirst = tourneyForm.prizeFirst.trim() 
+      ? `${parseInt(tourneyForm.prizeFirst.replace(/\D/g, '')).toLocaleString('uk-UA')} 🪙`
+      : `${Math.round(prizeNum * 0.5).toLocaleString('uk-UA')} 🪙`;
+      
+    const pSecond = tourneyForm.prizeSecond.trim() 
+      ? `${parseInt(tourneyForm.prizeSecond.replace(/\D/g, '')).toLocaleString('uk-UA')} 🪙`
+      : `${Math.round(prizeNum * 0.3).toLocaleString('uk-UA')} 🪙`;
+      
+    const pThird = tourneyForm.prizeThird.trim() 
+      ? `${parseInt(tourneyForm.prizeThird.replace(/\D/g, '')).toLocaleString('uk-UA')} 🪙`
+      : `${Math.round(prizeNum * 0.2).toLocaleString('uk-UA')} 🪙`;
+      
+    let formattedDate = tourneyForm.date;
+    if (tourneyForm.date) {
+      try {
+        const d = new Date(tourneyForm.date);
+        if (!isNaN(d.getTime())) {
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const year = d.getFullYear();
+          const hours = String(d.getHours()).padStart(2, '0');
+          const minutes = String(d.getMinutes()).padStart(2, '0');
+          formattedDate = `${day}.${month}.${year}, ${hours}:${minutes}`;
+        }
+      } catch (err) {
+        console.error("Date formatting error:", err);
+      }
+    } else {
+      formattedDate = 'Сьогодні, 20:00';
+    }
+
     createTournament({
       name: tourneyForm.name.toUpperCase(),
       type: tourneyForm.type,
-      date: tourneyForm.date || 'Сьогодні, 20:00',
+      date: formattedDate,
       prizePool: `${prizeNum.toLocaleString('uk-UA')} 🪙`,
       prizePlaces: {
-        first: `${Math.round(prizeNum * 0.5).toLocaleString('uk-UA')} 🪙`,
-        second: `${Math.round(prizeNum * 0.3).toLocaleString('uk-UA')} 🪙`,
-        third: `${Math.round(prizeNum * 0.2).toLocaleString('uk-UA')} 🪙`
+        first: pFirst,
+        second: pSecond,
+        third: pThird
       },
       maxParticipants: tourneyForm.maxParticipants,
       map: tourneyForm.map,
       system: 'Single Elimination',
       rules: tourneyForm.rules.split('\n').filter(r => r.trim()),
-      imageUrl: tourneyForm.imageUrl || MAP_PRESETS[tourneyForm.map] || ''
+      imageUrl: tourneyForm.imageUrl || MAP_PRESETS[tourneyForm.map] || '',
+      status: tourneyForm.status
     });
 
     // Add log entry
@@ -439,9 +479,18 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     ]);
 
     setTourneyForm({
-      name: '', type: '2X2', prize: '25 000', map: 'de_dust2', date: '', maxParticipants: 16,
+      name: '',
+      type: '2X2',
+      prize: '25 000',
+      prizeFirst: '',
+      prizeSecond: '',
+      prizeThird: '',
+      map: 'de_dust2',
+      date: '',
+      maxParticipants: 16,
       rules: 'Format: Single Elimination\nNo cheats permitted\nMatches are streamed live\nCaptain must report scores',
-      imageUrl: ''
+      imageUrl: '',
+      status: 'upcoming'
     });
 
     setActiveTab('tournaments');
@@ -1295,18 +1344,19 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Призовий Фонд (🪙)</label>
-                      <input 
-                        type="text" 
-                        required
-                        placeholder="25 000"
-                        value={tourneyForm.prize}
-                        onChange={e => setTourneyForm({ ...tourneyForm, prize: e.target.value })}
+                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Статус Турніру</label>
+                      <select 
+                        value={tourneyForm.status}
+                        onChange={e => setTourneyForm({ ...tourneyForm, status: e.target.value as any })}
                         style={{
-                          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                          background: '#0B0B11', border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit', cursor: 'pointer'
                         }}
-                      />
+                      >
+                        <option value="upcoming">Майбутній (Upcoming)</option>
+                        <option value="active">Активний (Active)</option>
+                        <option value="completed">Завершений (Completed)</option>
+                      </select>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1325,15 +1375,73 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Дата Та Час</label>
+                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Загальний Призовий Фонд (🪙)</label>
                     <input 
                       type="text" 
-                      placeholder="Завтра, 19:30"
+                      required
+                      placeholder="25 000"
+                      value={tourneyForm.prize}
+                      onChange={e => setTourneyForm({ ...tourneyForm, prize: e.target.value })}
+                      style={{
+                        background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '9px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>1-е місце (опц)</label>
+                      <input 
+                        type="text" 
+                        placeholder="Авто (50%)"
+                        value={tourneyForm.prizeFirst}
+                        onChange={e => setTourneyForm({ ...tourneyForm, prizeFirst: e.target.value })}
+                        style={{
+                          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '10px', padding: '10px 12px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '9px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>2-е місце (опц)</label>
+                      <input 
+                        type="text" 
+                        placeholder="Авто (30%)"
+                        value={tourneyForm.prizeSecond}
+                        onChange={e => setTourneyForm({ ...tourneyForm, prizeSecond: e.target.value })}
+                        style={{
+                          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '10px', padding: '10px 12px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '9px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>3-е місце (опц)</label>
+                      <input 
+                        type="text" 
+                        placeholder="Авто (20%)"
+                        value={tourneyForm.prizeThird}
+                        onChange={e => setTourneyForm({ ...tourneyForm, prizeThird: e.target.value })}
+                        style={{
+                          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '10px', padding: '10px 12px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Дата Та Час</label>
+                    <input 
+                      type="datetime-local" 
+                      required
                       value={tourneyForm.date}
                       onChange={e => setTourneyForm({ ...tourneyForm, date: e.target.value })}
                       style={{
                         background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                        borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit',
+                        colorScheme: 'dark'
                       }}
                     />
                   </div>

@@ -121,7 +121,7 @@ interface AppContextType {
   updateMatchOdds: (matchId: string, oddsA: number, oddsB: number) => void;
   resetAllData: () => Promise<void>;
   addFunds: (amount: number) => void;
-  createTournament: (tourney: Omit<Tournament, 'id' | 'participantsCount' | 'status'>) => void;
+  createTournament: (tourney: Omit<Tournament, 'id' | 'participantsCount'>) => void;
   resolveBetsForMatch: (matchId: string, winnerId: string, finalScoreA: number, finalScoreB: number) => void;
   generateBracketForTournament: (tournamentId: string) => void;
   updateProfile: (data: { username?: string; avatarGradient?: number }) => void;
@@ -1061,13 +1061,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Create Tournament ───
 
-  const createTournament = (tourneyData: Omit<Tournament, 'id' | 'participantsCount' | 'status'>) => {
+  const createTournament = (tourneyData: Omit<Tournament, 'id' | 'participantsCount'>) => {
     const newId = generateUUID();
     const newTourney: Tournament = {
       ...tourneyData,
       id: newId,
-      participantsCount: 0,
-      status: 'upcoming'
+      participantsCount: 0
+    };
+
+    const isValidUUID = (str: string) => {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
     };
 
     if (useSupabase) {
@@ -1082,12 +1085,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prize_third: newTourney.prizePlaces.third,
         participants_count: 0,
         max_participants: newTourney.maxParticipants,
-        status: 'upcoming',
+        status: newTourney.status,
         map: newTourney.map,
         system: newTourney.system,
         rules: newTourney.rules,
         image_url: newTourney.imageUrl || null,
-        created_by: user.id
+        created_by: isValidUUID(user.id) ? user.id : null
       }).then(({ error }) => {
         if (error) {
           console.error('[VOLKI] Error inserting tournament to Supabase:', error);
