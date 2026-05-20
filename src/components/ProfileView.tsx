@@ -16,8 +16,8 @@ const AVATAR_GRADIENTS = [
   ['#E11D48', '#7C3AED'],
 ];
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate }) => {
-  const { user, resetAllData, isAdmin, updateProfile, authLogout } = useApp();
+export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigate }) => {
+  const { user, resetAllData, updateProfile, authLogout } = useApp();
 
   // Editing state
   const [isEditingName, setIsEditingName] = useState(false);

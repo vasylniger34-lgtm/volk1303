@@ -7,7 +7,7 @@ interface HeaderProps {
   currentView: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
+export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView: _currentView }) => {
   const { user, addFunds, showToast } = useApp();
 
   return (

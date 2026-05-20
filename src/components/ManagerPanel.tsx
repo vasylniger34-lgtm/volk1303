@@ -4,8 +4,8 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { 
   Shield, Key, Mail, User, Lock, Eye, EyeOff, LogOut, 
   BarChart3, Trophy, Swords, Users, Settings, Activity, 
-  Plus, Check, ChevronRight, Play, Edit3, X, Save, 
-  Calendar, MapPin, Award, Trash2, PlusCircle, AlertCircle, RefreshCw, Send
+  Plus, Check, Play, Edit3, X, Save, 
+  MapPin, Award, Trash2, PlusCircle, AlertCircle, RefreshCw, Send
 } from 'lucide-react';
 
 const MANAGER_ACCESS_CODE = 'VOLKI-ADMIN-2026';
@@ -322,7 +322,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
     if (useSupabase) {
       showToast('Завантаження зображення...', 'info');
-      const { data, error } = await supabase.storage.from('banners').upload(filePath, file);
+      const { error } = await supabase.storage.from('banners').upload(filePath, file);
       if (error) {
         console.error('Supabase upload error:', error);
         showToast('Помилка завантаження. Створіть бакет "banners" у Supabase або вставте посилання.', 'error');
@@ -458,21 +458,6 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     ]);
   };
 
-  const adjustScore = (matchId: string, team: 'A' | 'B', currentA: number, currentB: number, change: number) => {
-    const match = matches.find(m => m.id === matchId);
-    if (!match) return;
-
-    const nextScoreA = team === 'A' ? Math.max(0, currentA + change) : currentA;
-    const nextScoreB = team === 'B' ? Math.max(0, currentB + change) : currentB;
-
-    setMatchScore(matchId, nextScoreA, nextScoreB, 'live', null);
-
-    setTerminalLogs(prev => [
-      ...prev,
-      `[${new Date().toLocaleTimeString()}] Adjusted match score: ${match.teamA?.name || 'A'} [${nextScoreA}:${nextScoreB}] ${match.teamB?.name || 'B'}`
-    ]);
-  };
-
   const finishMatchWithScore = (matchId: string, finalA: number, finalB: number) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
@@ -489,7 +474,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     showToast('Матч завершено, ставки розраховані!', 'success');
   };
 
-  const injectMatchLog = (matchId: string) => {
+  const injectMatchLog = (_matchId: string) => {
     if (!customLog.trim()) return;
     
     // Simulating app context score logs injection
