@@ -39,7 +39,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     tournaments, matches, teams,
     setMatchLive, setMatchScore, createTournament, 
     generateBracketForTournament, deleteTournament, updateTournament,
-    showToast
+    showToast, resetAllData
   } = useApp();
 
   const useSupabase = isSupabaseConfigured();
@@ -1955,10 +1955,9 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   <h4 style={{ fontSize: '13px', fontWeight: '800', fontFamily: 'Outfit', color: '#EF4444' }}>Небезпечна Зона</h4>
                   <p style={{ fontSize: '11px', color: '#51515E', marginTop: '4px', marginBottom: '12px' }}>Видаляє локально збережені сесії, турніри та налаштування симулятора.</p>
                   <button 
-                    onClick={() => {
-                      if (confirm('Скинути всю конфігурацію? Це перезавантажить сторінку.')) {
-                        localStorage.clear();
-                        window.location.reload();
+                    onClick={async () => {
+                      if (confirm('Скинути всю конфігурацію? Це видалить усі турніри, команди та матчі з сервера та локальної пам\'яті.')) {
+                        await resetAllData();
                       }
                     }}
                     style={{

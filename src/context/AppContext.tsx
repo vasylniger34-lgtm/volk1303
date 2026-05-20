@@ -118,7 +118,7 @@ interface AppContextType {
   placePrediction: (prediction: Omit<Prediction, 'id' | 'status' | 'payout' | 'date'>) => boolean;
   setMatchLive: (matchId: string) => void;
   setMatchScore: (matchId: string, scoreA: number, scoreB: number, status: 'live' | 'finished', winnerId?: string | null) => void;
-  resetAllData: () => void;
+  resetAllData: () => Promise<void>;
   addFunds: (amount: number) => void;
   createTournament: (tourney: Omit<Tournament, 'id' | 'participantsCount' | 'status'>) => void;
   resolveBetsForMatch: (matchId: string, winnerId: string, finalScoreA: number, finalScoreB: number) => void;
@@ -334,69 +334,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (tourneysData && tourneysData.length > 0) {
-        setTournaments(tourneysData.map(t => ({
-          id: t.id,
-          name: t.name,
-          type: t.type as '2X2' | '4X4' | 'BCI',
-          date: t.date,
-          prizePool: t.prize_pool,
-          prizePlaces: {
-            first: t.prize_first || '',
-            second: t.prize_second || '',
-            third: t.prize_third || ''
-          },
-          participantsCount: t.participants_count,
-          maxParticipants: t.max_participants,
-          status: t.status as 'upcoming' | 'active' | 'completed',
-          map: t.map,
-          system: t.system,
-          rules: t.rules || [],
-          imageUrl: t.image_url || ''
-        })));
+      if (tourneysData) {
+        if (tourneysData.length > 0) {
+          setTournaments(tourneysData.map(t => ({
+            id: t.id,
+            name: t.name,
+            type: t.type as '2X2' | '4X4' | 'BCI',
+            date: t.date,
+            prizePool: t.prize_pool,
+            prizePlaces: {
+              first: t.prize_first || '',
+              second: t.prize_second || '',
+              third: t.prize_third || ''
+            },
+            participantsCount: t.participants_count,
+            maxParticipants: t.max_participants,
+            status: t.status as 'upcoming' | 'active' | 'completed',
+            map: t.map,
+            system: t.system,
+            rules: t.rules || [],
+            imageUrl: t.image_url || ''
+          })));
+        } else {
+          setTournaments([]);
+        }
       }
 
       // Load teams
       const { data: teamsData } = await supabase.from('teams').select('*');
-      if (teamsData && teamsData.length > 0) {
-        const grouped: Record<string, Team[]> = {};
-        teamsData.forEach(t => {
-          const team = dbTeamToApp(t as TeamRow);
-          if (!grouped[t.tournament_id]) grouped[t.tournament_id] = [];
-          grouped[t.tournament_id].push(team);
-        });
-        setTeams(grouped);
+      if (teamsData) {
+        if (teamsData.length > 0) {
+          const grouped: Record<string, Team[]> = {};
+          teamsData.forEach(t => {
+            const team = dbTeamToApp(t as TeamRow);
+            if (!grouped[t.tournament_id]) grouped[t.tournament_id] = [];
+            grouped[t.tournament_id].push(team);
+          });
+          setTeams(grouped);
+        } else {
+          setTeams({});
+        }
       }
 
       // Load matches (with team data)
       const { data: matchesData } = await supabase.from('matches').select('*');
-      if (matchesData && matchesData.length > 0) {
-        // We need teams to hydrate match data
-        const { data: allTeamsData } = await supabase.from('teams').select('*');
-        const teamsMap: Record<string, Team> = {};
-        (allTeamsData || []).forEach(t => {
-          teamsMap[t.id] = dbTeamToApp(t as TeamRow);
-        });
+      if (matchesData) {
+        if (matchesData.length > 0) {
+          // We need teams to hydrate match data
+          const { data: allTeamsData } = await supabase.from('teams').select('*');
+          const teamsMap: Record<string, Team> = {};
+          (allTeamsData || []).forEach(t => {
+            teamsMap[t.id] = dbTeamToApp(t as TeamRow);
+          });
 
-        setMatches(matchesData.map((m: MatchRow) => ({
-          id: m.id,
-          tournamentId: m.tournament_id,
-          tournamentName: m.tournament_name,
-          roundName: m.round_name,
-          teamA: m.team_a_id ? teamsMap[m.team_a_id] || null : null,
-          teamB: m.team_b_id ? teamsMap[m.team_b_id] || null : null,
-          scoreA: m.score_a,
-          scoreB: m.score_b,
-          status: m.status as 'scheduled' | 'live' | 'finished',
-          winnerId: m.winner_id,
-          oddsA: Number(m.odds_a),
-          oddsB: Number(m.odds_b),
-          map: m.map,
-          time: m.time || '',
-          currentMap: m.current_map,
-          mapScores: (m.map_scores || []) as { scoreA: number; scoreB: number }[],
-          liveLogs: m.live_logs || []
-        })));
+          setMatches(matchesData.map((m: MatchRow) => ({
+            id: m.id,
+            tournamentId: m.tournament_id,
+            tournamentName: m.tournament_name,
+            roundName: m.round_name,
+            teamA: m.team_a_id ? teamsMap[m.team_a_id] || null : null,
+            teamB: m.team_b_id ? teamsMap[m.team_b_id] || null : null,
+            scoreA: m.score_a,
+            scoreB: m.score_b,
+            status: m.status as 'scheduled' | 'live' | 'finished',
+            winnerId: m.winner_id,
+            oddsA: Number(m.odds_a),
+            oddsB: Number(m.odds_b),
+            map: m.map,
+            time: m.time || '',
+            currentMap: m.current_map,
+            mapScores: (m.map_scores || []) as { scoreA: number; scoreB: number }[],
+            liveLogs: m.live_logs || []
+          })));
+        } else {
+          setMatches([]);
+          setPredictions([]);
+        }
       }
     } catch (err) {
       console.error('[VOLKI] Data load error:', err);
@@ -1013,7 +1026,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Reset ───
 
-  const resetAllData = () => {
+  const resetAllData = async () => {
+    if (useSupabase) {
+      try {
+        // Delete all predictions, matches, teams, tournaments
+        await supabase.from('predictions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('matches').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('teams').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('tournaments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch (e) {
+        console.error('[VOLKI] Failed to clear Supabase database:', e);
+      }
+    }
+
     localStorage.removeItem('volk_user');
     localStorage.removeItem('volk_tournaments');
     localStorage.removeItem('volk_teams');
