@@ -454,61 +454,126 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { localStorage.setItem('volk_matches', JSON.stringify(matches)); }, [matches]);
   useEffect(() => { localStorage.setItem('volk_predictions', JSON.stringify(predictions)); }, [predictions]);
 
-  // ─── LIVE scores simulator (offline mode only) ───
+  // ─── LIVE scores simulator ───
 
   useEffect(() => {
-    if (useSupabase) return; // In Supabase mode, scores are updated via admin panel
+    const isManagerSite = typeof window !== 'undefined' && (
+      window.location.pathname.startsWith('/admin') ||
+      window.location.search.includes('manager=true') ||
+      window.location.search.includes('admin=true')
+    );
+
+    // If using Supabase, only run simulation if the manager is active on the admin panel
+    if (useSupabase && (!isManagerSite || user.role !== 'admin')) return;
 
     const interval = setInterval(() => {
-      setMatches(prevMatches => {
-        let updated = false;
-        const newMatches = prevMatches.map(match => {
-          if (match.status === 'live') {
-            updated = true;
-            const probA = 1 / match.oddsA;
-            const probB = 1 / match.oddsB;
-            const totalProb = probA + probB;
-            const roll = Math.random() * totalProb;
+      if (useSupabase) {
+        // Supabase mode: simulate and write directly to Supabase
+        const liveMatches = matches.filter(m => m.status === 'live');
+        if (liveMatches.length === 0) return;
 
-            let newScoreA = match.scoreA;
-            let newScoreB = match.scoreB;
-            let roundWinner = '';
+        liveMatches.forEach(match => {
+          const probA = 1 / match.oddsA;
+          const probB = 1 / match.oddsB;
+          const totalProb = probA + probB;
+          const roll = Math.random() * totalProb;
 
-            if (roll < probA) {
-              newScoreA += 1;
-              roundWinner = match.teamA?.name || 'Team A';
-            } else {
-              newScoreB += 1;
-              roundWinner = match.teamB?.name || 'Team B';
-            }
+          let newScoreA = match.scoreA;
+          let newScoreB = match.scoreB;
+          let roundWinner = '';
 
-            const currentTotalRound = newScoreA + newScoreB;
-            const logEntry = `Round ${currentTotalRound}: ${roundWinner} wins with ${Math.random() > 0.6 ? 'a stunning double kill' : 'excellent site control'}.`;
-            const newLogs = [...match.liveLogs, logEntry];
-            if (newLogs.length > 15) newLogs.shift();
-
-            if (newScoreA >= 16 && newScoreA - newScoreB >= 2) {
-              setTimeout(() => {
-                resolveBetsForMatch(match.id, match.teamA?.id || '', newScoreA, newScoreB);
-              }, 500);
-              return { ...match, scoreA: newScoreA, scoreB: newScoreB, status: 'finished', winnerId: match.teamA?.id || null, liveLogs: [...newLogs, `${match.teamA?.name} wins ${newScoreA}:${newScoreB}!`] } as Match;
-            } else if (newScoreB >= 16 && newScoreB - newScoreA >= 2) {
-              setTimeout(() => {
-                resolveBetsForMatch(match.id, match.teamB?.id || '', newScoreA, newScoreB);
-              }, 500);
-              return { ...match, scoreA: newScoreA, scoreB: newScoreB, status: 'finished', winnerId: match.teamB?.id || null, liveLogs: [...newLogs, `${match.teamB?.name} wins ${newScoreA}:${newScoreB}!`] } as Match;
-            }
-
-            return { ...match, scoreA: newScoreA, scoreB: newScoreB, liveLogs: newLogs } as Match;
+          if (roll < probA) {
+            newScoreA += 1;
+            roundWinner = match.teamA?.name || 'Team A';
+          } else {
+            newScoreB += 1;
+            roundWinner = match.teamB?.name || 'Team B';
           }
-          return match;
+
+          const currentTotalRound = newScoreA + newScoreB;
+          const logEntry = `Round ${currentTotalRound}: ${roundWinner} wins with ${Math.random() > 0.6 ? 'a stunning double kill' : 'excellent site control'}.`;
+          const newLogs = [...match.liveLogs, logEntry];
+          if (newLogs.length > 15) newLogs.shift();
+
+          const isFinishedA = newScoreA >= 16 && newScoreA - newScoreB >= 2;
+          const isFinishedB = newScoreB >= 16 && newScoreB - newScoreA >= 2;
+
+          if (isFinishedA || isFinishedB) {
+            const winnerId = isFinishedA ? (match.teamA?.id || '') : (match.teamB?.id || '');
+            const winnerName = isFinishedA ? (match.teamA?.name || '') : (match.teamB?.name || '');
+            const finalLogs = [...newLogs, `${winnerName} wins ${newScoreA}:${newScoreB}!`];
+
+            supabase.from('matches').update({
+              score_a: newScoreA,
+              score_b: newScoreB,
+              status: 'finished',
+              winner_id: winnerId,
+              live_logs: finalLogs
+            }).eq('id', match.id).then(({ error }) => {
+              if (!error) {
+                resolveBetsForMatch(match.id, winnerId, newScoreA, newScoreB);
+              }
+            });
+          } else {
+            supabase.from('matches').update({
+              score_a: newScoreA,
+              score_b: newScoreB,
+              live_logs: newLogs
+            }).eq('id', match.id).then();
+          }
         });
-        return updated ? newMatches : prevMatches;
-      });
+      } else {
+        // Offline / localStorage mode: simulate and save to state
+        setMatches(prevMatches => {
+          let updated = false;
+          const newMatches = prevMatches.map(match => {
+            if (match.status === 'live') {
+              updated = true;
+              const probA = 1 / match.oddsA;
+              const probB = 1 / match.oddsB;
+              const totalProb = probA + probB;
+              const roll = Math.random() * totalProb;
+
+              let newScoreA = match.scoreA;
+              let newScoreB = match.scoreB;
+              let roundWinner = '';
+
+              if (roll < probA) {
+                newScoreA += 1;
+                roundWinner = match.teamA?.name || 'Team A';
+              } else {
+                newScoreB += 1;
+                roundWinner = match.teamB?.name || 'Team B';
+              }
+
+              const currentTotalRound = newScoreA + newScoreB;
+              const logEntry = `Round ${currentTotalRound}: ${roundWinner} wins with ${Math.random() > 0.6 ? 'a stunning double kill' : 'excellent site control'}.`;
+              const newLogs = [...match.liveLogs, logEntry];
+              if (newLogs.length > 15) newLogs.shift();
+
+              if (newScoreA >= 16 && newScoreA - newScoreB >= 2) {
+                setTimeout(() => {
+                  resolveBetsForMatch(match.id, match.teamA?.id || '', newScoreA, newScoreB);
+                }, 500);
+                return { ...match, scoreA: newScoreA, scoreB: newScoreB, status: 'finished', winnerId: match.teamA?.id || null, liveLogs: [...newLogs, `${match.teamA?.name} wins ${newScoreA}:${newScoreB}!`] } as Match;
+              } else if (newScoreB >= 16 && newScoreB - newScoreA >= 2) {
+                setTimeout(() => {
+                  resolveBetsForMatch(match.id, match.teamB?.id || '', newScoreA, newScoreB);
+                }, 500);
+                return { ...match, scoreA: newScoreA, scoreB: newScoreB, status: 'finished', winnerId: match.teamB?.id || null, liveLogs: [...newLogs, `${match.teamB?.name} wins ${newScoreA}:${newScoreB}!`] } as Match;
+              }
+
+              return { ...match, scoreA: newScoreA, scoreB: newScoreB, liveLogs: newLogs } as Match;
+            }
+            return match;
+          });
+          return updated ? newMatches : prevMatches;
+        });
+      }
     }, 9000);
 
     return () => clearInterval(interval);
-  }, [matches, useSupabase]);
+  }, [matches, useSupabase, user.role]);
 
   // ─── Auth Methods ───
 
