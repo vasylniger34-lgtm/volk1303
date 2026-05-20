@@ -8,7 +8,7 @@ import {
   Calendar, MapPin, Award, Hash, ChevronDown
 } from 'lucide-react';
 
-const ADMIN_PASSWORD = 'volki1303admin';
+const ADMIN_PASSWORD = '11111111';
 
 const MAPS = ['de_dust2', 'de_mirage', 'de_inferno', 'de_nuke', 'de_ancient', 'de_anubis', 'de_vertigo', 'de_overpass'];
 

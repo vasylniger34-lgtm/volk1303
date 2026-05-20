@@ -8,7 +8,7 @@ import {
   MapPin, Award, Trash2, PlusCircle, AlertCircle, RefreshCw, Send
 } from 'lucide-react';
 
-const MANAGER_ACCESS_CODE = 'volki1303admin';
+const MANAGER_ACCESS_CODE = '11111111';
 const MAPS = ['de_dust2', 'de_mirage', 'de_inferno', 'de_nuke', 'de_ancient', 'de_anubis', 'de_vertigo', 'de_overpass'];
 
 const MAP_PRESETS: Record<string, string> = {
@@ -185,7 +185,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     setAuthError('');
     setAuthLoading(true);
 
-    if (regCode.trim().toLowerCase() !== managerInviteCode.trim().toLowerCase() && regCode.trim() !== 'volki1303admin') {
+    if (regCode.trim().toLowerCase() !== managerInviteCode.trim().toLowerCase() && regCode.trim() !== '11111111') {
       setAuthError('Невірний код доступу керуючого! Зверніться до головного адміністратора.');
       setAuthLoading(false);
       return;
