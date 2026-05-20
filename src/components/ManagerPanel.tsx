@@ -992,7 +992,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   { title: 'Активні Турніри', count: tournaments.length, color: '#FF5C00', desc: 'Усього створено сіток' },
                   { title: 'Зареєстровано Команд', count: totalRegisteredTeams, color: '#10B981', desc: 'Склади гравців платформи' },
                   { title: 'Матчі LIVE / Scheduled', count: `${liveMatchesCount} / ${upcomingMatchesCount}`, color: '#3B82F6', desc: 'Активний розклад ігор' },
-                  { title: 'Об'єм Ставок (Mock)', count: '142 850 🪙', color: '#8B5CF6', desc: 'Прийнятий обсяг прогнозів' }
+                  { title: "Об'єм Ставок (Mock)", count: '142 850 🪙', color: '#8B5CF6', desc: 'Прийнятий обсяг прогнозів' }
                 ].map((stat, i) => (
                   <div key={i} className="esports-card" style={{
                     padding: '24px',
