@@ -39,7 +39,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     tournaments, matches, teams,
     setMatchLive, setMatchScore, createTournament, 
     generateBracketForTournament, deleteTournament, updateTournament,
-    showToast, resetAllData, updateMatchOdds
+    showToast, resetAllData, updateMatchOdds, fillTournamentWithBots
   } = useApp();
 
   const useSupabase = isSupabaseConfigured();
@@ -1213,6 +1213,21 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   }}
                                 >
                                   <Play size={10} /> Запустити
+                                </button>
+                              )}
+                              {tTeams.length < t.maxParticipants && (
+                                <button 
+                                  onClick={async () => {
+                                    setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Filling tournament "${t.name}" with bot participants...`]);
+                                    await fillTournamentWithBots(t.id);
+                                  }}
+                                  style={{
+                                    background: 'rgba(255, 92, 0, 0.08)', border: '1px solid rgba(255, 92, 0, 0.2)',
+                                    borderRadius: '8px', padding: '6px 12px', fontSize: '11px', color: '#FF5C00', fontWeight: '700',
+                                    fontFamily: 'Outfit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                  }}
+                                >
+                                  🤖 Наповнити ботами
                                 </button>
                               )}
                               <button 

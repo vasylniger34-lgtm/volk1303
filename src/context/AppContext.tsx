@@ -127,6 +127,7 @@ interface AppContextType {
   updateProfile: (data: { username?: string; avatarGradient?: number }) => void;
   deleteTournament: (tournamentId: string) => void;
   updateTournament: (tournamentId: string, data: Partial<Tournament>) => void;
+  fillTournamentWithBots: (tournamentId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1249,6 +1250,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Турнір оновлено', 'success');
   };
 
+  const fillTournamentWithBots = async (tournamentId: string) => {
+    const tourney = tournaments.find(t => t.id === tournamentId);
+    if (!tourney) return;
+    const currentTeams = teams[tournamentId] || [];
+    const countNeeded = tourney.maxParticipants - currentTeams.length;
+    if (countNeeded <= 0) return;
+
+    const botTeamNames = [
+      'NaVi', 'FaZe Clan', 'G2 Esports', 'Virtus.pro', 
+      'Team Vitality', 'Team Spirit', 'MOUZ', 'Astralis',
+      'Heroic', 'Team Liquid', 'Cloud9', 'FURIA Esports',
+      'Complexity', 'Fnatic', 'NIP', 'BIG Clan',
+      'AMKAL Esports', 'Eternal Fire', 'MIBR', 'KOI',
+      'ENCE', '9INE', '9z Team', 'Lynn Vision'
+    ];
+
+    const shuffledNames = [...botTeamNames].sort(() => Math.random() - 0.5);
+    const newTeamsList: Team[] = [];
+
+    for (let i = 0; i < countNeeded; i++) {
+      const name = shuffledNames[i % shuffledNames.length] + ` #${Math.floor(Math.random() * 90 + 10)}`;
+      const tag = name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase();
+      const cap = `@bot_${tag.toLowerCase()}`;
+      
+      const newTeam: Team = {
+        name,
+        tag,
+        captain: cap,
+        players: [
+          { username: cap },
+          { username: `@bot_${tag.toLowerCase()}_player2` }
+        ],
+        id: `team_${Date.now()}_${i}`,
+        logoText: tag,
+        logoBg: ['#FF5C00', '#8B5CF6', '#10B981', '#3B82F6', '#EF4444', '#EC4899'][Math.floor(Math.random() * 6)]
+      };
+      
+      newTeamsList.push(newTeam);
+
+      if (useSupabase) {
+        await supabase.from('teams').insert({
+          tournament_id: tournamentId,
+          name: newTeam.name,
+          tag: newTeam.tag,
+          captain: newTeam.captain,
+          players: newTeam.players as unknown as { username: string }[],
+          logo_text: newTeam.logoText,
+          logo_bg: newTeam.logoBg
+        });
+      }
+    }
+
+    const finalCount = currentTeams.length + countNeeded;
+
+    if (useSupabase) {
+      await supabase.from('tournaments')
+        .update({ participants_count: finalCount })
+        .eq('id', tournamentId);
+    }
+
+    setTeams(prev => ({ ...prev, [tournamentId]: [...(prev[tournamentId] || []), ...newTeamsList] }));
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        return { ...t, participantsCount: finalCount };
+      }
+      return t;
+    }));
+
+    showToast(`Зареєстровано ${countNeeded} бот-команд для турніру!`, 'success');
+  };
+
   // ─── Reset ───
 
   const resetAllData = async () => {
@@ -1300,7 +1372,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       generateBracketForTournament,
       updateProfile,
       deleteTournament,
-      updateTournament
+      updateTournament,
+      fillTournamentWithBots
     }}>
       {children}
     </AppContext.Provider>

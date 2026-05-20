@@ -9,17 +9,19 @@ interface RegisterModalProps {
 }
 
 export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onClose, onSuccess }) => {
-  const { registerTeam, tournaments } = useApp();
+  const { registerTeam, tournaments, user } = useApp();
   const tourney = tournaments.find(t => t.id === tournamentId);
+
+  const userHandle = user?.username ? (user.username.startsWith('@') ? user.username : `@${user.username}`) : '@volki_player';
 
   // Wizard steps
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Form states
-  const [teamName, setTeamName] = useState('VOLKI Team');
-  const [teamTag, setTeamTag] = useState('VLK');
-  const captain = '@volki_player';
-  const [players, setPlayers] = useState<string[]>(['@volki_player']);
+  const [teamName, setTeamName] = useState(user?.username ? `${user.username.replace('@', '').toUpperCase()} Team` : 'VOLKI Team');
+  const [teamTag, setTeamTag] = useState(user?.username ? user.username.replace('@', '').substring(0, 3).toUpperCase() : 'VLK');
+  const captain = userHandle;
+  const [players, setPlayers] = useState<string[]>([userHandle]);
   const [newPlayerInput, setNewPlayerInput] = useState('');
 
   if (!tourney) return null;

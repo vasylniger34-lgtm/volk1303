@@ -15,7 +15,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   onSelectMatch,
   onOpenRegister
 }) => {
-  const { tournaments, teams, matches } = useApp();
+  const { tournaments, teams, matches, user } = useApp();
   const tourney = tournaments.find(t => t.id === tournamentId);
   const [activeTab, setActiveTab] = useState<'INFO' | 'BRACKET' | 'PARTICIPANTS' | 'RULES'>('INFO');
   const [isFavorited, setIsFavorited] = useState(false);
@@ -26,7 +26,8 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   const tourneyMatches = matches.filter(m => m.tournamentId === tournamentId);
 
   // Check if user is registered by inspecting captain names in the team list
-  const isUserRegistered = tourneyTeams.some(t => t.captain === '@volki_player');
+  const userHandle = user?.username ? (user.username.startsWith('@') ? user.username : `@${user.username}`) : '@volki_player';
+  const isUserRegistered = tourneyTeams.some(t => t.captain === userHandle || t.players?.some(p => p.username === userHandle));
 
   return (
     <div className="scroll-container" style={{ position: 'relative' }}>
@@ -555,74 +556,77 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
             gridTemplateColumns: 'repeat(4, 1fr)',
             gap: '12px'
           }}>
-            {tourneyTeams.map((team) => (
-              <div 
-                key={team.id}
-                className="esports-card"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'var(--card-bg)',
-                  border: team.captain === '@volki_player' ? '1px solid rgba(255,92,0,0.3)' : '1px solid var(--card-border)',
-                  borderRadius: '16px',
-                  padding: '14px 6px',
-                  textAlign: 'center',
-                  position: 'relative'
-                }}
-              >
-                <div style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '50%',
-                  backgroundColor: team.logoBg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  fontWeight: '900',
-                  color: 'white',
-                  fontFamily: 'Outfit, sans-serif',
-                  border: '2px solid rgba(255,255,255,0.08)',
-                  marginBottom: '8px',
-                  boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
-                }}>
-                  {team.logoText}
-                </div>
-                
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: '800',
-                  color: 'white',
-                  width: '100%',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  fontFamily: 'Outfit, sans-serif'
-                }}>
-                  {team.name}
-                </span>
-
-                {team.captain === '@volki_player' && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '-6px',
-                    right: '-4px',
-                    fontSize: '8px',
-                    backgroundColor: 'var(--primary-orange)',
-                    color: 'white',
-                    padding: '2px 6px',
-                    borderRadius: '6px',
+            {tourneyTeams.map((team) => {
+              const isMyTeam = team.captain === userHandle || team.players?.some(p => p.username === userHandle);
+              return (
+                <div 
+                  key={team.id}
+                  className="esports-card"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'var(--card-bg)',
+                    border: isMyTeam ? '1px solid rgba(255,92,0,0.3)' : '1px solid var(--card-border)',
+                    borderRadius: '16px',
+                    padding: '14px 6px',
+                    textAlign: 'center',
+                    position: 'relative'
+                  }}
+                >
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    backgroundColor: team.logoBg,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
                     fontWeight: '900',
+                    color: 'white',
                     fontFamily: 'Outfit, sans-serif',
-                    border: '1px solid rgba(0,0,0,0.3)'
+                    border: '2px solid rgba(255,255,255,0.08)',
+                    marginBottom: '8px',
+                    boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
                   }}>
-                    MY
+                    {team.logoText}
+                  </div>
+                  
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    color: 'white',
+                    width: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontFamily: 'Outfit, sans-serif'
+                  }}>
+                    {team.name}
                   </span>
-                )}
-              </div>
-            ))}
+
+                  {isMyTeam && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      right: '-4px',
+                      fontSize: '8px',
+                      backgroundColor: 'var(--primary-orange)',
+                      color: 'white',
+                      padding: '2px 6px',
+                      borderRadius: '6px',
+                      fontWeight: '900',
+                      fontFamily: 'Outfit, sans-serif',
+                      border: '1px solid rgba(0,0,0,0.3)'
+                    }}>
+                      MY
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
