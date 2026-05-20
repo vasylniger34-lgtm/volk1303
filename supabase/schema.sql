@@ -205,6 +205,10 @@ CREATE POLICY "predictions_update_admin" ON predictions
 -- FUNCTIONS & TRIGGERS
 -- ============================================================
 
+-- First drop the trigger and function to avoid dependency issues
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS handle_new_user();
+
 -- Auto-create profile when a new user signs up
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
@@ -252,8 +256,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger on auth.users insert
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+-- Recreate trigger on auth.users insert
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
