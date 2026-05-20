@@ -236,6 +236,34 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
 
 
       {/* Account Settings */}
+      {user.role === 'admin' && (
+        <div style={{ marginBottom: '20px' }}>
+          <button
+            onClick={() => onNavigate('manager' as any)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              background: 'linear-gradient(135deg, #FF5C00 0%, #FF8A47 100%)',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '14px',
+              color: 'white',
+              width: '100%',
+              fontSize: '13px',
+              fontWeight: '800',
+              cursor: 'pointer',
+              boxShadow: '0 4px 15px rgba(255, 92, 0, 0.25)',
+              transition: 'all 0.2s',
+              fontFamily: 'Outfit, sans-serif'
+            }}
+          >
+            💼 ПАНЕЛЬ КЕРУЮЧОГО
+          </button>
+        </div>
+      )}
+
       <h4 style={{
         fontSize: '11px',
         color: '#8F8F9B',

@@ -16,7 +16,7 @@ import { ShieldCheck, Loader2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   // Navigation states
-  const [view, setView] = useState<'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin'>('home');
+  const [view, setView] = useState<'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager'>('home');
   
   // Selection states
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
@@ -26,7 +26,7 @@ const AppContent: React.FC = () => {
   const { toast, hideToast, isAuthenticated, isLoading, authLogin } = useApp();
 
   // Navigation controller helper
-  const navigateTo = (targetView: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin') => {
+  const navigateTo = (targetView: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager') => {
     setView(targetView);
     setSelectedTournamentId(null);
     setSelectedMatchId(null);
@@ -158,15 +158,19 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const isManagerSite = window.location.pathname.startsWith('/admin') || window.location.search.includes('manager=true');
+  const isManagerSite = window.location.pathname.startsWith('/admin') || window.location.search.includes('manager=true') || view === 'manager';
   const isAdminSite = window.location.search.includes('admin=true') || view === 'admin';
 
   if (isManagerSite) {
     return (
       <div className="admin-site-container">
         <ManagerPanel onExitAdmin={() => {
-          window.history.replaceState({}, document.title, '/');
-          navigateTo('home');
+          if (view === 'manager') {
+            navigateTo('profile');
+          } else {
+            window.history.replaceState({}, document.title, '/');
+            navigateTo('home');
+          }
         }} />
 
         {/* Global Toast Alerts */}
