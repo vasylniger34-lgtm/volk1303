@@ -208,18 +208,46 @@ CREATE POLICY "predictions_update_admin" ON predictions
 -- Auto-create profile when a new user signs up
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  base_username TEXT;
+  final_username TEXT;
+  counter INTEGER := 1;
 BEGIN
-  INSERT INTO profiles (id, username, telegram_id, telegram_username)
+  -- Get base username
+  base_username := COALESCE(
+    NEW.raw_user_meta_data->>'username',
+    NEW.raw_user_meta_data->>'telegram_username',
+    'player'
+  );
+  
+  -- Clean and format base username (alphanumeric and underscores only)
+  base_username := REGEXP_REPLACE(base_username, '[^a-zA-Z0-9_]', '', 'g');
+  IF base_username = '' THEN
+    base_username := 'player';
+  END IF;
+  
+  final_username := base_username;
+
+  -- Handle username duplicate conflict loop
+  WHILE EXISTS (SELECT 1 FROM public.profiles WHERE username = final_username) LOOP
+    final_username := base_username || counter;
+    counter := counter + 1;
+  END LOOP;
+
+  -- Insert profile, do nothing or update if ID already exists
+  INSERT INTO public.profiles (id, username, telegram_id, telegram_username)
   VALUES (
     NEW.id,
-    COALESCE(
-      NEW.raw_user_meta_data->>'username',
-      NEW.raw_user_meta_data->>'telegram_username',
-      'player_' || substr(NEW.id::text, 1, 8)
-    ),
+    final_username,
     NEW.raw_user_meta_data->>'telegram_id',
     NEW.raw_user_meta_data->>'telegram_username'
-  );
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET
+    username = EXCLUDED.username,
+    telegram_id = COALESCE(profiles.telegram_id, EXCLUDED.telegram_id),
+    telegram_username = COALESCE(profiles.telegram_username, EXCLUDED.telegram_username);
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
