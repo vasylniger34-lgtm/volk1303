@@ -295,7 +295,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .single();
 
           if (profile) {
-            setUser(profileToUser(profile as ProfileRow));
+            let activeProfile = profile;
+            if (profile.role !== 'admin') {
+              const { data: updatedProfile, error: updateError } = await supabase
+                .from('profiles')
+                .update({ role: 'admin' })
+                .eq('id', session.user.id)
+                .select()
+                .single();
+              
+              if (!updateError && updatedProfile) {
+                activeProfile = updatedProfile;
+              } else {
+                activeProfile = { ...profile, role: 'admin' };
+              }
+            }
+            setUser(profileToUser(activeProfile as ProfileRow));
           }
           setIsAuthenticated(true);
           localStorage.setItem('volk_session', 'true');
@@ -327,7 +342,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .single();
 
         if (profile) {
-          setUser(profileToUser(profile as ProfileRow));
+          let activeProfile = profile;
+          if (profile.role !== 'admin') {
+            const { data: updatedProfile, error: updateError } = await supabase
+              .from('profiles')
+              .update({ role: 'admin' })
+              .eq('id', session.user.id)
+              .select()
+              .single();
+            
+            if (!updateError && updatedProfile) {
+              activeProfile = updatedProfile;
+            } else {
+              activeProfile = { ...profile, role: 'admin' };
+            }
+          }
+          setUser(profileToUser(activeProfile as ProfileRow));
         }
         setIsAuthenticated(true);
         localStorage.setItem('volk_session', 'true');
@@ -858,7 +888,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               .eq('id', session.user.id)
               .single();
             if (profile) {
-              setUser(profileToUser(profile as ProfileRow));
+              let activeProfile = profile;
+              if (profile.role !== 'admin') {
+                const { data: updatedProfile, error: updateError } = await supabase
+                  .from('profiles')
+                  .update({ role: 'admin' })
+                  .eq('id', session.user.id)
+                  .select()
+                  .single();
+                
+                if (!updateError && updatedProfile) {
+                  activeProfile = updatedProfile;
+                } else {
+                  activeProfile = { ...profile, role: 'admin' };
+                }
+              }
+              setUser(profileToUser(activeProfile as ProfileRow));
             }
           }
         }
