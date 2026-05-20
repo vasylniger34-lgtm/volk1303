@@ -1,38 +1,82 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { ChevronLeft, Share2, Zap } from 'lucide-react';
+import { ChevronLeft, Share2, Zap, Tv2, ExternalLink, TrendingUp, Coins, CheckCircle, XCircle, Clock, X } from 'lucide-react';
 
 interface MatchDetailViewProps {
   matchId: string;
   onBack: () => void;
 }
 
-export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBack }) => {
-  const { matches, placePrediction, user, showToast } = useApp();
-  const match = matches.find(m => m.id === matchId);
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'STATS' | 'BETS'>('OVERVIEW');
+// Converts any YouTube / Twitch URL to an embeddable iframe src
+function getEmbedUrl(url: string): string | null {
+  if (!url) return null;
 
-  // Betting states
-  const [wager, setWager] = useState<number>(100);
+  // YouTube: youtu.be/ID or youtube.com/watch?v=ID or youtube.com/live/ID
+  const ytShort = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  const ytFull  = url.match(/youtube\.com\/(?:watch\?v=|live\/)([a-zA-Z0-9_-]{11})/);
+  const ytId = (ytShort || ytFull)?.[1];
+  if (ytId) return `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0`;
+
+  // Twitch channel: twitch.tv/CHANNEL
+  const twCh = url.match(/twitch\.tv\/([a-zA-Z0-9_]+)/);
+  if (twCh) return `https://player.twitch.tv/?channel=${twCh[1]}&parent=${window.location.hostname}&autoplay=true`;
+
+  return null; // unsupported platform – we'll show a fallback link
+}
+
+export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBack }) => {
+  const { matches, tournaments, placePrediction, predictions, user, showToast } = useApp();
+  const match  = matches.find(m => m.id === matchId);
+  const tourney = tournaments.find(t => t.id === match?.tournamentId);
+
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'STREAM' | 'BETS'>('OVERVIEW');
+
+  // ─── Betting State ───
+  const [betOpen, setBetOpen] = useState(false);
   const [selectedBet, setSelectedBet] = useState<{
     type: 'winner' | 'total_rounds';
     value: string;
     odds: number;
   } | null>(null);
+  const [wager, setWager] = useState<number>(100);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-open bet keyboard on mobile
+  useEffect(() => {
+    if (betOpen && inputRef.current) {
+      setTimeout(() => inputRef.current?.focus(), 150);
+    }
+  }, [betOpen]);
 
   if (!match) return <div style={{ padding: '20px', color: 'white' }}>Матч не знайдено</div>;
 
-  const handlePlaceBet = () => {
-    if (!selectedBet) {
-      alert('Будь ласка, оберіть варіант прогнозу!');
-      return;
-    }
-    if (wager <= 0) {
-      alert('Сума ставки повинна бути більше 0!');
-      return;
-    }
+  const isLive     = match.status === 'live';
+  const isFinished = match.status === 'finished';
 
-    const success = placePrediction({
+  // ─── My bets on this match ───
+  const myBets = predictions.filter(p => p.matchId === matchId);
+
+  // ─── Stream embed ───
+  const rawStream = tourney?.streamUrl || '';
+  const embedUrl  = getEmbedUrl(rawStream);
+
+  // ─── Bet Handlers ───
+  const openBet = (type: 'winner' | 'total_rounds', value: string, odds: number) => {
+    if (isFinished) { showToast('Прийом ставок закрито', 'error'); return; }
+    if (isLive && type === 'winner' && myBets.some(b => b.predictionType === 'winner')) {
+      showToast('Ви вже зробили ставку на переможця!', 'error'); return;
+    }
+    setSelectedBet({ type, value, odds });
+    setWager(100);
+    setBetOpen(true);
+  };
+
+  const confirmBet = () => {
+    if (!selectedBet) return;
+    if (wager <= 0) { showToast('Введіть суму ставки!', 'error'); return; }
+    if (wager > user.balance) { showToast('Недостатньо монет!', 'error'); return; }
+
+    const ok = placePrediction({
       matchId: match.id,
       tournamentName: match.tournamentName,
       teamA: match.teamA?.name || 'Team A',
@@ -40,54 +84,51 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
       predictionType: selectedBet.type,
       predictedValue: selectedBet.value,
       odds: selectedBet.odds,
-      wager
+      wager,
     });
 
-    if (success) {
-      setSelectedBet(null);
-    }
+    if (ok) { setBetOpen(false); setSelectedBet(null); }
   };
 
-  const isLive = match.status === 'live';
-  const isFinished = match.status === 'finished';
-
-  // Stats calculation
-  const firstHalfA = Math.min(8, match.scoreA);
-  const firstHalfB = Math.min(4, match.scoreB);
+  // ─── Half-time stats ───
+  const firstHalfA  = Math.min(8, match.scoreA);
+  const firstHalfB  = Math.min(4, match.scoreB);
   const secondHalfA = Math.max(0, match.scoreA - 8);
   const secondHalfB = Math.max(0, match.scoreB - 4);
 
+  // Pick button style helper
+  const pickStyle = (active: boolean) => ({
+    background: active ? 'rgba(255, 92, 0, 0.12)' : 'rgba(255,255,255,0.02)',
+    border: `1px solid ${active ? '#FF5C00' : 'rgba(255,255,255,0.06)'}`,
+    borderRadius: '14px',
+    padding: '14px 16px',
+    color: 'white',
+    cursor: 'pointer',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    transition: 'all 0.18s',
+    textAlign: 'left' as const,
+    width: '100%',
+  });
+
   return (
-    <div className="scroll-container" style={{ paddingBottom: '120px' }}>
-      
-      {/* Header bar matching screenshot 6 */}
+    <div className="scroll-container" style={{ paddingBottom: '160px' }}>
+
+      {/* ─── Sticky Header ─── */}
       <div className="glass-panel" style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '16px 20px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 16px',
         borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 40
+        position: 'sticky', top: 0, zIndex: 50,
       }}>
-        <button 
-          onClick={onBack}
-          style={{ background: 'none', border: 'none', color: '#8F8F9B', cursor: 'pointer', padding: '4px' }}
-        >
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#8F8F9B', cursor: 'pointer', padding: '4px' }}>
           <ChevronLeft size={22} />
         </button>
-        
-        <h3 style={{
-          fontSize: '14px',
-          fontWeight: '900',
-          color: 'white',
-          fontFamily: 'Outfit, sans-serif'
-        }}>
+        <h3 style={{ fontSize: '14px', fontWeight: '900', color: 'white', fontFamily: 'Outfit, sans-serif' }}>
           {match.teamA?.logoText} VS {match.teamB?.logoText}
         </h3>
-
-        <button 
+        <button
           onClick={() => {
             if (navigator.share) {
               navigator.share({ title: `Матч ${match.teamA?.name} vs ${match.teamB?.name}`, url: window.location.href });
@@ -101,49 +142,28 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
         </button>
       </div>
 
-      {/* Main Scorecard Arena Card */}
+      {/* ─── Scoreboard ─── */}
       <div style={{
         background: 'linear-gradient(180deg, #111116 0%, #070709 100%)',
-        padding: '24px 16px',
+        padding: '24px 16px 20px',
         textAlign: 'center',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.03)'
+        borderBottom: '1px solid rgba(255,255,255,0.03)',
       }}>
-        <span style={{
-          fontSize: '9px',
-          color: '#8F8F9B',
-          fontWeight: '700',
-          letterSpacing: '0.5px',
-          textTransform: 'uppercase',
-          display: 'block',
-          marginBottom: '10px'
-        }}>
+        <span style={{ fontSize: '9px', color: '#8F8F9B', fontWeight: '700', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
           {match.tournamentName} • {match.roundName.toUpperCase()}
         </span>
 
-        {/* Dynamic Teams vs row */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-around',
-          marginBottom: '16px'
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', marginBottom: '14px' }}>
           {/* Team A */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '32%' }}>
             <div style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '50%',
+              width: '52px', height: '52px', borderRadius: '50%',
               backgroundColor: match.teamA?.logoBg || '#4C1D95',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: '900',
-              color: 'white',
-              fontSize: '18px',
-              fontFamily: 'Outfit, sans-serif',
-              border: '2px solid rgba(255,255,255,0.06)',
-              boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
-              marginBottom: '8px'
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: '900', color: 'white', fontSize: '18px', fontFamily: 'Outfit, sans-serif',
+              border: '2px solid rgba(255,255,255,0.08)',
+              boxShadow: isLive ? '0 0 20px rgba(255,92,0,0.3)' : '0 6px 16px rgba(0,0,0,0.4)',
+              marginBottom: '8px',
             }}>
               {match.teamA?.logoText}
             </div>
@@ -152,67 +172,38 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
             </span>
           </div>
 
-          {/* Scores */}
+          {/* Score */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <span style={{ fontSize: '36px', fontWeight: '900', fontFamily: 'Outfit, sans-serif', color: 'white' }}>
-                {match.scoreA}
-              </span>
-              <span style={{ fontSize: '13px', color: '#51515E', fontWeight: '700' }}>VS</span>
-              <span style={{ fontSize: '36px', fontWeight: '900', fontFamily: 'Outfit, sans-serif', color: 'white' }}>
-                {match.scoreB}
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ fontSize: '40px', fontWeight: '900', fontFamily: 'Outfit, sans-serif', color: 'white' }}>{match.scoreA}</span>
+              <span style={{ fontSize: '13px', color: '#51515E', fontWeight: '700' }}>:</span>
+              <span style={{ fontSize: '40px', fontWeight: '900', fontFamily: 'Outfit, sans-serif', color: 'white' }}>{match.scoreB}</span>
             </div>
-            
             {isLive ? (
               <span className="badge-live" style={{ marginTop: '4px' }}>
                 <span className="badge-live-pulse" /> LIVE
               </span>
             ) : isFinished ? (
-              <span style={{
-                fontSize: '8px',
-                color: '#10B981',
-                backgroundColor: 'rgba(16, 185, 129, 0.05)',
-                border: '1px solid rgba(16, 185, 129, 0.15)',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                fontWeight: '900',
-                marginTop: '4px'
-              }}>
-                МАТЧ ЗАВЕРШЕНО
+              <span style={{ fontSize: '8px', color: '#10B981', backgroundColor: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)', padding: '2px 8px', borderRadius: '4px', fontWeight: '900', marginTop: '4px' }}>
+                ЗАВЕРШЕНО
               </span>
             ) : (
-              <span style={{
-                fontSize: '9px',
-                color: '#8F8F9B',
-                backgroundColor: 'rgba(255,255,255,0.02)',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                marginTop: '4px',
-                fontWeight: '700'
-              }}>
+              <span style={{ fontSize: '9px', color: '#8F8F9B', backgroundColor: 'rgba(255,255,255,0.02)', padding: '2px 8px', borderRadius: '4px', marginTop: '4px', fontWeight: '700' }}>
                 ОЧІКУВАННЯ
               </span>
             )}
           </div>
 
           {/* Team B */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '32%' }}>
             <div style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '50%',
+              width: '52px', height: '52px', borderRadius: '50%',
               backgroundColor: match.teamB?.logoBg || '#1E293B',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: '900',
-              color: 'white',
-              fontSize: '18px',
-              fontFamily: 'Outfit, sans-serif',
-              border: '2px solid rgba(255,255,255,0.06)',
-              boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
-              marginBottom: '8px'
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: '900', color: 'white', fontSize: '18px', fontFamily: 'Outfit, sans-serif',
+              border: '2px solid rgba(255,255,255,0.08)',
+              boxShadow: isLive ? '0 0 20px rgba(139,92,246,0.3)' : '0 6px 16px rgba(0,0,0,0.4)',
+              marginBottom: '8px',
             }}>
               {match.teamB?.logoText}
             </div>
@@ -222,22 +213,27 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
           </div>
         </div>
 
-        {/* Map and BO stats */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', fontSize: '11px', color: '#8F8F9B', marginTop: '10px' }}>
+        {/* Map row + stream indicator */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', fontSize: '11px', color: '#8F8F9B', marginTop: '4px' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Zap size={11} color="#FF5C00" /> {match.map}
           </span>
           <span>BO3 систем</span>
+          {rawStream && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#EF4444', fontWeight: '700' }}>
+              <Tv2 size={11} /> ЕФІР
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="tabs-header" style={{ padding: '0 16px', margin: '14px 0' }}>
+      {/* ─── Tabs ─── */}
+      <div className="tabs-header" style={{ padding: '0 16px', margin: '12px 0' }}>
         {[
           { id: 'OVERVIEW', label: 'Огляд' },
-          { id: 'STATS', label: 'Статистика' },
-          { id: 'BETS', label: 'Ставки' }
-        ].map((tab) => (
+          { id: 'STREAM',   label: rawStream ? '📡 Ефір' : 'Ефір' },
+          { id: 'BETS',     label: 'Ставки' },
+        ].map(tab => (
           <button
             key={tab.id}
             className={`tab-btn ${activeTab === tab.id ? 'tab-btn-active' : ''}`}
@@ -248,17 +244,18 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
         ))}
       </div>
 
-      {/* OVERVIEW TAB */}
+      {/* ══════════════════════════════════════
+          TAB: OVERVIEW
+         ══════════════════════════════════════ */}
       {activeTab === 'OVERVIEW' && (
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Map stats card matching image 6 */}
-          <div className="esports-card" style={{ 
-            padding: '20px 16px',
-            background: 'linear-gradient(180deg, rgba(255, 92, 0, 0.06) 0%, rgba(16, 16, 22, 0.98) 100%)',
-            border: '1px solid rgba(255, 92, 0, 0.25)',
-            boxShadow: '0 8px 32px rgba(255, 92, 0, 0.05)'
+          {/* Half-time card */}
+          <div className="esports-card" style={{
+            padding: '18px 16px',
+            background: 'linear-gradient(180deg, rgba(255,92,0,0.06) 0%, rgba(16,16,22,0.98) 100%)',
+            border: '1px solid rgba(255,92,0,0.22)',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '11px', color: 'white', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Zap size={12} color="#FF5C00" fill="#FF5C00" /> {match.map}
               </span>
@@ -266,7 +263,6 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
                 {match.scoreA} : {match.scoreB}
               </span>
             </div>
-
             <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', fontSize: '11px' }}>
               <div style={{ textAlign: 'center' }}>
                 <span style={{ color: '#51515E', display: 'block', marginBottom: '2px' }}>1st half</span>
@@ -280,357 +276,228 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
             </div>
           </div>
 
-          {/* Quick Winner Bets Panel directly on Overview tab */}
-          {!isFinished && (
+          {/* Quick bet picks - only when not finished */}
+          {!isFinished && match.teamA && match.teamB && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <h4 style={{ fontSize: '11px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.8px', fontFamily: 'Outfit, sans-serif', fontWeight: '800' }}>
-                ШВИДКИЙ ПРЕДИКТ ПЕРЕМОЖЦЯ
+                ЗРОБИТИ СТАВКУ
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <button 
-                  onClick={() => {
-                    setActiveTab('BETS');
-                    setSelectedBet({ type: 'winner', value: match.teamA?.name || '', odds: match.oddsA });
-                  }}
-                  className="esports-card"
+                <button
+                  onClick={() => openBet('winner', match.teamA!.name, match.oddsA)}
                   style={{
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.05)',
-                    padding: '14px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    transition: 'all 0.2s'
+                    ...pickStyle(selectedBet?.value === match.teamA.name),
+                    flexDirection: 'column', alignItems: 'flex-start', gap: '4px',
                   }}
                 >
-                  <span style={{ fontSize: '11px', fontWeight: '800' }}>{match.teamA?.name}</span>
-                  <span style={{ fontSize: '13px', fontWeight: '900', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>
-                    {match.oddsA}
+                  <span style={{ fontSize: '13px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: match.teamA.logoBg, display: 'inline-block' }} />
+                    {match.teamA.name}
+                  </span>
+                  <span style={{ fontSize: '17px', fontWeight: '900', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>
+                    ×{match.oddsA}
                   </span>
                 </button>
-                <button 
-                  onClick={() => {
-                    setActiveTab('BETS');
-                    setSelectedBet({ type: 'winner', value: match.teamB?.name || '', odds: match.oddsB });
-                  }}
-                  className="esports-card"
+                <button
+                  onClick={() => openBet('winner', match.teamB!.name, match.oddsB)}
                   style={{
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.05)',
-                    padding: '14px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    transition: 'all 0.2s'
+                    ...pickStyle(selectedBet?.value === match.teamB.name),
+                    flexDirection: 'column', alignItems: 'flex-start', gap: '4px',
                   }}
                 >
-                  <span style={{ fontSize: '11px', fontWeight: '800' }}>{match.teamB?.name}</span>
-                  <span style={{ fontSize: '13px', fontWeight: '900', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>
-                    {match.oddsB}
+                  <span style={{ fontSize: '13px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: match.teamB.logoBg, display: 'inline-block' }} />
+                    {match.teamB.name}
+                  </span>
+                  <span style={{ fontSize: '17px', fontWeight: '900', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>
+                    ×{match.oddsB}
                   </span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Live Simulator Logs */}
+          {/* Live logs */}
           <div className="esports-card" style={{ padding: '16px' }}>
             <h4 style={{ fontSize: '11px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
               ХРОНОЛОГІЯ МАТЧУ
             </h4>
-            
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-              maxHeight: '180px',
-              overflowY: 'auto',
-              fontSize: '11px',
-              color: '#8F8F9B'
-            }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '200px', overflowY: 'auto', fontSize: '11px', color: '#8F8F9B' }}>
               {match.liveLogs.length > 0 ? (
                 [...match.liveLogs].reverse().map((log, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                    borderBottom: '1px solid rgba(255,255,255,0.01)',
-                    paddingBottom: '6px'
-                  }}>
+                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.01)', paddingBottom: '6px' }}>
                     <span style={{ color: '#FF5C00' }}>•</span>
                     <span>{log}</span>
                   </div>
                 ))
               ) : (
-                <div style={{ textAlign: 'center', color: '#51515E', padding: '20px 0' }}>
-                  Очікування старту гри...
-                </div>
+                <div style={{ textAlign: 'center', color: '#51515E', padding: '20px 0' }}>Очікування старту гри...</div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* STATS TAB */}
-      {activeTab === 'STATS' && (
+      {/* ══════════════════════════════════════
+          TAB: LIVE STREAM
+         ══════════════════════════════════════ */}
+      {activeTab === 'STREAM' && (
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div className="esports-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ fontSize: '11px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              ПОРІВНЯЛЬНА СТАТИСТИКА
-            </h4>
+          {rawStream ? (
+            <>
+              {embedUrl ? (
+                <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,92,0,0.2)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                  <iframe
+                    src={embedUrl}
+                    width="100%"
+                    height="220"
+                    frameBorder="0"
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    allowFullScreen
+                    title="Live Stream"
+                    style={{ display: 'block' }}
+                  />
+                </div>
+              ) : (
+                <div className="esports-card" style={{ padding: '20px', textAlign: 'center' }}>
+                  <Tv2 size={32} color="#FF5C00" style={{ margin: '0 auto 12px' }} />
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '6px' }}>Ефір доступний за посиланням</p>
+                  <p style={{ fontSize: '11px', color: '#8F8F9B', marginBottom: '16px' }}>Платформа не підтримує вбудований плеєр</p>
+                  <a
+                    href={rawStream}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      backgroundColor: '#FF5C00', borderRadius: '10px', padding: '10px 20px',
+                      color: 'white', fontWeight: '800', fontSize: '12px', textDecoration: 'none',
+                    }}
+                  >
+                    <ExternalLink size={14} /> Відкрити ефір
+                  </a>
+                </div>
+              )}
 
-            {[
-              { label: 'Середній K/D', valA: '1.24', valB: '1.02', pct: 60 },
-              { label: 'Клатчі 1vX', valA: '4', valB: '2', pct: 68 },
-              { label: 'Перші вбивства (First Blood)', valA: '11', valB: '8', pct: 58 },
-              { label: 'Вінрейт на карті', valA: '78%', valB: '54%', pct: 62 }
-            ].map((stat, idx) => (
-              <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                  <span style={{ fontWeight: '700', color: 'white' }}>{stat.valA}</span>
-                  <span style={{ color: '#8F8F9B' }}>{stat.label}</span>
-                  <span style={{ fontWeight: '700', color: 'white' }}>{stat.valB}</span>
-                </div>
-                {/* Stats Bar */}
+              {/* Stream info card */}
+              <div className="esports-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  height: '6px',
-                  backgroundColor: 'rgba(255,255,255,0.03)',
-                  borderRadius: '3px',
-                  position: 'relative',
-                  overflow: 'hidden'
+                  width: '40px', height: '40px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    height: '100%',
-                    width: `${stat.pct}%`,
-                    backgroundColor: '#FF5C00',
-                    borderRadius: '3px'
-                  }} />
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    height: '100%',
-                    width: `${100 - stat.pct}%`,
-                    backgroundColor: '#8B5CF6'
-                  }} />
+                  <Tv2 size={20} color="#EF4444" />
                 </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>
+                    {match.teamA?.name} vs {match.teamB?.name}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#8F8F9B', marginTop: '2px' }}>{match.tournamentName} • Офіційний ефір</div>
+                </div>
+                <a
+                  href={rawStream}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#8F8F9B', display: 'flex', alignItems: 'center' }}
+                >
+                  <ExternalLink size={16} />
+                </a>
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <div className="esports-card" style={{ padding: '40px 20px', textAlign: 'center' }}>
+              <Tv2 size={40} color="#51515E" style={{ margin: '0 auto 14px', opacity: 0.4 }} />
+              <p style={{ fontSize: '14px', fontWeight: '700', color: '#8F8F9B' }}>Ефір ще не підключено</p>
+              <p style={{ fontSize: '11px', color: '#51515E', marginTop: '6px' }}>
+                Адміністратор платформи налаштує посилання на трансляцію до початку матчу
+              </p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* BETS TAB */}
+      {/* ══════════════════════════════════════
+          TAB: BETS
+         ══════════════════════════════════════ */}
       {activeTab === 'BETS' && (
-        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {isFinished ? (
             <div className="esports-card" style={{ padding: '20px', textAlign: 'center', color: '#51515E', fontSize: '12px' }}>
-              Прийом ставок на цей матч закрито (матч завершено).
+              Прийом ставок закрито — матч завершено.
             </div>
           ) : (
             <>
-              {/* Option 1: Match Winner */}
+              {/* Winner picks */}
               <div>
-                <h4 style={{ fontSize: '11px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+                <h4 style={{ fontSize: '11px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', fontFamily: 'Outfit' }}>
                   ПЕРЕМОЖЕЦЬ МАТЧУ
                 </h4>
-                
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  {/* Bet Team A */}
-                  <button 
-                    onClick={() => setSelectedBet({ type: 'winner', value: match.teamA?.name || '', odds: match.oddsA })}
-                    style={{
-                      background: selectedBet?.type === 'winner' && selectedBet.value === match.teamA?.name ? 'rgba(255,92,0,0.1)' : 'rgba(255,255,255,0.02)',
-                      border: selectedBet?.type === 'winner' && selectedBet.value === match.teamA?.name ? '1px solid #FF5C00' : '1px solid rgba(255,255,255,0.05)',
-                      borderRadius: '12px',
-                      padding: '14px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <span style={{ fontSize: '12px', fontWeight: '700' }}>{match.teamA?.name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>
-                      {match.oddsA}
-                    </span>
-                  </button>
-
-                  {/* Bet Team B */}
-                  <button 
-                    onClick={() => setSelectedBet({ type: 'winner', value: match.teamB?.name || '', odds: match.oddsB })}
-                    style={{
-                      background: selectedBet?.type === 'winner' && selectedBet.value === match.teamB?.name ? 'rgba(255,92,0,0.1)' : 'rgba(255,255,255,0.02)',
-                      border: selectedBet?.type === 'winner' && selectedBet.value === match.teamB?.name ? '1px solid #FF5C00' : '1px solid rgba(255,255,255,0.05)',
-                      borderRadius: '12px',
-                      padding: '14px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <span style={{ fontSize: '12px', fontWeight: '700' }}>{match.teamB?.name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>
-                      {match.oddsB}
-                    </span>
-                  </button>
+                  {[
+                    { team: match.teamA, odds: match.oddsA },
+                    { team: match.teamB, odds: match.oddsB },
+                  ].map(({ team, odds }) => team ? (
+                    <button
+                      key={team.id}
+                      onClick={() => openBet('winner', team.name, odds)}
+                      style={{ ...pickStyle(selectedBet?.type === 'winner' && selectedBet.value === team.name), flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: team.logoBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '900' }}>
+                          {team.logoText}
+                        </div>
+                        <span style={{ fontSize: '13px', fontWeight: '800' }}>{team.name}</span>
+                      </div>
+                      <span style={{ fontSize: '20px', fontWeight: '950', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>×{odds}</span>
+                    </button>
+                  ) : null)}
                 </div>
               </div>
 
-              {/* Option 2: Total Rounds */}
+              {/* Total rounds */}
               <div>
-                <h4 style={{ fontSize: '11px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-                  ТОТАЛ РАУНДІВ
+                <h4 style={{ fontSize: '11px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', fontFamily: 'Outfit' }}>
+                  ТОТАЛ РАУНДІВ (26.5)
                 </h4>
-                
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  {/* Over 26.5 */}
-                  <button 
-                    onClick={() => setSelectedBet({ type: 'total_rounds', value: 'over', odds: 1.75 })}
-                    style={{
-                      background: selectedBet?.type === 'total_rounds' && selectedBet.value === 'over' ? 'rgba(255,92,0,0.1)' : 'rgba(255,255,255,0.02)',
-                      border: selectedBet?.type === 'total_rounds' && selectedBet.value === 'over' ? '1px solid #FF5C00' : '1px solid rgba(255,255,255,0.05)',
-                      borderRadius: '12px',
-                      padding: '14px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <span style={{ fontSize: '12px', fontWeight: '700' }}>Більше 26.5</span>
-                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>
-                      1.75
-                    </span>
+                  <button onClick={() => openBet('total_rounds', 'over', 1.75)}
+                    style={{ ...pickStyle(selectedBet?.type === 'total_rounds' && selectedBet.value === 'over'), flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '700' }}>Більше 26.5</span>
+                    <span style={{ fontSize: '20px', fontWeight: '950', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>×1.75</span>
                   </button>
-
-                  {/* Under 26.5 */}
-                  <button 
-                    onClick={() => setSelectedBet({ type: 'total_rounds', value: 'under', odds: 2.05 })}
-                    style={{
-                      background: selectedBet?.type === 'total_rounds' && selectedBet.value === 'under' ? 'rgba(255,92,0,0.1)' : 'rgba(255,255,255,0.02)',
-                      border: selectedBet?.type === 'total_rounds' && selectedBet.value === 'under' ? '1px solid #FF5C00' : '1px solid rgba(255,255,255,0.05)',
-                      borderRadius: '12px',
-                      padding: '14px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <span style={{ fontSize: '12px', fontWeight: '700' }}>Менше 26.5</span>
-                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>
-                      2.05
-                    </span>
+                  <button onClick={() => openBet('total_rounds', 'under', 2.05)}
+                    style={{ ...pickStyle(selectedBet?.type === 'total_rounds' && selectedBet.value === 'under'), flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '700' }}>Менше 26.5</span>
+                    <span style={{ fontSize: '20px', fontWeight: '950', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>×2.05</span>
                   </button>
                 </div>
               </div>
 
-              {/* Prediction details & wager input */}
-              {selectedBet && (
-                <div className="esports-card orange-glow" style={{
-                  padding: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  border: '1px solid rgba(255,92,0,0.2)'
-                }}>
-                  {/* Selected label */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontSize: '8px', color: '#8F8F9B', textTransform: 'uppercase' }}>Прогноз</span>
-                      <span style={{ fontSize: '14px', fontWeight: '800', color: 'white', display: 'block' }}>
-                        {selectedBet.type === 'winner' ? `Перемога ${selectedBet.value}` : `Тотал ${selectedBet.value === 'over' ? 'Більше' : 'Менше'} 26.5`}
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '8px', color: '#8F8F9B', textTransform: 'uppercase', display: 'block', textAlign: 'right' }}>Коефіцієнт</span>
-                      <span style={{ fontSize: '16px', fontWeight: '900', color: '#FF5C00', fontFamily: 'Outfit, sans-serif' }}>
-                        {selectedBet.odds}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Input wager */}
+              {/* My bets on this match */}
+              {myBets.length > 0 && (
+                <div>
+                  <h4 style={{ fontSize: '11px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', fontFamily: 'Outfit' }}>
+                    МОЇ СТАВКИ НА ЦЕЙ МАТЧ
+                  </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#8F8F9B' }}>
-                      <span>Сума ставки (монетки)</span>
-                      <span>Доступно: {user.balance.toLocaleString('uk-UA')} 🪙</span>
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <input
-                        type="number"
-                        className="form-input"
-                        value={wager}
-                        onChange={(e) => setWager(Math.max(0, parseInt(e.target.value) || 0))}
-                        style={{ flex: 1, padding: '10px 14px' }}
-                      />
-                      
-                      {/* Quick options */}
-                      {['+100', '+500', 'Max'].map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() => {
-                            if (opt === 'Max') setWager(user.balance);
-                            else setWager(prev => Math.min(user.balance, prev + parseInt(opt.replace('+', ''))));
-                          }}
-                          style={{
-                            background: 'rgba(255,255,255,0.03)',
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            borderRadius: '10px',
-                            color: 'white',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            padding: '0 12px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
+                    {myBets.map(b => (
+                      <div key={b.id} className="esports-card" style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontSize: '11px', color: '#8F8F9B', display: 'block' }}>
+                            {b.predictionType === 'winner' ? `Перемога ${b.predictedValue}` : `Тотал ${b.predictedValue === 'over' ? 'більше' : 'менше'} 26.5`}
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: 'white' }}>
+                            {b.wager.toLocaleString('uk-UA')} 🪙 × {b.odds}
+                          </span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          {b.status === 'pending' && <span style={{ fontSize: '10px', color: '#FF5C00', display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={10} /> У грі</span>}
+                          {b.status === 'won'     && <span style={{ fontSize: '10px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle size={10} /> +{b.payout.toLocaleString('uk-UA')} 🪙</span>}
+                          {b.status === 'lost'    && <span style={{ fontSize: '10px', color: '#EF4444', display: 'flex', alignItems: 'center', gap: '4px' }}><XCircle size={10} /> Програш</span>}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-
-                  {/* Payout calculation */}
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderTop: '1px solid rgba(255,255,255,0.03)',
-                    paddingTop: '12px',
-                    fontSize: '13px'
-                  }}>
-                    <span style={{ color: '#8F8F9B', fontWeight: '500' }}>Можливий виграш</span>
-                    <span style={{ fontWeight: '900', color: '#10B981', fontFamily: 'Outfit, sans-serif' }}>
-                      {Math.round(wager * selectedBet.odds).toLocaleString('uk-UA')} 🪙
-                    </span>
-                  </div>
-
-                  {/* Giant place bet button */}
-                  <button 
-                    className="btn-primary" 
-                    onClick={handlePlaceBet}
-                    style={{ width: '100%', padding: '14px' }}
-                  >
-                    ПОСТАВИТИ ПРЕДИКТ
-                  </button>
                 </div>
               )}
             </>
@@ -638,6 +505,120 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
         </div>
       )}
 
+      {/* ══════════════════════════════════════
+          FLOATING BET BOTTOM SHEET
+         ══════════════════════════════════════ */}
+      {betOpen && selectedBet && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setBetOpen(false)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+              backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+              zIndex: 100,
+            }}
+          />
+
+          {/* Sheet */}
+          <div style={{
+            position: 'fixed', left: 0, right: 0, bottom: 0,
+            background: '#0D0D14',
+            border: '1px solid rgba(255,92,0,0.2)',
+            borderRadius: '28px 28px 0 0',
+            padding: '24px 20px 40px',
+            zIndex: 101,
+            animation: 'slideUp 0.25s ease',
+          }}>
+            {/* Handle bar */}
+            <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.1)', margin: '0 auto 20px' }} />
+
+            {/* Bet summary header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+              <div>
+                <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ваш прогноз</span>
+                <p style={{ fontSize: '18px', fontWeight: '900', color: 'white', fontFamily: 'Outfit, sans-serif', marginTop: '2px' }}>
+                  {selectedBet.type === 'winner'
+                    ? `Перемога ${selectedBet.value}`
+                    : `Тотал ${selectedBet.value === 'over' ? 'Більше' : 'Менше'} 26.5`
+                  }
+                </p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase' }}>Коефіцієнт</span>
+                <p style={{ fontSize: '24px', fontWeight: '950', color: '#FF5C00', fontFamily: 'Outfit, sans-serif', marginTop: '2px' }}>
+                  ×{selectedBet.odds}
+                </p>
+              </div>
+              <button onClick={() => setBetOpen(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', cursor: 'pointer', color: '#8F8F9B' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Balance indicator */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#8F8F9B', marginBottom: '8px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Coins size={11} /> Ваш баланс</span>
+              <span style={{ fontWeight: '700', color: 'white' }}>{user.balance.toLocaleString('uk-UA')} 🪙</span>
+            </div>
+
+            {/* Wager input */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <input
+                ref={inputRef}
+                type="number"
+                className="form-input"
+                value={wager}
+                min={1}
+                max={user.balance}
+                onChange={e => setWager(Math.max(0, parseInt(e.target.value) || 0))}
+                style={{ flex: 1, padding: '12px 14px', fontSize: '16px', fontWeight: '800', fontFamily: 'Outfit, sans-serif' }}
+              />
+              {[100, 500, 1000].map(amt => (
+                <button key={amt} onClick={() => setWager(Math.min(user.balance, amt))}
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', color: 'white', fontSize: '11px', fontWeight: '700', padding: '0 12px', cursor: 'pointer' }}>
+                  {amt >= 1000 ? `${amt/1000}K` : amt}
+                </button>
+              ))}
+              <button onClick={() => setWager(user.balance)}
+                style={{ background: 'rgba(255,92,0,0.08)', border: '1px solid rgba(255,92,0,0.2)', borderRadius: '10px', color: '#FF5C00', fontSize: '11px', fontWeight: '800', padding: '0 12px', cursor: 'pointer' }}>
+                MAX
+              </button>
+            </div>
+
+            {/* Potential payout */}
+            <div style={{
+              background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.12)',
+              borderRadius: '12px', padding: '12px 16px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              marginBottom: '16px',
+            }}>
+              <span style={{ fontSize: '12px', color: '#8F8F9B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <TrendingUp size={13} color="#10B981" /> Можливий виграш
+              </span>
+              <span style={{ fontSize: '18px', fontWeight: '900', color: '#10B981', fontFamily: 'Outfit, sans-serif' }}>
+                {wager > 0 ? Math.round(wager * selectedBet.odds).toLocaleString('uk-UA') : '–'} 🪙
+              </span>
+            </div>
+
+            {/* Confirm button */}
+            <button
+              className="btn-primary"
+              onClick={confirmBet}
+              disabled={wager <= 0 || wager > user.balance}
+              style={{ width: '100%', padding: '16px', fontSize: '14px', fontWeight: '900', letterSpacing: '1px' }}
+            >
+              ПІДТВЕРДИТИ СТАВКУ
+            </button>
+          </div>
+        </>
+      )}
+
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };

@@ -36,6 +36,7 @@ export interface Tournament {
   system: string;
   rules: string[];
   imageUrl?: string;
+  streamUrl?: string;
 }
 
 export interface Match {
@@ -360,7 +361,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             map: t.map,
             system: t.system,
             rules: t.rules || [],
-            imageUrl: t.image_url || ''
+            imageUrl: t.image_url || '',
+            streamUrl: t.stream_url || ''
           })));
         } else {
           setTournaments([]);
@@ -1210,6 +1212,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         system: newTourney.system,
         rules: newTourney.rules,
         image_url: newTourney.imageUrl || null,
+        stream_url: newTourney.streamUrl || null,
         created_by: isValidUUID(user.id) ? user.id : null
       }).then(({ error }) => {
         if (error) {
@@ -1289,6 +1292,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data.system !== undefined) dbUpdate.system = data.system;
       if (data.rules !== undefined) dbUpdate.rules = data.rules;
       if (data.imageUrl !== undefined) dbUpdate.image_url = data.imageUrl;
+      if (data.streamUrl !== undefined) dbUpdate.stream_url = data.streamUrl;
 
       supabase.from('tournaments').update(dbUpdate).eq('id', tournamentId).then(({ error }) => {
         if (error) {

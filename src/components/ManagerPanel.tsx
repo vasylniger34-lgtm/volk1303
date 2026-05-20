@@ -108,6 +108,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     maxParticipants: 16,
     rules: 'Format: Single Elimination\nNo cheats permitted\nMatches are streamed live\nCaptain must report scores',
     imageUrl: '',
+    streamUrl: '',
     status: 'upcoming' as 'upcoming' | 'active' | 'completed'
   });
 
@@ -126,6 +127,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     date: '',
     rules: '',
     imageUrl: '',
+    streamUrl: '',
     status: 'upcoming' as 'upcoming' | 'active' | 'completed'
   });
 
@@ -404,6 +406,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       map: editTourneyForm.map,
       rules: editTourneyForm.rules.split('\n').filter(r => r.trim()),
       imageUrl: editTourneyForm.imageUrl || MAP_PRESETS[editTourneyForm.map] || '',
+      streamUrl: editTourneyForm.streamUrl || '',
       status: editTourneyForm.status
     });
 
@@ -469,6 +472,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       system: 'Single Elimination',
       rules: tourneyForm.rules.split('\n').filter(r => r.trim()),
       imageUrl: tourneyForm.imageUrl || MAP_PRESETS[tourneyForm.map] || '',
+      streamUrl: tourneyForm.streamUrl || '',
       status: tourneyForm.status
     });
 
@@ -490,6 +494,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       maxParticipants: 16,
       rules: 'Format: Single Elimination\nNo cheats permitted\nMatches are streamed live\nCaptain must report scores',
       imageUrl: '',
+      streamUrl: '',
       status: 'upcoming'
     });
 
@@ -1259,6 +1264,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                     date: t.date,
                                     rules: (t.rules || []).join('\n'),
                                     imageUrl: t.imageUrl || '',
+                                    streamUrl: t.streamUrl || '',
                                     status: t.status
                                   });
                                 }}
@@ -1555,6 +1561,25 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#EF4444', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      📡 Посилання на LIVE Ефір (YouTube / Twitch)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://youtube.com/live/... або https://twitch.tv/channel"
+                      value={tourneyForm.streamUrl}
+                      onChange={e => setTourneyForm({ ...tourneyForm, streamUrl: e.target.value })}
+                      style={{
+                        background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.2)',
+                        borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                      }}
+                    />
+                    <span style={{ fontSize: '10px', color: '#51515E' }}>
+                      Гравці побачать цей ефір на сторінці матчу під час Live статусу
+                    </span>
                   </div>
 
                   <button 
@@ -2471,6 +2496,36 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Stream URL */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '16px' }}>
+                <label style={{ fontSize: '10px', fontWeight: '800', color: '#EF4444', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  📡 Посилання на LIVE Ефір (YouTube / Twitch)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://youtube.com/live/... або https://twitch.tv/channel"
+                  value={editTourneyForm.streamUrl}
+                  onChange={e => setEditTourneyForm({ ...editTourneyForm, streamUrl: e.target.value })}
+                  style={{
+                    background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.2)',
+                    borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                  }}
+                />
+                {editTourneyForm.streamUrl && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '700' }}>✓ Ефір підключено</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditTourneyForm({ ...editTourneyForm, streamUrl: '' })}
+                      style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '10px', fontWeight: '700' }}
+                    >
+                      Прибрати
+                    </button>
+                  </div>
+                )}
+                <span style={{ fontSize: '10px', color: '#51515E' }}>Гравці побачать цей ефір на сторінці матчу під час Live статусу</span>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
