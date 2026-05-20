@@ -1534,7 +1534,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     if (useSupabase) {
-      supabase.from('tournaments').insert({
+      const insertData = {
         id: newId,
         name: newTourney.name,
         type: newTourney.type,
@@ -1552,10 +1552,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         image_url: newTourney.imageUrl || null,
         stream_url: newTourney.streamUrl || null,
         created_by: isValidUUID(user.id) ? user.id : null
-      }).then(({ error }) => {
+      };
+
+      supabase.from('tournaments').insert(insertData).then(({ error }) => {
         if (error) {
           console.error('[VOLKI] Error inserting tournament to Supabase:', error);
-          showToast('❌ Помилка збереження турніру в базі даних!', 'error');
+          
+          // If it failed due to a foreign key constraint on created_by (code 23503), retry without it
+          if (error.code === '23503' && insertData.created_by) {
+            console.log('[VOLKI] Stale user session / foreign key violation detected. Retrying insert with created_by: null...');
+            supabase.from('tournaments').insert({
+              ...insertData,
+              created_by: null
+            }).then(({ error: retryError }) => {
+              if (retryError) {
+                console.error('[VOLKI] Retry insert failed:', retryError);
+                showToast('❌ Помилка збереження турніру в базі даних!', 'error');
+              } else {
+                console.log('[VOLKI] Tournament successfully saved to Supabase (retry)!');
+              }
+            });
+          } else {
+            showToast('❌ Помилка збереження турніру в базі даних!', 'error');
+          }
+        } else {
+          console.log('[VOLKI] Tournament successfully saved to Supabase!');
         }
       });
     }
