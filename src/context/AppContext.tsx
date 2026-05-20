@@ -1534,7 +1534,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     if (useSupabase) {
-      const insertData = {
+      const insertData: any = {
         id: newId,
         name: newTourney.name,
         type: newTourney.type,
@@ -1554,31 +1554,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         created_by: isValidUUID(user.id) ? user.id : null
       };
 
-      supabase.from('tournaments').insert(insertData).then(({ error }) => {
-        if (error) {
-          console.error('[VOLKI] Error inserting tournament to Supabase:', error);
-          
-          // If it failed due to a foreign key constraint on created_by (code 23503), retry without it
-          if (error.code === '23503' && insertData.created_by) {
-            console.log('[VOLKI] Stale user session / foreign key violation detected. Retrying insert with created_by: null...');
-            supabase.from('tournaments').insert({
-              ...insertData,
-              created_by: null
-            }).then(({ error: retryError }) => {
-              if (retryError) {
-                console.error('[VOLKI] Retry insert failed:', retryError);
-                showToast('❌ Помилка збереження турніру в базі даних!', 'error');
-              } else {
-                console.log('[VOLKI] Tournament successfully saved to Supabase (retry)!');
-              }
-            });
-          } else {
+      const attemptInsert = (data: any) => {
+        supabase.from('tournaments').insert(data).then(({ error }) => {
+          if (error) {
+            console.error('[VOLKI] Error inserting tournament to Supabase:', error);
+            
+            // Case 1: Foreign key constraint violation on created_by (code 23503)
+            if (error.code === '23503' && data.created_by) {
+              console.log('[VOLKI] Stale user session / foreign key violation detected. Retrying insert with created_by: null...');
+              attemptInsert({
+                ...data,
+                created_by: null
+              });
+              return;
+            }
+            
+            // Case 2: Missing image_url or stream_url column in the schema cache (code PGRST204)
+            const errorMsg = error.message || '';
+            const isMissingColumnError = error.code === 'PGRST204' || 
+                                         errorMsg.includes('image_url') || 
+                                         errorMsg.includes('stream_url');
+            
+            if (isMissingColumnError && ('image_url' in data || 'stream_url' in data)) {
+              console.log('[VOLKI] Missing image_url or stream_url column in DB. Retrying insert without them...');
+              const cleanedData = { ...data };
+              delete cleanedData.image_url;
+              delete cleanedData.stream_url;
+              attemptInsert(cleanedData);
+              return;
+            }
+            
             showToast('❌ Помилка збереження турніру в базі даних!', 'error');
+          } else {
+            console.log('[VOLKI] Tournament successfully saved to Supabase!');
           }
-        } else {
-          console.log('[VOLKI] Tournament successfully saved to Supabase!');
-        }
-      });
+        });
+      };
+
+      attemptInsert(insertData);
     }
 
     setTournaments(prev => [newTourney, ...prev]);
@@ -1654,11 +1667,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data.imageUrl !== undefined) dbUpdate.image_url = data.imageUrl;
       if (data.streamUrl !== undefined) dbUpdate.stream_url = data.streamUrl;
 
-      supabase.from('tournaments').update(dbUpdate).eq('id', tournamentId).then(({ error }) => {
-        if (error) {
-          console.error('[VOLKI] Error updating tournament in Supabase:', error);
-        }
-      });
+      const attemptUpdate = (updatePayload: any) => {
+        supabase.from('tournaments').update(updatePayload).eq('id', tournamentId).then(({ error }) => {
+          if (error) {
+            console.error('[VOLKI] Error updating tournament in Supabase:', error);
+            
+            const errorMsg = error.message || '';
+            const isMissingColumnError = error.code === 'PGRST204' || 
+                                         errorMsg.includes('image_url') || 
+                                         errorMsg.includes('stream_url');
+            
+            if (isMissingColumnError && ('image_url' in updatePayload || 'stream_url' in updatePayload)) {
+              console.log('[VOLKI] Missing image_url or stream_url column in DB. Retrying update without them...');
+              const cleanedUpdate = { ...updatePayload };
+              delete cleanedUpdate.image_url;
+              delete cleanedUpdate.stream_url;
+              attemptUpdate(cleanedUpdate);
+            }
+          }
+        });
+      };
+
+      attemptUpdate(dbUpdate);
     }
 
     setTournaments(prev => prev.map(t => 
