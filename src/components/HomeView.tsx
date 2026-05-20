@@ -17,14 +17,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
 }) => {
   const { tournaments, matches } = useApp();
 
-  // Find featured (2X2 AIM CUP)
-  const featuredTourney = tournaments.find(t => t.id === '2x2_aim_cup') || tournaments[0];
+  // Find featured tournament: prioritize any active (live) tournament, then the specific featured ID, then the first tournament in the list
+  const featuredTourney = tournaments.find(t => t.status === 'active') || 
+                          tournaments.find(t => t.id === '2x2_aim_cup') || 
+                          tournaments[0];
   
   // Find live match
   const liveMatch = matches.find(m => m.status === 'live');
   
-  // Get upcoming tournaments (excluding active featured one)
-  const upcomingTourneys = tournaments.filter(t => t.id !== featuredTourney?.id).slice(0, 3);
+  // Get other tournaments (excluding the featured one)
+  const upcomingTourneys = tournaments.filter(t => t.id !== featuredTourney?.id);
 
   return (
     <div className="scroll-container" style={{ padding: '16px 20px' }}>
@@ -50,15 +52,24 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div style={{ position: 'relative', zIndex: 2 }}>
             <span style={{
               fontSize: '10px',
-              color: 'var(--primary-orange)',
+              color: featuredTourney.status === 'active' ? '#10B981' : 'var(--primary-orange)',
               fontWeight: '900',
               letterSpacing: '3px',
               textTransform: 'uppercase',
-              display: 'block',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
               marginBottom: '6px',
               fontFamily: 'Outfit, sans-serif'
             }}>
-              НАЙБЛИЖЧИЙ ТУРНІР
+              {featuredTourney.status === 'active' ? (
+                <>
+                  <span className="badge-live-pulse" style={{ display: 'inline-block', position: 'static', transform: 'none', width: '6px', height: '6px', marginRight: '4px' }} />
+                  ТУРНІР У ЛАЙВІ
+                </>
+              ) : (
+                'НАЙБЛИЖЧИЙ ТУРНІР'
+              )}
             </span>
             <h2 style={{
               fontSize: '28px',
@@ -102,11 +113,24 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <button 
-              className="btn-primary" 
-              onClick={() => onOpenRegister(featuredTourney.id)}
-              style={{ width: '100%', padding: '14px', fontSize: '13px', letterSpacing: '1px' }}
+              className={featuredTourney.status === 'active' ? "btn-primary" : "btn-primary"} 
+              onClick={() => {
+                if (featuredTourney.status === 'active') {
+                  onSelectTournament(featuredTourney.id);
+                } else {
+                  onOpenRegister(featuredTourney.id);
+                }
+              }}
+              style={{ 
+                width: '100%', 
+                padding: '14px', 
+                fontSize: '13px', 
+                letterSpacing: '1px',
+                background: featuredTourney.status === 'active' ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)' : undefined,
+                borderColor: featuredTourney.status === 'active' ? '#10B981' : undefined
+              }}
             >
-              ЗАРЕЄСТРУВАТИСЬ
+              {featuredTourney.status === 'active' ? 'ПЕРЕГЛЯНУТИ МАТЧІ' : 'ЗАРЕЄСТРУВАТИСЬ'}
             </button>
           </div>
         </div>
@@ -398,8 +422,35 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   {tourney.type}
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '14px', fontWeight: '800', color: 'white', fontFamily: 'Outfit, sans-serif' }}>
+                  <h4 style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '800', 
+                    color: 'white', 
+                    fontFamily: 'Outfit, sans-serif',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
                     {tourney.name}
+                    {tourney.status === 'active' && (
+                      <span className="badge-live" style={{ fontSize: '8px', padding: '1px 6px', display: 'inline-flex', alignItems: 'center', position: 'static', transform: 'none' }}>
+                        <span className="badge-live-pulse" style={{ width: '4px', height: '4px', marginRight: '3px', position: 'static', transform: 'none' }} /> LIVE
+                      </span>
+                    )}
+                    {tourney.status === 'completed' && (
+                      <span style={{ 
+                        fontSize: '8px', 
+                        padding: '1px 6px', 
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)', 
+                        color: '#8B5CF6', 
+                        borderRadius: '4px',
+                        border: '1px solid rgba(139, 92, 246, 0.2)',
+                        fontWeight: '800',
+                        textTransform: 'uppercase'
+                      }}>
+                        FINISH
+                      </span>
+                    )}
                   </h4>
                   <span style={{ fontSize: '11px', color: '#8F8F9B', fontWeight: '500' }}>
                     {tourney.date}
