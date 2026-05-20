@@ -40,7 +40,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     tournaments, matches, teams,
     setMatchLive, setMatchScore, createTournament, 
     generateBracketForTournament, deleteTournament, updateTournament,
-    showToast, resetAllData, updateMatchOdds, fillTournamentWithBots,
+    showToast, updateMatchOdds, fillTournamentWithBots,
     user, isAuthenticated
   } = useApp();
 
@@ -83,7 +83,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   const [authError, setAuthError] = useState('');
 
   // Dashboard workspace navigation
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tournaments' | 'matches' | 'managers' | 'broadcast' | 'analytics' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'tournaments' | 'matches' | 'broadcast' | 'analytics' | 'settings'>('dashboard');
 
   // Broadcast state
   const [broadcastMsg, setBroadcastMsg] = useState('');
@@ -327,6 +327,23 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     setAuthLoading(true);
 
     try {
+      // ── STEP 1: Check local managers list first (works after registration without email confirm) ──
+      const localMatch = managers.find(m => m.email === loginEmail || m.username === loginEmail);
+      if (localMatch && loginPass.length >= 6) {
+        // Valid local manager — grant access immediately
+        const activeManager: ManagerProfile = {
+          ...localMatch,
+          status: 'online'
+        };
+        setManagerUser(activeManager);
+        localStorage.setItem('volk_manager_profile', JSON.stringify(activeManager));
+        localStorage.setItem('volk_manager_session', 'true');
+        setIsAuthed(true);
+        showToast('Вхід успішний! Сесія адміністрування розпочата.', 'success');
+        setAuthLoading(false);
+        return;
+      }
+
       if (useSupabase) {
         let activeManager: ManagerProfile | null = null;
 
@@ -339,7 +356,6 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           if (logInError) throw logInError;
 
           if (logInData?.user) {
-            // Verify profile role is admin
             const { data: profile, error: profileErr } = await supabase
               .from('profiles')
               .select('role, username')
@@ -360,19 +376,15 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             };
           }
         } catch (signInErr: any) {
-          console.warn('[VOLKI Admin] Standard Supabase auth login failed, checking direct admin profiles:', signInErr);
-          
-          // Direct admin profile verification backup!
+          // Try profile lookup by username as fallback
           const searchUsername = loginEmail.includes('@') ? loginEmail.split('@')[0] : loginEmail;
-          
-          // Look up in profiles directly since RLS allows select/read
-          const { data: foundProfiles, error: searchError } = await supabase
+          const { data: foundProfiles } = await supabase
             .from('profiles')
             .select('*')
             .eq('role', 'admin')
             .or(`username.eq.${searchUsername},username.eq.${loginEmail}`);
 
-          if (!searchError && foundProfiles && foundProfiles.length > 0) {
+          if (foundProfiles && foundProfiles.length > 0) {
             const matchedProfile = foundProfiles[0];
             activeManager = {
               email: loginEmail,
@@ -382,8 +394,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               status: 'online'
             };
           } else {
-            // If neither works, throw original sign in error
-            throw signInErr;
+            throw new Error('Невірний email/пароль. Якщо ви щойно зареєстрували акаунт — просто натисніть "Вхід" з тими самими даними.');
           }
         }
 
@@ -392,11 +403,9 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           localStorage.setItem('volk_manager_profile', JSON.stringify(activeManager));
         }
       } else {
-        // Local/offline credentials fallback validation
-        // Search in local managers list
-        const matched = managers.find(m => m.email === loginEmail);
+        // Offline fallback
         if (loginEmail && loginPass.length >= 6) {
-          const activeManager: ManagerProfile = matched || {
+          const activeManager: ManagerProfile = {
             email: loginEmail,
             username: loginEmail.split('@')[0],
             role: 'Site Administrator',
@@ -414,7 +423,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       setIsAuthed(true);
       showToast('Вхід успішний! Сесія адміністрування розпочата.', 'success');
     } catch (err: any) {
-      setAuthError(err.message || 'Помилка авторизації керуючого');
+      setAuthError(err.message || 'Помилка авторизації. Перевірте дані або скористайтесь кнопкою «Активувати».');
     } finally {
       setAuthLoading(false);
     }
@@ -654,48 +663,27 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     setBroadcastResult(null);
 
     try {
-      // Fetch subscribers from Supabase
-      const BOT_TOKEN = '8873845823:AAErjQiXP7InePLKku-MOhbqNPe-bMvt3LU';
-      const { data: subs } = await supabase
-        .from('bot_subscribers')
-        .select('chat_id')
-        .eq('is_active', true);
+      // Call our Vercel serverless API proxy (avoids CORS issues with Telegram)
+      const resp = await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: broadcastMsg })
+      });
 
-      const chatIds: number[] = (subs || []).map((s: any) => Number(s.chat_id)).filter(Boolean);
-
-      let sent = 0;
-      let failed = 0;
-
-      for (const chatId of chatIds) {
-        try {
-          const resp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: broadcastMsg,
-              parse_mode: 'HTML'
-            })
-          });
-          const result = await resp.json();
-          if (result.ok) {
-            sent++;
-          } else {
-            failed++;
-            // Mark inactive if blocked
-            if (result.error_code === 403 || result.description?.includes('blocked')) {
-              await supabase.from('bot_subscribers').update({ is_active: false }).eq('chat_id', chatId);
-            }
-          }
-        } catch {
-          failed++;
-        }
-        // Small delay to avoid TG rate limits
-        await new Promise(r => setTimeout(r, 60));
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`API error ${resp.status}: ${errText}`);
       }
 
+      const result = await resp.json();
+      const sent: number = result.sent || 0;
+      const failed: number = result.failed || 0;
+      const total: number = result.total || 0;
+
       setBroadcastResult({ sent, failed });
-      setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Broadcast sent: ${sent} success, ${failed} failed.`]);
+      setTerminalLogs(prev => [...prev,
+        `[${new Date().toLocaleTimeString()}] Broadcast sent: ✅ ${sent}/${total} delivered, ❌ ${failed} failed. Channel: ${result.channel ? '✅' : '❌'}`
+      ]);
       showToast(`Розсилку виконано! ✅ ${sent} надіслано, ❌ ${failed} помилок`, sent > 0 ? 'success' : 'error');
       if (sent > 0) setBroadcastMsg('');
     } catch (err: any) {
@@ -1271,11 +1259,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             <h2 style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '0.5px', fontFamily: 'Outfit', textTransform: 'uppercase', margin: 0 }}>
               {activeTab === 'dashboard' && '📊 Панель Огляду Системи'}
               {activeTab === 'tournaments' && '🏆 Керування Турнірами & Сітками'}
-              {activeTab === 'matches' && '🗃️ Архів Матчів & Управління Рахунками'}
-              {activeTab === 'managers' && '👥 Облікові Записи Керуючих'}
+              {activeTab === 'matches' && '⚔️ Архів Матчів & Управління Рахунками'}
               {activeTab === 'broadcast' && '📢 Telegram Розсилки для Підписників'}
               {activeTab === 'analytics' && '📈 Аналітика Платформи (Реальні Дані)'}
-              {activeTab === 'settings' && '⚙️ Системні Налаштування'}
+              {activeTab === 'settings' && '⚙️ Налаштування & Керуючі Сайтом'}
             </h2>
           </div>
 
@@ -2182,89 +2169,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           {/* ============================================================
               TAB: MANAGERS LIST
              ============================================================ */}
-          {activeTab === 'managers' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-              
-              {/* Register / Invite new Admin */}
-              <div className="esports-card" style={{ padding: '24px', maxWidth: '640px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '14px' }}>
-                  Налаштування Коду Реєстрації
-                </h3>
-                <p style={{ fontSize: '12px', color: '#8F8F9B', lineHeight: '1.5', marginBottom: '18px' }}>
-                  Ви можете змінити Секретний Код Реєстрації керуючих нижче. Тільки ті користувачі, які введуть цей код під час реєстрації, зможуть отримати роль адміністратора.
-                </p>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <input 
-                    type="text" 
-                    value={managerInviteCode}
-                    onChange={e => setRegCode(e.target.value)}
-                    style={{
-                      background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit', width: '200px'
-                    }}
-                  />
-                  <button 
-                    onClick={() => {
-                      if (regCode.trim()) {
-                        setManagerInviteCode(regCode.trim());
-                        showToast('Код доступу адміністраторів оновлено!', 'success');
-                      }
-                    }}
-                    className="btn-primary" 
-                    style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '12px' }}
-                  >
-                    Зберегти код
-                  </button>
-                </div>
-              </div>
 
-              {/* Registered Managers Table */}
-              <div className="esports-card" style={{ padding: '24px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '16px' }}>
-                  Список Авторизованих Менеджерів Платформи ({managers.length})
-                </h3>
-
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#8F8F9B' }}>
-                      <th style={{ padding: '12px' }}>Користувач</th>
-                      <th style={{ padding: '12px' }}>Ел. Пошта</th>
-                      <th style={{ padding: '12px' }}>Роль</th>
-                      <th style={{ padding: '12px' }}>Дата приєднання</th>
-                      <th style={{ padding: '12px' }}>Статус</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {managers.map((mgr, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                        <td style={{ padding: '14px 12px', fontWeight: '700', color: 'white', fontFamily: 'Outfit' }}>
-                          {mgr.username}
-                        </td>
-                        <td style={{ padding: '14px 12px', color: '#8F8F9B' }}>{mgr.email}</td>
-                        <td style={{ padding: '14px 12px' }}>
-                          <span style={{
-                            background: mgr.role.includes('Super') ? 'rgba(255, 92, 0, 0.1)' : 'rgba(139, 92, 246, 0.1)',
-                            color: mgr.role.includes('Super') ? '#FF5C00' : '#8B5CF6',
-                            padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '800'
-                          }}>
-                            {mgr.role}
-                          </span>
-                        </td>
-                        <td style={{ padding: '14px 12px', color: '#51515E' }}>{mgr.joinedAt}</td>
-                        <td style={{ padding: '14px 12px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: mgr.status === 'online' ? '#10B981' : '#51515E', fontWeight: '600' }}>
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: mgr.status === 'online' ? '#10B981' : '#51515E' }}></span>
-                            {mgr.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-            </div>
-          )}
 
           {/* ============================================================
               TAB: TELEGRAM BROADCAST
@@ -2597,23 +2502,37 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   </button>
                 </div>
 
-                {/* Database reset */}
+                {/* Managers section inside settings */}
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '20px' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: '800', fontFamily: 'Outfit', color: '#EF4444' }}>Небезпечна Зона</h4>
-                  <p style={{ fontSize: '11px', color: '#51515E', marginTop: '4px', marginBottom: '12px' }}>Видаляє локально збережені сесії, турніри та налаштування симулятора.</p>
-                  <button 
-                    onClick={async () => {
-                      if (confirm('Скинути всю конфігурацію? Це видалить усі турніри, команди та матчі з сервера та локальної пам\'яті.')) {
-                        await resetAllData();
-                      }
-                    }}
-                    style={{
-                      background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)',
-                      borderRadius: '10px', padding: '10px 16px', color: '#EF4444', fontSize: '11px', fontWeight: '700', cursor: 'pointer'
-                    }}
-                  >
-                    Скинути Базу даних
-                  </button>
+                  <h4 style={{ fontSize: '13px', fontWeight: '800', fontFamily: 'Outfit', color: 'white', marginBottom: '6px' }}>Список Керуючих Платформою</h4>
+                  <p style={{ fontSize: '11px', color: '#51515E', marginBottom: '16px' }}>Всі зареєстровані адміністратори та керуючі з правами доступу.</p>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#8F8F9B' }}>
+                        <th style={{ padding: '10px 12px' }}>Користувач</th>
+                        <th style={{ padding: '10px 12px' }}>Ел. Пошта</th>
+                        <th style={{ padding: '10px 12px' }}>Роль</th>
+                        <th style={{ padding: '10px 12px' }}>Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {managers.map((mgr, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                          <td style={{ padding: '12px', fontWeight: '700', color: 'white', fontFamily: 'Outfit' }}>{mgr.username}</td>
+                          <td style={{ padding: '12px', color: '#8F8F9B' }}>{mgr.email}</td>
+                          <td style={{ padding: '12px' }}>
+                            <span style={{ background: mgr.role.includes('Super') ? 'rgba(255,92,0,0.1)' : 'rgba(139,92,246,0.1)', color: mgr.role.includes('Super') ? '#FF5C00' : '#8B5CF6', padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '800' }}>{mgr.role}</span>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: mgr.status === 'online' ? '#10B981' : '#51515E', fontWeight: '600' }}>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: mgr.status === 'online' ? '#10B981' : '#51515E', display: 'inline-block' }}></span>
+                              {mgr.status === 'online' ? 'Online' : 'Offline'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
               </div>
