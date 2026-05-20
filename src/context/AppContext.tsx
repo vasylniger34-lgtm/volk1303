@@ -123,7 +123,7 @@ interface AppContextType {
   addFunds: (amount: number) => void;
   createTournament: (tourney: Omit<Tournament, 'id' | 'participantsCount' | 'status'> & { status?: 'upcoming' | 'active' | 'completed' }) => void;
   resolveBetsForMatch: (matchId: string, winnerId: string, finalScoreA: number, finalScoreB: number) => void;
-  generateBracketForTournament: (tournamentId: string) => void;
+  generateBracketForTournament: (tournamentId: string) => Promise<void>;
   updateProfile: (data: { username?: string; avatarGradient?: number }) => void;
   deleteTournament: (tournamentId: string) => void;
   updateTournament: (tournamentId: string, data: Partial<Tournament>) => void;
@@ -271,6 +271,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const initAuth = async () => {
       try {
+        // Always load public data (tournaments, matches) regardless of auth
+        await loadSupabaseData();
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           const { data: profile } = await supabase
@@ -284,12 +287,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           setIsAuthenticated(true);
           localStorage.setItem('volk_session', 'true');
-
-          // Load tournaments from Supabase
-          await loadSupabaseData();
         } else {
-          setIsAuthenticated(false);
-          localStorage.removeItem('volk_session');
+          // Check localStorage session (for manager panel / telegram users)
+          const hasLocalSession = localStorage.getItem('volk_session') === 'true';
+          if (hasLocalSession) {
+            setIsAuthenticated(true);
+          } else {
+            setIsAuthenticated(false);
+          }
         }
       } catch (err) {
         console.error('[VOLKI] Auth init error:', err);
@@ -730,74 +735,122 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Generate Bracket ───
 
-  const generateBracketForTournament = (tournamentId: string) => {
+  const generateBracketForTournament = async (tournamentId: string) => {
     const list = teams[tournamentId] || [];
-    if (list.length < 2) return;
+    if (list.length < 2) {
+      showToast('Потрібно мінімум 2 команди!', 'error');
+      return;
+    }
 
-    const newMatches: Match[] = [];
     const tourney = tournaments.find(t => t.id === tournamentId);
     const tournamentName = tourney?.name || 'Tournament';
     const shuffled = [...list].sort(() => Math.random() - 0.5);
 
+    // Build match definitions (no id yet — will get from Supabase or generate)
+    type MatchDef = {
+      roundName: 'Semifinal' | 'Final' | '1/8' | 'Quarterfinal';
+      teamA: (typeof list)[0] | null;
+      teamB: (typeof list)[0] | null;
+      oddsA: number;
+      oddsB: number;
+      time: string;
+      isFinal?: boolean;
+    };
+
+    const matchDefs: MatchDef[] = [];
+
     if (shuffled.length >= 8) {
-      newMatches.push({
-        id: `match_${tournamentId}_semi_1`, tournamentId, tournamentName,
-        roundName: 'Semifinal', teamA: shuffled[0] || null, teamB: shuffled[1] || null,
-        scoreA: 0, scoreB: 0, status: 'scheduled', winnerId: null,
-        oddsA: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)),
-        oddsB: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)),
-        map: tourney?.map || 'de_dust2', time: '18:00', currentMap: 1, mapScores: [], liveLogs: []
-      });
-
-      newMatches.push({
-        id: `match_${tournamentId}_semi_2`, tournamentId, tournamentName,
-        roundName: 'Semifinal', teamA: shuffled[2] || null, teamB: shuffled[3] || null,
-        scoreA: 0, scoreB: 0, status: 'scheduled', winnerId: null,
-        oddsA: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)),
-        oddsB: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)),
-        map: tourney?.map || 'de_dust2', time: '18:45', currentMap: 1, mapScores: [], liveLogs: []
-      });
-
-      newMatches.push({
-        id: `match_${tournamentId}_final`, tournamentId, tournamentName,
-        roundName: 'Final', teamA: null, teamB: null,
-        scoreA: 0, scoreB: 0, status: 'scheduled', winnerId: null,
-        oddsA: 1.85, oddsB: 1.85,
-        map: tourney?.map || 'de_dust2', time: '20:00', currentMap: 1, mapScores: [], liveLogs: []
-      });
+      matchDefs.push({ roundName: 'Semifinal', teamA: shuffled[0], teamB: shuffled[1], oddsA: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)), oddsB: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)), time: '18:00' });
+      matchDefs.push({ roundName: 'Semifinal', teamA: shuffled[2], teamB: shuffled[3], oddsA: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)), oddsB: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)), time: '18:45' });
+      matchDefs.push({ roundName: 'Final', teamA: null, teamB: null, oddsA: 1.85, oddsB: 1.85, time: '20:00', isFinal: true });
+    } else {
+      matchDefs.push({ roundName: 'Final', teamA: shuffled[0], teamB: shuffled[1], oddsA: 1.85, oddsB: 1.85, time: '18:00' });
     }
 
     if (useSupabase) {
-      // Delete existing matches for this tournament, then insert new ones
-      supabase.from('matches').delete().eq('tournament_id', tournamentId).then(() => {
-        newMatches.forEach(m => {
-          supabase.from('matches').insert({
-            tournament_id: m.tournamentId,
-            tournament_name: m.tournamentName,
-            round_name: m.roundName,
-            team_a_id: m.teamA?.id || null,
-            team_b_id: m.teamB?.id || null,
-            score_a: m.scoreA,
-            score_b: m.scoreB,
-            status: m.status,
-            odds_a: m.oddsA,
-            odds_b: m.oddsB,
-            map: m.map,
-            time: m.time,
-            current_map: m.currentMap,
-            map_scores: m.mapScores,
-            live_logs: m.liveLogs
-          }).then();
-        });
+      // 1. Delete existing matches for this tournament
+      await supabase.from('matches').delete().eq('tournament_id', tournamentId);
+
+      // 2. Insert each match and get back the real UUID
+      const insertedMatches: Match[] = [];
+
+      for (const def of matchDefs) {
+        const { data: inserted, error } = await supabase.from('matches').insert({
+          tournament_id: tournamentId,
+          tournament_name: tournamentName,
+          round_name: def.roundName,
+          team_a_id: def.teamA?.id || null,
+          team_b_id: def.teamB?.id || null,
+          score_a: 0,
+          score_b: 0,
+          status: 'scheduled',
+          odds_a: def.oddsA,
+          odds_b: def.oddsB,
+          map: tourney?.map || 'de_dust2',
+          time: def.time,
+          current_map: 1,
+          map_scores: [],
+          live_logs: []
+        }).select().single();
+
+        if (error) {
+          console.error('[VOLKI] Failed to insert match to Supabase:', error);
+          // Fall back to local UUID
+          insertedMatches.push({
+            id: generateUUID(),
+            tournamentId, tournamentName,
+            roundName: def.roundName,
+            teamA: def.teamA || null,
+            teamB: def.teamB || null,
+            scoreA: 0, scoreB: 0,
+            status: 'scheduled', winnerId: null,
+            oddsA: def.oddsA, oddsB: def.oddsB,
+            map: tourney?.map || 'de_dust2',
+            time: def.time, currentMap: 1, mapScores: [], liveLogs: []
+          });
+        } else if (inserted) {
+          insertedMatches.push({
+            id: inserted.id, // ← Real UUID from Supabase
+            tournamentId, tournamentName,
+            roundName: def.roundName,
+            teamA: def.teamA || null,
+            teamB: def.teamB || null,
+            scoreA: 0, scoreB: 0,
+            status: 'scheduled', winnerId: null,
+            oddsA: def.oddsA, oddsB: def.oddsB,
+            map: tourney?.map || 'de_dust2',
+            time: def.time, currentMap: 1, mapScores: [], liveLogs: []
+          });
+        }
+      }
+
+      setMatches(prev => {
+        const filtered = prev.filter(m => m.tournamentId !== tournamentId);
+        return [...filtered, ...insertedMatches];
+      });
+    } else {
+      // Offline mode — generate local UUIDs
+      const newMatches: Match[] = matchDefs.map(def => ({
+        id: generateUUID(),
+        tournamentId, tournamentName,
+        roundName: def.roundName,
+        teamA: def.teamA || null,
+        teamB: def.teamB || null,
+        scoreA: 0, scoreB: 0,
+        status: 'scheduled' as const, winnerId: null,
+        oddsA: def.oddsA, oddsB: def.oddsB,
+        map: tourney?.map || 'de_dust2',
+        time: def.time, currentMap: 1, mapScores: [], liveLogs: []
+      }));
+
+      setMatches(prev => {
+        const filtered = prev.filter(m => m.tournamentId !== tournamentId);
+        return [...filtered, ...newMatches];
       });
     }
 
-    setMatches(prev => {
-      const filtered = prev.filter(m => m.tournamentId !== tournamentId);
-      return [...filtered, ...newMatches];
-    });
-
     showToast('Турнірну сітку сформовано!', 'info');
+
   };
 
   // ─── Place Prediction ───
