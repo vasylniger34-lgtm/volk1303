@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Search, Calendar, ShieldAlert } from 'lucide-react';
+import { Search, Calendar, ShieldAlert, Trash2 } from 'lucide-react';
 
 interface TournamentsViewProps {
   onSelectTournament: (id: string) => void;
 }
 
 export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTournament }) => {
-  const { tournaments } = useApp();
+  const { tournaments, deleteTournament, user } = useApp();
+  const isAdmin = user.role === 'admin';
   const [activeTab, setActiveTab] = useState<'BCI' | '2X2' | '4X4'>('BCI');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -109,16 +110,32 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
 
                 {/* Middle details */}
                 <div>
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '800',
-                    color: 'white',
-                    marginBottom: '6px',
-                    fontFamily: 'Outfit, sans-serif',
-                    letterSpacing: '0.3px'
-                  }}>
-                    {tourney.name}
-                  </h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <h3 style={{
+                      fontSize: '16px',
+                      fontWeight: '800',
+                      color: 'white',
+                      marginBottom: '6px',
+                      fontFamily: 'Outfit, sans-serif',
+                      letterSpacing: '0.3px'
+                    }}>
+                      {tourney.name}
+                    </h3>
+                    {isAdmin && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(Видалити турнір ?)) deleteTournament(tourney.id);
+                        }}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)',
+                          borderRadius: '6px', padding: '6px', color: '#EF4444', cursor: 'pointer', zIndex: 10
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                   <span style={{ fontSize: '11px', color: '#8F8F9B', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
                     <Calendar size={13} color="var(--primary-orange)" /> {tourney.date}
                   </span>

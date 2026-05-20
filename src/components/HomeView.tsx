@@ -15,7 +15,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onSelectMatch,
   onOpenRegister
 }) => {
-  const { tournaments, matches } = useApp();
+  const { tournaments, matches, deleteTournament, user } = useApp();
+  const isAdmin = user.role === 'admin';
 
   // Find featured (2X2 AIM CUP)
   const featuredTourney = tournaments.find(t => t.id === '2x2_aim_cup') || tournaments[0];

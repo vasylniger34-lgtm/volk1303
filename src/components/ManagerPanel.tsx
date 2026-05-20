@@ -1230,10 +1230,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                 }}
                                 style={{
                                   background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)',
-                                  borderRadius: '8px', padding: '8px', color: '#EF4444', cursor: 'pointer'
+                                  borderRadius: '8px', padding: '6px 12px', fontSize: '11px', color: '#EF4444', fontWeight: '700',
+                                  fontFamily: 'Outfit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
                                 }}
                               >
-                                <Trash2 size={12} />
+                                <Trash2 size={10} /> Видалити
                               </button>
                             </div>
                           </div>
