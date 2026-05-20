@@ -272,6 +272,9 @@ ALTER PUBLICATION supabase_realtime ADD TABLE matches;
 -- Enable Realtime for tournaments (new tournaments appear instantly)
 ALTER PUBLICATION supabase_realtime ADD TABLE tournaments;
 
+-- Enable Realtime for teams (new teams appear instantly)
+ALTER PUBLICATION supabase_realtime ADD TABLE teams;
+
 -- ============================================================
 -- INDEXES for performance
 -- ============================================================

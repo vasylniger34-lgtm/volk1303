@@ -259,6 +259,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
+  // Refs to avoid stale closures in realtime subscriptions
+  const tournamentsRef = React.useRef(tournaments);
+  const teamsRef = React.useRef(teams);
+  const matchesRef = React.useRef(matches);
+  const userRef = React.useRef(user);
+
+  useEffect(() => { tournamentsRef.current = tournaments; }, [tournaments]);
+  useEffect(() => { teamsRef.current = teams; }, [teams]);
+  useEffect(() => { matchesRef.current = matches; }, [matches]);
+  useEffect(() => { userRef.current = user; }, [user]);
+
   // Toast
   const [toast, setToast] = useState<ToastMessage>({ show: false, message: '', type: 'success' });
 
@@ -430,29 +441,244 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!useSupabase) return;
 
+    const channelName = `volk-realtime-${user.id}`;
     const channel = supabase
-      .channel('matches-realtime')
+      .channel(channelName)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'matches'
-      }, () => {
-        // Reload all data on any match change
-        loadSupabaseData();
+      }, (payload) => {
+        const { eventType, new: newRow, old: oldRow } = payload;
+        
+        if (eventType === 'UPDATE' && newRow) {
+          setMatches(prev => prev.map(m => {
+            if (m.id === newRow.id) {
+              const tourneyTeams = teamsRef.current[newRow.tournament_id] || [];
+              let teamA = m.teamA;
+              let teamB = m.teamB;
+
+              // Hydrate teams dynamically if team_a_id/team_b_id changed or was set (fixes Blank Finals bug)
+              if (newRow.team_a_id !== (m.teamA?.id || null)) {
+                teamA = tourneyTeams.find(t => t.id === newRow.team_a_id) || null;
+                if (!teamA && newRow.team_a_id) {
+                  for (const key of Object.keys(teamsRef.current)) {
+                    const found = teamsRef.current[key].find(t => t.id === newRow.team_a_id);
+                    if (found) { teamA = found; break; }
+                  }
+                }
+              }
+              if (newRow.team_b_id !== (m.teamB?.id || null)) {
+                teamB = tourneyTeams.find(t => t.id === newRow.team_b_id) || null;
+                if (!teamB && newRow.team_b_id) {
+                  for (const key of Object.keys(teamsRef.current)) {
+                    const found = teamsRef.current[key].find(t => t.id === newRow.team_b_id);
+                    if (found) { teamB = found; break; }
+                  }
+                }
+              }
+
+              return {
+                ...m,
+                teamA,
+                teamB,
+                scoreA: newRow.score_a,
+                scoreB: newRow.score_b,
+                status: newRow.status as 'scheduled' | 'live' | 'finished',
+                winnerId: newRow.winner_id,
+                oddsA: Number(newRow.odds_a),
+                oddsB: Number(newRow.odds_b),
+                map: newRow.map,
+                time: newRow.time || '',
+                currentMap: newRow.current_map,
+                mapScores: (newRow.map_scores || []) as { scoreA: number; scoreB: number }[],
+                liveLogs: newRow.live_logs || []
+              };
+            }
+            return m;
+          }));
+        } else if (eventType === 'INSERT' && newRow) {
+          const tourneyTeams = teamsRef.current[newRow.tournament_id] || [];
+          let teamA = tourneyTeams.find(t => t.id === newRow.team_a_id) || null;
+          let teamB = tourneyTeams.find(t => t.id === newRow.team_b_id) || null;
+
+          if (!teamA && newRow.team_a_id) {
+            for (const key of Object.keys(teamsRef.current)) {
+              const found = teamsRef.current[key].find(t => t.id === newRow.team_a_id);
+              if (found) { teamA = found; break; }
+            }
+          }
+          if (!teamB && newRow.team_b_id) {
+            for (const key of Object.keys(teamsRef.current)) {
+              const found = teamsRef.current[key].find(t => t.id === newRow.team_b_id);
+              if (found) { teamB = found; break; }
+            }
+          }
+
+          const mappedMatch: Match = {
+            id: newRow.id,
+            tournamentId: newRow.tournament_id,
+            tournamentName: newRow.tournament_name,
+            roundName: newRow.round_name,
+            teamA,
+            teamB,
+            scoreA: newRow.score_a,
+            scoreB: newRow.score_b,
+            status: newRow.status as 'scheduled' | 'live' | 'finished',
+            winnerId: newRow.winner_id,
+            oddsA: Number(newRow.odds_a),
+            oddsB: Number(newRow.odds_b),
+            map: newRow.map,
+            time: newRow.time || '',
+            currentMap: newRow.current_map,
+            mapScores: (newRow.map_scores || []) as { scoreA: number; scoreB: number }[],
+            liveLogs: newRow.live_logs || []
+          };
+
+          setMatches(prev => {
+            if (prev.some(m => m.id === mappedMatch.id)) return prev;
+            return [...prev, mappedMatch];
+          });
+        } else if (eventType === 'DELETE' && oldRow) {
+          setMatches(prev => prev.filter(m => m.id !== oldRow.id));
+        }
       })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'tournaments'
-      }, () => {
-        loadSupabaseData();
+      }, (payload) => {
+        const { eventType, new: newRow, old: oldRow } = payload;
+
+        if (eventType === 'INSERT' && newRow) {
+          const mapped: Tournament = {
+            id: newRow.id,
+            name: newRow.name,
+            type: newRow.type as '2X2' | '4X4' | 'BCI',
+            date: newRow.date,
+            prizePool: newRow.prize_pool,
+            prizePlaces: {
+              first: newRow.prize_first || '',
+              second: newRow.prize_second || '',
+              third: newRow.prize_third || ''
+            },
+            participantsCount: newRow.participants_count,
+            maxParticipants: newRow.max_participants,
+            status: newRow.status as 'upcoming' | 'active' | 'completed',
+            map: newRow.map,
+            system: newRow.system,
+            rules: newRow.rules || [],
+            imageUrl: newRow.image_url || '',
+            streamUrl: newRow.stream_url || ''
+          };
+          setTournaments(prev => {
+            if (prev.some(t => t.id === mapped.id)) return prev;
+            return [mapped, ...prev];
+          });
+        } else if (eventType === 'UPDATE' && newRow) {
+          setTournaments(prev => prev.map(t => {
+            if (t.id === newRow.id) {
+              return {
+                ...t,
+                name: newRow.name,
+                type: newRow.type as '2X2' | '4X4' | 'BCI',
+                date: newRow.date,
+                prizePool: newRow.prize_pool,
+                prizePlaces: {
+                  first: newRow.prize_first || '',
+                  second: newRow.prize_second || '',
+                  third: newRow.prize_third || ''
+                },
+                participantsCount: newRow.participants_count,
+                maxParticipants: newRow.max_participants,
+                status: newRow.status as 'upcoming' | 'active' | 'completed',
+                map: newRow.map,
+                system: newRow.system,
+                rules: newRow.rules || [],
+                imageUrl: newRow.image_url || '',
+                streamUrl: newRow.stream_url || ''
+              };
+            }
+            return t;
+          }));
+        } else if (eventType === 'DELETE' && oldRow) {
+          setTournaments(prev => prev.filter(t => t.id !== oldRow.id));
+        }
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'teams'
+      }, (payload) => {
+        const { eventType, new: newRow, old: oldRow } = payload;
+
+        if (eventType === 'INSERT' && newRow) {
+          const mappedTeam: Team = {
+            id: newRow.id,
+            name: newRow.name,
+            tag: newRow.tag,
+            captain: newRow.captain,
+            players: (newRow.players || []) as Player[],
+            logoText: newRow.logo_text || newRow.tag.substring(0, 2).toUpperCase(),
+            logoBg: newRow.logo_bg || '#1E293B'
+          };
+          setTeams(prev => {
+            const tourneyId = newRow.tournament_id;
+            const copy = { ...prev };
+            if (!copy[tourneyId]) copy[tourneyId] = [];
+            if (copy[tourneyId].some(t => t.id === mappedTeam.id)) return prev;
+            copy[tourneyId] = [...copy[tourneyId], mappedTeam];
+            return copy;
+          });
+        } else if (eventType === 'UPDATE' && newRow) {
+          setTeams(prev => {
+            const tourneyId = newRow.tournament_id;
+            const copy = { ...prev };
+            if (copy[tourneyId]) {
+              copy[tourneyId] = copy[tourneyId].map(t => {
+                if (t.id === newRow.id) {
+                  return {
+                    ...t,
+                    name: newRow.name,
+                    tag: newRow.tag,
+                    captain: newRow.captain,
+                    players: (newRow.players || []) as Player[],
+                    logoText: newRow.logo_text || newRow.tag.substring(0, 2).toUpperCase(),
+                    logoBg: newRow.logo_bg || '#1E293B'
+                  };
+                }
+                return t;
+              });
+            }
+            return copy;
+          });
+        } else if (eventType === 'DELETE' && oldRow) {
+          setTeams(prev => {
+            const copy = { ...prev };
+            Object.keys(copy).forEach(k => {
+              copy[k] = copy[k].filter(t => t.id !== oldRow.id);
+            });
+            return copy;
+          });
+        }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${user.id}`
+      }, (payload) => {
+        const { new: newRow } = payload;
+        if (newRow) {
+          setUser(profileToUser(newRow as ProfileRow));
+        }
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [useSupabase, loadSupabaseData]);
+  }, [useSupabase, user.id, loadSupabaseData]);
 
   // ─── localStorage sync (offline mode) ───
 
@@ -773,63 +999,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 1. Delete existing matches for this tournament
       await supabase.from('matches').delete().eq('tournament_id', tournamentId);
 
-      // 2. Insert each match and get back the real UUID
-      const insertedMatches: Match[] = [];
+      // 2. Perform a bulk insert of all matches
+      const matchesToInsert = matchDefs.map(def => ({
+        tournament_id: tournamentId,
+        tournament_name: tournamentName,
+        round_name: def.roundName,
+        team_a_id: def.teamA?.id || null,
+        team_b_id: def.teamB?.id || null,
+        score_a: 0,
+        score_b: 0,
+        status: 'scheduled',
+        odds_a: def.oddsA,
+        odds_b: def.oddsB,
+        map: tourney?.map || 'de_dust2',
+        time: def.time,
+        current_map: 1,
+        map_scores: [],
+        live_logs: []
+      }));
 
-      for (const def of matchDefs) {
-        const { data: inserted, error } = await supabase.from('matches').insert({
-          tournament_id: tournamentId,
-          tournament_name: tournamentName,
-          round_name: def.roundName,
-          team_a_id: def.teamA?.id || null,
-          team_b_id: def.teamB?.id || null,
-          score_a: 0,
-          score_b: 0,
-          status: 'scheduled',
-          odds_a: def.oddsA,
-          odds_b: def.oddsB,
+      const { data: insertedRows, error } = await supabase
+        .from('matches')
+        .insert(matchesToInsert)
+        .select();
+
+      if (error) {
+        console.error('[VOLKI] Failed to insert matches to Supabase:', error);
+        // Fall back to local UUID generation
+        const fallbackMatches = matchDefs.map(def => ({
+          id: generateUUID(),
+          tournamentId, tournamentName,
+          roundName: def.roundName,
+          teamA: def.teamA || null,
+          teamB: def.teamB || null,
+          scoreA: 0, scoreB: 0,
+          status: 'scheduled' as const, winnerId: null,
+          oddsA: def.oddsA, oddsB: def.oddsB,
           map: tourney?.map || 'de_dust2',
-          time: def.time,
-          current_map: 1,
-          map_scores: [],
-          live_logs: []
-        }).select().single();
+          time: def.time, currentMap: 1, mapScores: [], liveLogs: []
+        }));
+        setMatches(prev => {
+          const filtered = prev.filter(m => m.tournamentId !== tournamentId);
+          return [...filtered, ...fallbackMatches];
+        });
+      } else if (insertedRows) {
+        const mapped = insertedRows.map((row: any) => {
+          // Find matching definition to get the full team objects
+          const def = matchDefs.find(d => 
+            d.roundName === row.round_name && 
+            (d.teamA?.id || null) === row.team_a_id && 
+            (d.teamB?.id || null) === row.team_b_id
+          ) || matchDefs[0];
 
-        if (error) {
-          console.error('[VOLKI] Failed to insert match to Supabase:', error);
-          // Fall back to local UUID
-          insertedMatches.push({
-            id: generateUUID(),
-            tournamentId, tournamentName,
-            roundName: def.roundName,
-            teamA: def.teamA || null,
-            teamB: def.teamB || null,
-            scoreA: 0, scoreB: 0,
-            status: 'scheduled', winnerId: null,
-            oddsA: def.oddsA, oddsB: def.oddsB,
-            map: tourney?.map || 'de_dust2',
-            time: def.time, currentMap: 1, mapScores: [], liveLogs: []
-          });
-        } else if (inserted) {
-          insertedMatches.push({
-            id: inserted.id, // ← Real UUID from Supabase
-            tournamentId, tournamentName,
-            roundName: def.roundName,
-            teamA: def.teamA || null,
-            teamB: def.teamB || null,
-            scoreA: 0, scoreB: 0,
-            status: 'scheduled', winnerId: null,
-            oddsA: def.oddsA, oddsB: def.oddsB,
-            map: tourney?.map || 'de_dust2',
-            time: def.time, currentMap: 1, mapScores: [], liveLogs: []
-          });
-        }
+          return {
+            id: row.id,
+            tournamentId,
+            tournamentName,
+            roundName: row.round_name,
+            teamA: def?.teamA || null,
+            teamB: def?.teamB || null,
+            scoreA: row.score_a,
+            scoreB: row.score_b,
+            status: row.status as 'scheduled' | 'live' | 'finished',
+            winnerId: row.winner_id,
+            oddsA: Number(row.odds_a),
+            oddsB: Number(row.odds_b),
+            map: row.map,
+            time: row.time || '',
+            currentMap: row.current_map,
+            mapScores: (row.map_scores || []) as { scoreA: number; scoreB: number }[],
+            liveLogs: row.live_logs || []
+          };
+        });
+
+        setMatches(prev => {
+          const filtered = prev.filter(m => m.tournamentId !== tournamentId);
+          return [...filtered, ...mapped];
+        });
       }
-
-      setMatches(prev => {
-        const filtered = prev.filter(m => m.tournamentId !== tournamentId);
-        return [...filtered, ...insertedMatches];
-      });
     } else {
       // Offline mode — generate local UUIDs
       const newMatches: Match[] = matchDefs.map(def => ({
@@ -1326,6 +1573,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const shuffledNames = [...botTeamNames].sort(() => Math.random() - 0.5);
     const newTeamsList: Team[] = [];
 
+    const teamsToInsert: any[] = [];
+
     for (let i = 0; i < countNeeded; i++) {
       const name = shuffledNames[i % shuffledNames.length] + ` #${Math.floor(Math.random() * 90 + 10)}`;
       const tag = name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase();
@@ -1346,15 +1595,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       newTeamsList.push(newTeam);
 
-      if (useSupabase) {
-        await supabase.from('teams').insert({
-          tournament_id: tournamentId,
-          name: newTeam.name,
-          tag: newTeam.tag,
-          captain: newTeam.captain,
-          players: newTeam.players as unknown as { username: string }[],
-          logo_text: newTeam.logoText,
-          logo_bg: newTeam.logoBg
+      teamsToInsert.push({
+        tournament_id: tournamentId,
+        name: newTeam.name,
+        tag: newTeam.tag,
+        captain: newTeam.captain,
+        players: newTeam.players as unknown as { username: string }[],
+        logo_text: newTeam.logoText,
+        logo_bg: newTeam.logoBg
+      });
+    }
+
+    if (useSupabase && teamsToInsert.length > 0) {
+      const { data: insertedTeams, error } = await supabase
+        .from('teams')
+        .insert(teamsToInsert)
+        .select();
+
+      if (!error && insertedTeams) {
+        insertedTeams.forEach((inserted: any, idx: number) => {
+          newTeamsList[idx].id = inserted.id;
         });
       }
     }

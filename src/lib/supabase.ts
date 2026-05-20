@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Base64 obfuscated credentials to prevent automated GitHub scraping bots from finding them
 const DEFAULT_URL = atob('aHR0cHM6Ly9uYmpubXpyamx2amJlamdlb2djZS5zdXBhYmFzZS5jbw==');
-const DEFAULT_KEY = atob('c2JfcHVibGlzaGFibGVfd3FSY05UOXlLSk5pMTZFSmVxcHduUV9iZmlhQV92dg==');
+const DEFAULT_KEY = atob('c2JfcHVibGlzaGFibGVfd3FSY05UOXlLSk5pMTZFSWVxcHduUV9iZmlhQV92dg==');
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || DEFAULT_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_KEY;

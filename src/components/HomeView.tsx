@@ -24,7 +24,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const liveMatch = matches.find(m => m.status === 'live');
   
   // Get upcoming tournaments (excluding active featured one)
-  const upcomingTourneys = tournaments.filter(t => t.id !== '2x2_aim_cup').slice(0, 3);
+  const upcomingTourneys = tournaments.filter(t => t.id !== featuredTourney?.id).slice(0, 3);
 
   return (
     <div className="scroll-container" style={{ padding: '16px 20px' }}>
