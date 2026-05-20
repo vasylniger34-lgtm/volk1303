@@ -1174,8 +1174,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           {[
             { id: 'dashboard', label: 'Огляд Системи', icon: <Activity size={16} /> },
             { id: 'tournaments', label: 'Турніри & Сітки', icon: <Trophy size={16} /> },
-            { id: 'matches', label: 'Симулятор Матчів', icon: <Swords size={16} /> },
-            { id: 'managers', label: 'Керуючі Сайтом', icon: <Users size={16} /> },
+            { id: 'matches', label: 'Архів', icon: <Swords size={16} /> },
+            { id: 'broadcast', label: 'Telegram Розсилки', icon: <MessageSquare size={16} /> },
             { id: 'analytics', label: 'Аналітика & Дані', icon: <BarChart3 size={16} /> },
             { id: 'settings', label: 'Налаштування', icon: <Settings size={16} /> }
           ].map(item => {
