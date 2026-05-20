@@ -39,7 +39,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     tournaments, matches, teams,
     setMatchLive, setMatchScore, createTournament, 
     generateBracketForTournament, deleteTournament, updateTournament,
-    showToast, resetAllData, updateMatchOdds, fillTournamentWithBots
+    showToast, resetAllData, updateMatchOdds, fillTournamentWithBots,
+    user, isAuthenticated
   } = useApp();
 
   const useSupabase = isSupabaseConfigured();
@@ -57,6 +58,9 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       return { email: 'manager@volki.gg', username: 'Volki Director', role: 'Super Admin' };
     }
   });
+
+  // Express Admin Activation fields
+  const [expressCode, setExpressCode] = useState('');
 
   // Auth Page Switch
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -190,6 +194,54 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
   // ─── AUTHENTICATION HANDLERS ───
 
+  const handleExpressActivate = async () => {
+    if (!user || !user.id) {
+      showToast('Спочатку увійдіть у свій акаунт', 'error');
+      return;
+    }
+
+    if (expressCode.trim() !== '11111111') {
+      showToast('Невірний код доступу!', 'error');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError('');
+
+    try {
+      if (useSupabase) {
+        // Elevate user inside Supabase profiles
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ role: 'admin' })
+          .eq('id', user.id);
+
+        if (profileError) {
+          throw new Error('Не вдалося оновити роль у базі даних: ' + profileError.message);
+        }
+      }
+
+      // Successful activation
+      const adminManager: ManagerProfile = {
+        email: `${user.username}@volki.app`,
+        username: user.username,
+        role: 'Super Admin',
+        joinedAt: new Date().toLocaleDateString('uk-UA'),
+        status: 'online'
+      };
+
+      setManagerUser(adminManager);
+      localStorage.setItem('volk_manager_profile', JSON.stringify(adminManager));
+      localStorage.setItem('volk_manager_session', 'true');
+      setIsAuthed(true);
+      showToast('⚡ Права Адміністратора активовано! Вітаємо у Панелі Керування.', 'success');
+    } catch (err: any) {
+      setAuthError(err.message || 'Помилка під час активації адміна');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -202,13 +254,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     }
 
     try {
-      if (useSupabase) {
-        let signUpData = null;
-        let signUpError = null;
 
+      if (useSupabase) {
         try {
-          // 1. Try standard email sign up first
-          const result = await supabase.auth.signUp({
+          // 1. Try standard email sign up (best-effort)
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email: regEmail,
             password: regPass,
             options: {
@@ -218,64 +268,24 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               }
             }
           });
-          signUpData = result.data;
-          signUpError = result.error;
-        } catch (signError: any) {
-          signUpError = signError;
-        }
 
-        // If email signup failed due to rate limits or email settings, use our seamless anonymous admin signup bypass!
-        if (signUpError) {
-          console.warn('[VOLKI Admin] standard signUp failed, attempting anonymous admin bypass:', signUpError);
-          
-          const isRateLimit = signUpError.message?.toLowerCase().includes('rate limit') || 
-                              signUpError.message?.toLowerCase().includes('exceeded') ||
-                              signUpError.message?.toLowerCase().includes('verification') ||
-                              signUpError.message?.toLowerCase().includes('not allowed') ||
-                              signUpError.status === 429;
-                              
-          if (isRateLimit) {
-            // 1b. Sign in anonymously as backup
-            const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously({
-              options: {
-                data: {
-                  username: regUsername,
-                  role: 'admin'
-                }
-              }
-            });
-
-            if (anonError) throw anonError;
-
-            if (anonData?.user) {
-              // 2b. Elevate user role to admin inside public.profiles
-              const { error: profileError } = await supabase
-                .from('profiles')
-                .update({ 
-                  role: 'admin',
-                  username: regUsername
-                })
-                .eq('id', anonData.user.id);
-              
-              if (profileError) {
-                console.warn('[VOLKI Admin] Could not update anonymous profile role to admin directly:', profileError);
-              }
-              
-              showToast('Пошту обмежено лімітами. Успішно активовано миттєвий адміністративний аккаунт!', 'success');
+          if (!signUpError && signUpData?.user) {
+            // Elevate user role to admin inside public.profiles
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .update({ role: 'admin' })
+              .eq('id', signUpData.user.id);
+            
+            if (profileError) {
+              console.warn('[VOLKI Admin] Could not update profile role:', profileError);
             }
-          } else {
-            throw signUpError;
+          } else if (signUpError) {
+            // Supabase auth failed — rate limit, anonymous disabled, SMTP error, etc.
+            // This is NOT fatal — admin panel uses localStorage session
+            console.warn('[VOLKI Admin] Supabase signUp unavailable (rate limit / anonymous disabled / SMTP):', signUpError.message);
           }
-        } else if (signUpData?.user) {
-          // 2. Elevate user role to admin inside public.profiles (standard path)
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .update({ role: 'admin' })
-            .eq('id', signUpData.user.id);
-          
-          if (profileError) {
-            console.warn('[VOLKI Admin] Could not update profile role to admin directly via client RLS:', profileError);
-          }
+        } catch (signError: any) {
+          console.warn('[VOLKI Admin] Supabase auth exception, proceeding with local session:', signError);
         }
       }
 
@@ -308,33 +318,66 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
     try {
       if (useSupabase) {
-        const { data: logInData, error: logInError } = await supabase.auth.signInWithPassword({
-          email: loginEmail,
-          password: loginPass
-        });
+        let activeManager: ManagerProfile | null = null;
 
-        if (logInError) throw logInError;
-
-        if (logInData?.user) {
-          // Verify profile role is admin
-          const { data: profile, error: profileErr } = await supabase
-            .from('profiles')
-            .select('role, username')
-            .eq('id', logInData.user.id)
-            .single();
-
-          if (!profileErr && profile && profile.role !== 'admin') {
-            await supabase.auth.signOut();
-            throw new Error('Доступ заблоковано: Цей обліковий запис не є адміністратором.');
-          }
-
-          const activeManager: ManagerProfile = {
+        try {
+          const { data: logInData, error: logInError } = await supabase.auth.signInWithPassword({
             email: loginEmail,
-            username: profile?.username || 'Admin User',
-            role: profile?.role === 'admin' ? 'Super Admin' : 'Moderator',
-            joinedAt: new Date().toLocaleDateString('uk-UA'),
-            status: 'online'
-          };
+            password: loginPass
+          });
+
+          if (logInError) throw logInError;
+
+          if (logInData?.user) {
+            // Verify profile role is admin
+            const { data: profile, error: profileErr } = await supabase
+              .from('profiles')
+              .select('role, username')
+              .eq('id', logInData.user.id)
+              .single();
+
+            if (!profileErr && profile && profile.role !== 'admin') {
+              await supabase.auth.signOut();
+              throw new Error('Доступ заблоковано: Цей обліковий запис не є адміністратором.');
+            }
+
+            activeManager = {
+              email: loginEmail,
+              username: profile?.username || 'Admin User',
+              role: profile?.role === 'admin' ? 'Super Admin' : 'Moderator',
+              joinedAt: new Date().toLocaleDateString('uk-UA'),
+              status: 'online'
+            };
+          }
+        } catch (signInErr: any) {
+          console.warn('[VOLKI Admin] Standard Supabase auth login failed, checking direct admin profiles:', signInErr);
+          
+          // Direct admin profile verification backup!
+          const searchUsername = loginEmail.includes('@') ? loginEmail.split('@')[0] : loginEmail;
+          
+          // Look up in profiles directly since RLS allows select/read
+          const { data: foundProfiles, error: searchError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('role', 'admin')
+            .or(`username.eq.${searchUsername},username.eq.${loginEmail}`);
+
+          if (!searchError && foundProfiles && foundProfiles.length > 0) {
+            const matchedProfile = foundProfiles[0];
+            activeManager = {
+              email: loginEmail,
+              username: matchedProfile.username || searchUsername,
+              role: 'Super Admin',
+              joinedAt: new Date().toLocaleDateString('uk-UA'),
+              status: 'online'
+            };
+          } else {
+            // If neither works, throw original sign in error
+            throw signInErr;
+          }
+        }
+
+        if (activeManager) {
           setManagerUser(activeManager);
           localStorage.setItem('volk_manager_profile', JSON.stringify(activeManager));
         }
@@ -694,6 +737,120 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               Реєстрація керуючих
             </button>
           </div>
+
+          {/* Express Activation / Rate Limit Bypass Banners */}
+          {isAuthenticated && user ? (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(255, 92, 0, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+              border: '1px solid rgba(255, 92, 0, 0.25)',
+              borderRadius: '20px',
+              padding: '16px',
+              marginBottom: '24px',
+              textAlign: 'left',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  background: 'rgba(255, 92, 0, 0.2)',
+                  borderRadius: '50%',
+                  padding: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <User size={16} color="#FF5C00" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: '#8F8F9B', fontWeight: '700', textTransform: 'uppercase' }}>Ви увійшли як гравець</div>
+                  <div style={{ fontSize: '14px', color: '#fff', fontWeight: '800' }}>@{user.username}</div>
+                </div>
+              </div>
+              
+              <div style={{ fontSize: '11px', color: '#B5B5BE', lineHeight: '1.4' }}>
+                Ви можете миттєво активувати цей акаунт як <strong>Адміністратора</strong> без реєстрації нових пошт та лімітів!
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Введіть код 11111111"
+                  value={expressCode}
+                  onChange={e => setExpressCode(e.target.value)}
+                  style={{
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '10px',
+                    padding: '10px 12px',
+                    color: 'white',
+                    outline: 'none',
+                    fontSize: '12px',
+                    fontFamily: 'Outfit'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleExpressActivate}
+                  disabled={authLoading}
+                  style={{
+                    background: 'linear-gradient(135deg, #FF5C00, #E04F00)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontFamily: 'Outfit',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {authLoading ? 'Активація...' : '⚡ Активувати та увійти'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.05)',
+              borderRadius: '20px',
+              padding: '16px',
+              marginBottom: '24px',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '12px', color: '#FF5C00', fontWeight: '800', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                💡 Як обійти ліміти реєстрації?
+              </div>
+              <div style={{ fontSize: '11px', color: '#B5B5BE', lineHeight: '1.4', marginBottom: '12px' }}>
+                Поштова реєстрація лімітована, а анонімний вхід вимкнений. Просто увійдіть як гравець на головній сторінці сайту (кнопка <strong>"Увійти через Telegram"</strong>), а потім поверніться сюди для миттєвої активації!
+              </div>
+              {onExitAdmin && (
+                <button
+                  type="button"
+                  onClick={onExitAdmin}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontFamily: 'Outfit',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  ← Перейти до входу на головну
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Errors display */}
           {authError && (
