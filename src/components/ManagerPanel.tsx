@@ -1122,7 +1122,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       onClick={() => {
                         if (confirm('Ви впевнені, що хочете видалити ВСІ турніри? Це також видалить усі пов\'язані матчі, команди та ставки.')) {
                           tournaments.forEach(t => deleteTournament(t.id));
-                          setTerminalLogs(prev => [...prev, [] Deleted all tournaments.]);
+                          setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Deleted all tournaments.`]);
                           showToast('Усі турніри видалено', 'info');
                         }
                       }}

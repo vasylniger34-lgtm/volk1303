@@ -827,6 +827,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
       return m;
+    }));
   };
 
   const updateMatchOdds = (matchId: string, oddsA: number, oddsB: number) => {

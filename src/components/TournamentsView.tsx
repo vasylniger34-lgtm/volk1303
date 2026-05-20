@@ -125,7 +125,7 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(Видалити турнір ?)) deleteTournament(tourney.id);
+                          if (confirm(`Видалити турнір ${tourney.name}?`)) deleteTournament(tourney.id);
                         }}
                         style={{
                           background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)',
