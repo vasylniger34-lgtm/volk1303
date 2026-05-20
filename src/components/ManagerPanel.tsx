@@ -5,7 +5,8 @@ import {
   Shield, Key, Mail, User, Lock, Eye, EyeOff, LogOut, 
   BarChart3, Trophy, Swords, Users, Settings, Activity, 
   Plus, Check, Play, Edit3, X, Save, 
-  MapPin, Award, Trash2, PlusCircle, AlertCircle, RefreshCw, Send
+  MapPin, Award, Trash2, PlusCircle, AlertCircle, RefreshCw, Send,
+  MessageSquare, CheckCircle2
 } from 'lucide-react';
 
 const MANAGER_ACCESS_CODE = '11111111';
@@ -82,7 +83,16 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   const [authError, setAuthError] = useState('');
 
   // Dashboard workspace navigation
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tournaments' | 'matches' | 'managers' | 'analytics' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'tournaments' | 'matches' | 'managers' | 'broadcast' | 'analytics' | 'settings'>('dashboard');
+
+  // Broadcast state
+  const [broadcastMsg, setBroadcastMsg] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<{sent: number; failed: number} | null>(null);
+
+  // Analytics real data state
+  const [profilesCount, setProfilesCount] = useState(0);
+  const [botSubscribersCount, setBotSubscribersCount] = useState(0);
 
   // Match management state
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -633,6 +643,68 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     showToast('Коментар впроваджено в трансляцію!', 'success');
   };
 
+  // ─── BROADCAST HANDLER ───
+
+  const handleSendBroadcast = async () => {
+    if (!broadcastMsg.trim()) {
+      showToast('Введіть текст повідомлення!', 'error');
+      return;
+    }
+    setBroadcastSending(true);
+    setBroadcastResult(null);
+
+    try {
+      // Fetch subscribers from Supabase
+      const BOT_TOKEN = '8873845823:AAErjQiXP7InePLKku-MOhbqNPe-bMvt3LU';
+      const { data: subs } = await supabase
+        .from('bot_subscribers')
+        .select('chat_id')
+        .eq('is_active', true);
+
+      const chatIds: number[] = (subs || []).map((s: any) => Number(s.chat_id)).filter(Boolean);
+
+      let sent = 0;
+      let failed = 0;
+
+      for (const chatId of chatIds) {
+        try {
+          const resp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: broadcastMsg,
+              parse_mode: 'HTML'
+            })
+          });
+          const result = await resp.json();
+          if (result.ok) {
+            sent++;
+          } else {
+            failed++;
+            // Mark inactive if blocked
+            if (result.error_code === 403 || result.description?.includes('blocked')) {
+              await supabase.from('bot_subscribers').update({ is_active: false }).eq('chat_id', chatId);
+            }
+          }
+        } catch {
+          failed++;
+        }
+        // Small delay to avoid TG rate limits
+        await new Promise(r => setTimeout(r, 60));
+      }
+
+      setBroadcastResult({ sent, failed });
+      setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Broadcast sent: ${sent} success, ${failed} failed.`]);
+      showToast(`Розсилку виконано! ✅ ${sent} надіслано, ❌ ${failed} помилок`, sent > 0 ? 'success' : 'error');
+      if (sent > 0) setBroadcastMsg('');
+    } catch (err: any) {
+      showToast('Помилка розсилки: ' + err.message, 'error');
+    } finally {
+      setBroadcastSending(false);
+    }
+  };
+
   // ─── STYLES & LAYOUTS ───
 
   const activeMatch = matches.find(m => m.id === selectedMatchId);
@@ -641,6 +713,19 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   const liveMatchesCount = matches.filter(m => m.status === 'live').length;
   const upcomingMatchesCount = matches.filter(m => m.status === 'scheduled').length;
   const totalRegisteredTeams = Object.values(teams).reduce((a, b) => a + b.length, 0);
+  const completedTournaments = tournaments.filter(t => t.status === 'completed').length;
+  const finishedMatches = matches.filter(m => m.status === 'finished').length;
+
+  // Load real analytics from Supabase
+  useEffect(() => {
+    if (!useSupabase || !isAuthed) return;
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).then(({ count }) => {
+      setProfilesCount(count || 0);
+    });
+    supabase.from('bot_subscribers').select('chat_id', { count: 'exact', head: true }).eq('is_active', true).then(({ count }) => {
+      setBotSubscribersCount(count || 0);
+    });
+  }, [useSupabase, isAuthed]);
 
   // ─── RENDER: AUTH GATE ───
 
@@ -694,10 +779,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               <Shield size={36} color="#FF5C00" />
             </div>
             <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '28px', fontWeight: '950', letterSpacing: '4px', margin: 0, color: '#fff' }}>
-              COMMAND CENTER
+              VOLKI 1303
             </h1>
             <span style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '3px', color: '#FF5C00', textTransform: 'uppercase', marginTop: '6px' }}>
-              Керування Платформою VOLKI
+              ADMIN PANEL
             </span>
           </div>
 
@@ -815,41 +900,28 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               </div>
             </div>
           ) : (
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              borderRadius: '20px',
-              padding: '16px',
-              marginBottom: '24px',
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '12px', color: '#FF5C00', fontWeight: '800', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                💡 Як обійти ліміти реєстрації?
-              </div>
-              <div style={{ fontSize: '11px', color: '#B5B5BE', lineHeight: '1.4', marginBottom: '12px' }}>
-                Поштова реєстрація лімітована, а анонімний вхід вимкнений. Просто увійдіть як гравець на головній сторінці сайту (кнопка <strong>"Увійти через Telegram"</strong>), а потім поверніться сюди для миттєвої активації!
-              </div>
-              {onExitAdmin && (
+            onExitAdmin ? (
+              <div style={{ marginBottom: '24px', textAlign: 'center' }}>
                 <button
                   type="button"
                   onClick={onExitAdmin}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    color: '#fff',
-                    border: 'none',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    color: '#8F8F9B',
+                    border: '1px solid rgba(255,255,255,0.08)',
                     borderRadius: '10px',
-                    padding: '8px 12px',
-                    fontSize: '11px',
+                    padding: '10px 16px',
+                    fontSize: '12px',
                     fontWeight: '700',
                     cursor: 'pointer',
                     fontFamily: 'Outfit',
                     transition: 'all 0.2s',
                   }}
                 >
-                  ← Перейти до входу на головну
+                  ← Перейти до головного сайту
                 </button>
-              )}
-            </div>
+              </div>
+            ) : null
           )}
 
           {/* Errors display */}
@@ -1077,8 +1149,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             <Shield size={20} color="#FF5C00" />
           </div>
           <div>
-            <div style={{ fontSize: '16px', fontWeight: '950', fontFamily: 'Outfit', letterSpacing: '2px' }}>VOLKI 13:03</div>
-            <div style={{ fontSize: '9px', color: '#FF5C00', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase' }}>COMMAND WORKSPACE</div>
+            <div style={{ fontSize: '16px', fontWeight: '950', fontFamily: 'Outfit', letterSpacing: '2px' }}>VOLKI 1303</div>
+            <div style={{ fontSize: '9px', color: '#FF5C00', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase' }}>ADMIN PANEL</div>
           </div>
         </div>
 
@@ -1199,9 +1271,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             <h2 style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '0.5px', fontFamily: 'Outfit', textTransform: 'uppercase', margin: 0 }}>
               {activeTab === 'dashboard' && '📊 Панель Огляду Системи'}
               {activeTab === 'tournaments' && '🏆 Керування Турнірами & Сітками'}
-              {activeTab === 'matches' && '⚔️ Симулятор Матчів & Запис Рахунків'}
+              {activeTab === 'matches' && '🗃️ Архів Матчів & Управління Рахунками'}
               {activeTab === 'managers' && '👥 Облікові Записи Керуючих'}
-              {activeTab === 'analytics' && '📈 Аналітика Платформи & Користувачі'}
+              {activeTab === 'broadcast' && '📢 Telegram Розсилки для Підписників'}
+              {activeTab === 'analytics' && '📈 Аналітика Платформи (Реальні Дані)'}
               {activeTab === 'settings' && '⚙️ Системні Налаштування'}
             </h2>
           </div>
@@ -2194,122 +2267,269 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           )}
 
           {/* ============================================================
-              TAB: PLATFORM ANALYTICS (SVG Charts Cover)
+              TAB: TELEGRAM BROADCAST
+             ============================================================ */}
+          {activeTab === 'broadcast' && (
+            <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start' }}>
+              {/* Broadcast Composer */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="esports-card" style={{ padding: '28px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '900', fontFamily: 'Outfit', color: '#fff', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MessageSquare size={18} color="#FF5C00" /> Нова Розсилка
+                  </h3>
+                  <p style={{ fontSize: '11px', color: '#8F8F9B', marginBottom: '20px' }}>
+                    Повідомлення буде надіслано всім активним підписникам Telegram-бота. Підтримується HTML-форматування: <code style={{color:'#FF5C00'}}>&lt;b&gt;</code>, <code style={{color:'#FF5C00'}}>&lt;i&gt;</code>, <code style={{color:'#FF5C00'}}>&lt;code&gt;</code>.
+                  </p>
+
+                  {/* Quick templates */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '10px', color: '#8F8F9B', fontWeight: '700', textTransform: 'uppercase', alignSelf: 'center' }}>Шаблони:</span>
+                    {[
+                      { label: '🏆 Новий турнір', text: '🚨 <b>АНОНС ТУРНІРУ!</b>\n\n🏆 Незабаром відбудеться новий турнір VOLKI 1303!\n📅 Дата: [ДАТА]\n💰 Призовий фонд: [ФОНД]\n\nРеєструйся зараз у додатку! 👇' },
+                      { label: '⚙️ Тех. роботи', text: '⚙️ <b>Технічні роботи</b>\n\nПлатформа VOLKI 1303 тимчасово недоступна для профілактичних робіт.\nОчікуваний час відновлення: [ЧАС]\n\nДякуємо за розуміння! 🐺' },
+                      { label: '🎉 Результати', text: '🎉 <b>РЕЗУЛЬТАТИ ТУРНІРУ!</b>\n\n🥇 Переможець: [КОМАНДА]\n🥈 2-е місце: [КОМАНДА]\n🥉 3-є місце: [КОМАНДА]\n\nВітаємо всіх учасників! 🏆' }
+                    ].map(tmpl => (
+                      <button
+                        key={tmpl.label}
+                        onClick={() => setBroadcastMsg(tmpl.text)}
+                        style={{
+                          background: 'rgba(255, 92, 0, 0.06)', border: '1px solid rgba(255, 92, 0, 0.15)',
+                          borderRadius: '8px', padding: '6px 12px', fontSize: '11px', color: '#FF5C00',
+                          fontWeight: '700', cursor: 'pointer', fontFamily: 'Outfit'
+                        }}
+                      >
+                        {tmpl.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <textarea
+                    rows={8}
+                    placeholder={'🚨 <b>АНОНС!</b>\n\nТекст вашого повідомлення...\n\n#volki1303'}
+                    value={broadcastMsg}
+                    onChange={e => setBroadcastMsg(e.target.value)}
+                    style={{
+                      width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '13px', outline: 'none',
+                      fontFamily: 'monospace', resize: 'vertical', boxSizing: 'border-box', lineHeight: '1.6'
+                    }}
+                  />
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+                    <span style={{ fontSize: '11px', color: '#51515E' }}>
+                      {broadcastMsg.length} символів
+                    </span>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        onClick={() => setBroadcastMsg('')}
+                        style={{
+                          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '10px', padding: '10px 16px', color: '#8F8F9B', fontSize: '12px',
+                          fontWeight: '700', cursor: 'pointer', fontFamily: 'Outfit'
+                        }}
+                      >
+                        Очистити
+                      </button>
+                      <button
+                        onClick={handleSendBroadcast}
+                        disabled={broadcastSending || !broadcastMsg.trim()}
+                        className="btn-primary"
+                        style={{ padding: '10px 24px', borderRadius: '10px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', opacity: broadcastSending ? 0.7 : 1 }}
+                      >
+                        {broadcastSending ? (
+                          <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Надсилання...</>
+                        ) : (
+                          <><Send size={14} /> Надіслати всім</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Result */}
+                  {broadcastResult && (
+                    <div style={{
+                      marginTop: '16px', padding: '14px 16px', borderRadius: '12px',
+                      background: broadcastResult.sent > 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                      border: `1px solid ${broadcastResult.sent > 0 ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+                      display: 'flex', alignItems: 'center', gap: '12px'
+                    }}>
+                      <CheckCircle2 size={18} color={broadcastResult.sent > 0 ? '#10B981' : '#EF4444'} />
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>
+                        ✅ Надіслано: <strong style={{ color: '#10B981' }}>{broadcastResult.sent}</strong>
+                        &nbsp;&nbsp;❌ Помилок: <strong style={{ color: '#EF4444' }}>{broadcastResult.failed}</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Preview + Subscriber Stats */}
+              <div style={{ width: '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Subscriber count */}
+                <div className="esports-card" style={{ padding: '20px' }}>
+                  <h4 style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', marginBottom: '14px' }}>Аудиторія</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#8F8F9B' }}>Підписники бота</span>
+                      <span style={{ fontSize: '18px', fontWeight: '900', fontFamily: 'Outfit', color: '#FF5C00' }}>{botSubscribersCount}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#8F8F9B' }}>Гравців на платформі</span>
+                      <span style={{ fontSize: '18px', fontWeight: '900', fontFamily: 'Outfit', color: '#3B82F6' }}>{profilesCount}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Telegram preview */}
+                <div className="esports-card" style={{ padding: '20px' }}>
+                  <h4 style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', marginBottom: '12px' }}>Прев'ю у Telegram</h4>
+                  <div style={{
+                    background: '#1C1C22', borderRadius: '12px', padding: '14px',
+                    border: '1px solid rgba(255,255,255,0.04)', minHeight: '80px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #FF5C00, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🐺</div>
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#fff' }}>VOLKI 1303</div>
+                        <div style={{ fontSize: '9px', color: '#8F8F9B' }}>Бот</div>
+                      </div>
+                    </div>
+                    <div
+                      style={{ fontSize: '12px', color: '#E5E5EA', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                      dangerouslySetInnerHTML={{
+                        __html: broadcastMsg
+                          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                          .replace(/&lt;b&gt;/g, '<strong>').replace(/&lt;\/b&gt;/g, '</strong>')
+                          .replace(/&lt;i&gt;/g, '<em>').replace(/&lt;\/i&gt;/g, '</em>')
+                          .replace(/&lt;code&gt;/g, '<code style="background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px">').replace(/&lt;\/code&gt;/g, '</code>')
+                          || '<span style="color:#51515E;font-style:italic">Введіть текст повідомлення зліва...</span>'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================
+              TAB: PLATFORM ANALYTICS (Real Data)
              ============================================================ */}
           {activeTab === 'analytics' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
               
-              {/* Analytics header overview stats */}
+              {/* Real Analytics Stats Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                 {[
-                  { label: 'Нові користувачі (Цей тиждень)', val: '+142 гравці', rate: '+12.4% відн. минулого' },
-                  { label: 'Середній розмір ставки', val: '450 🪙', rate: 'Стабільно' },
-                  { label: 'Коефіцієнт утримання (Retention)', val: '78.2%', rate: '+2.1% за місяць' }
-                ].map((item, i) => (
-                  <div key={i} className="esports-card" style={{ padding: '20px' }}>
-                    <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase' }}>{item.label}</span>
-                    <div style={{ fontSize: '20px', fontWeight: '800', fontFamily: 'Outfit', margin: '6px 0', color: 'white' }}>{item.val}</div>
-                    <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '600' }}>{item.rate}</span>
+                  { label: 'Гравців на платформі', val: profilesCount.toString(), color: '#3B82F6', icon: '👤' },
+                  { label: 'Підписники Telegram', val: botSubscribersCount.toString(), color: '#FF5C00', icon: '📱' },
+                  { label: 'Турнірів проведено', val: completedTournaments.toString(), color: '#8B5CF6', icon: '🏆' },
+                  { label: 'Матчів зіграно', val: finishedMatches.toString(), color: '#10B981', icon: '⚔️' },
+                  { label: 'Команд зареєстровано', val: totalRegisteredTeams.toString(), color: '#F59E0B', icon: '👥' },
+                  { label: 'LIVE зараз', val: liveMatchesCount.toString(), color: '#EF4444', icon: '🔴' }
+                ].map((stat, i) => (
+                  <div key={i} className="esports-card" style={{
+                    padding: '20px',
+                    background: `linear-gradient(135deg, ${stat.color}08 0%, rgba(16, 16, 25, 0.4) 100%)`,
+                    border: `1px solid ${stat.color}15`
+                  }}>
+                    <span style={{ fontSize: '20px', display: 'block', marginBottom: '8px' }}>{stat.icon}</span>
+                    <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase', fontWeight: '700' }}>{stat.label}</span>
+                    <div style={{ fontSize: '28px', fontWeight: '950', fontFamily: 'Outfit', color: stat.color, margin: '4px 0 0' }}>{stat.val}</div>
                   </div>
                 ))}
               </div>
 
-              {/* Spline Custom SVG Charts Area */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px' }}>
-                
-                {/* User registration curve */}
-                <div className="esports-card" style={{ padding: '24px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '20px' }}>
-                    Динаміка Реєстрації Гравців (Травень)
-                  </h3>
-
-                  {/* Custom SVG Line Graph */}
-                  <div style={{ position: 'relative', width: '100%', height: '220px' }}>
-                    <svg viewBox="0 0 500 200" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                      <defs>
-                        <linearGradient id="curveGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#FF5C00" stopOpacity="0.25" />
-                          <stop offset="100%" stopColor="#FF5C00" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-
-                      {/* Grid Lines */}
-                      <line x1="0" y1="50" x2="500" y2="50" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
-                      <line x1="0" y1="100" x2="500" y2="100" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
-                      <line x1="0" y1="150" x2="500" y2="150" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
-                      
-                      {/* Spline Path */}
-                      <path 
-                        d="M0 160 Q 80 120, 160 140 T 320 70 T 480 30" 
-                        fill="none" 
-                        stroke="#FF5C00" 
-                        strokeWidth="3"
-                        style={{ filter: 'drop-shadow(0 4px 10px rgba(255, 92, 0, 0.4))' }} 
-                      />
-
-                      {/* Area Under Spline */}
-                      <path 
-                        d="M0 160 Q 80 120, 160 140 T 320 70 T 480 30 L 480 200 L 0 200 Z" 
-                        fill="url(#curveGrad)" 
-                      />
-
-                      {/* Points markers */}
-                      <circle cx="160" cy="140" r="5" fill="#FF5C00" stroke="#fff" strokeWidth="2" />
-                      <circle cx="320" cy="70" r="5" fill="#FF5C00" stroke="#fff" strokeWidth="2" />
-                      <circle cx="480" cy="30" r="5" fill="#FF5C00" stroke="#fff" strokeWidth="2" />
-                    </svg>
+              {/* Tournaments Breakdown Table */}
+              <div className="esports-card" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '18px' }}>
+                  Деталізація по Турнірах (Реальні Дані)
+                </h3>
+                {tournaments.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#51515E', padding: '40px' }}>
+                    <Trophy size={32} style={{ margin: '0 auto 12px', opacity: 0.2 }} />
+                    <p>Турнірів ще немає</p>
                   </div>
-                  
-                  {/* Axis Legend */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#51515E', marginTop: '12px', fontFamily: 'Outfit' }}>
-                    <span>01 Трав</span>
-                    <span>08 Трав</span>
-                    <span>15 Трав</span>
-                    <span>20 Трав (Сьогодні)</span>
-                  </div>
-                </div>
-
-                {/* Betting Distribution */}
-                <div className="esports-card" style={{ padding: '24px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '20px' }}>
-                    Розподіл Ставок за Дисциплінами
-                  </h3>
-
-                  {/* SVG Donut Chart */}
-                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '180px' }}>
-                    <svg viewBox="0 0 100 100" style={{ width: '130px', height: '130px' }}>
-                      {/* Background Donut */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.02)" strokeWidth="12" />
-                      
-                      {/* CS2 2X2 portion (60%) */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#FF5C00" strokeWidth="12" strokeDasharray="150 251.2" strokeDashoffset="0" />
-                      
-                      {/* CS2 4X4 portion (25%) */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#8B5CF6" strokeWidth="12" strokeDasharray="62.8 251.2" strokeDashoffset="-150" />
-                      
-                      {/* BCI portion (15%) */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#10B981" strokeWidth="12" strokeDasharray="38.4 251.2" strokeDashoffset="-212.8" />
-                    </svg>
-                  </div>
-
-                  {/* Donut Legend */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px', marginTop: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#FF5C00' }}></span> 2х2 Дуелі</span>
-                      <span style={{ fontWeight: '700' }}>60%</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#8B5CF6' }}></span> 4х4 Командні</span>
-                      <span style={{ fontWeight: '700' }}>25%</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#10B981' }}></span> Битви Кланів (BCI)</span>
-                      <span style={{ fontWeight: '700' }}>15%</span>
-                    </div>
-                  </div>
-                </div>
-
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#8F8F9B', textAlign: 'left' }}>
+                        <th style={{ padding: '10px 12px' }}>Назва</th>
+                        <th style={{ padding: '10px 12px' }}>Тип</th>
+                        <th style={{ padding: '10px 12px' }}>Статус</th>
+                        <th style={{ padding: '10px 12px' }}>Команди</th>
+                        <th style={{ padding: '10px 12px' }}>Матчі</th>
+                        <th style={{ padding: '10px 12px' }}>Призовий фонд</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tournaments.map(t => {
+                        const tTeams = teams[t.id] || [];
+                        const tMatches = matches.filter(m => m.tournamentId === t.id);
+                        return (
+                          <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                            <td style={{ padding: '12px', fontWeight: '700', color: 'white', fontFamily: 'Outfit' }}>{t.name}</td>
+                            <td style={{ padding: '12px', color: '#FF5C00', fontWeight: '700' }}>{t.type}</td>
+                            <td style={{ padding: '12px' }}>
+                              <span style={{
+                                background: t.status === 'active' ? 'rgba(16,185,129,0.1)' : t.status === 'completed' ? 'rgba(139,92,246,0.1)' : 'rgba(255,92,0,0.1)',
+                                color: t.status === 'active' ? '#10B981' : t.status === 'completed' ? '#8B5CF6' : '#FF5C00',
+                                padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '800', textTransform: 'uppercase'
+                              }}>
+                                {t.status === 'active' ? 'LIVE' : t.status === 'completed' ? 'DONE' : 'SOON'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', color: '#10B981', fontWeight: '700' }}>{tTeams.length}/{t.maxParticipants}</td>
+                            <td style={{ padding: '12px', color: '#3B82F6', fontWeight: '700' }}>{tMatches.length}</td>
+                            <td style={{ padding: '12px', color: '#FF5C00', fontWeight: '800' }}>{t.prizePool}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
+
+              {/* Tournament Status Donut (real data) */}
+              {tournaments.length > 0 && (() => {
+                const upcoming = tournaments.filter(t => t.status === 'upcoming').length;
+                const active = tournaments.filter(t => t.status === 'active').length;
+                const completed = tournaments.filter(t => t.status === 'completed').length;
+                const total = tournaments.length;
+                const circ = 251.2;
+                const upcomingArc = (upcoming / total) * circ;
+                const activeArc = (active / total) * circ;
+                const completedArc = (completed / total) * circ;
+                return (
+                  <div className="esports-card" style={{ padding: '24px', maxWidth: '380px' }}>
+                    <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '20px' }}>
+                      Розподіл за Статусами Турнірів
+                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                      <svg viewBox="0 0 100 100" style={{ width: '120px', height: '120px', flexShrink: 0 }}>
+                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
+                        {upcomingArc > 0 && <circle cx="50" cy="50" r="40" fill="transparent" stroke="#FF5C00" strokeWidth="12" strokeDasharray={`${upcomingArc} ${circ}`} strokeDashoffset="0" />}
+                        {activeArc > 0 && <circle cx="50" cy="50" r="40" fill="transparent" stroke="#10B981" strokeWidth="12" strokeDasharray={`${activeArc} ${circ}`} strokeDashoffset={`-${upcomingArc}`} />}
+                        {completedArc > 0 && <circle cx="50" cy="50" r="40" fill="transparent" stroke="#8B5CF6" strokeWidth="12" strokeDasharray={`${completedArc} ${circ}`} strokeDashoffset={`-${upcomingArc + activeArc}`} />}
+                        <text x="50" y="54" textAnchor="middle" fill="white" fontSize="16" fontWeight="bold" fontFamily="Outfit">{total}</text>
+                      </svg>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8F8F9B' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#FF5C00', display: 'inline-block' }}></span> Очікування</span>
+                          <strong style={{ color: '#FF5C00' }}>{upcoming}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8F8F9B' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#10B981', display: 'inline-block' }}></span> Активні</span>
+                          <strong style={{ color: '#10B981' }}>{active}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8F8F9B' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#8B5CF6', display: 'inline-block' }}></span> Завершені</span>
+                          <strong style={{ color: '#8B5CF6' }}>{completed}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
             </div>
           )}
