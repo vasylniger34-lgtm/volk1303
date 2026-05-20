@@ -29,86 +29,127 @@ export const HomeView: React.FC<HomeViewProps> = ({
   return (
     <div className="scroll-container" style={{ padding: '16px 20px' }}>
       
-      <div 
-        className="orange-glow"
-        style={{
-          background: `linear-gradient(180deg, rgba(10, 10, 14, 0.25) 0%, rgba(10, 10, 14, 0.9) 100%), url("${featuredTourney?.imageUrl || '/tactical_soldier.png'}") center/cover no-repeat`,
-          border: '1px solid rgba(255, 92, 0, 0.15)',
-          borderRadius: '24px',
-          padding: '28px 24px',
-          position: 'relative',
-          overflow: 'hidden',
-          marginBottom: '24px',
-          boxShadow: '0 12px 36px rgba(255, 92, 0, 0.08)',
-          minHeight: '230px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-end'
-        }}
-      >
-        <div style={{ position: 'relative', zIndex: 2 }}>
-          <span style={{
-            fontSize: '10px',
-            color: 'var(--primary-orange)',
-            fontWeight: '900',
-            letterSpacing: '3px',
-            textTransform: 'uppercase',
-            display: 'block',
-            marginBottom: '6px',
-            fontFamily: 'Outfit, sans-serif'
-          }}>
-            НАЙБЛИЖЧИЙ ТУРНІР
-          </span>
+      {featuredTourney ? (
+        <div 
+          className="orange-glow"
+          style={{
+            background: `linear-gradient(180deg, rgba(10, 10, 14, 0.25) 0%, rgba(10, 10, 14, 0.9) 100%), url("${featuredTourney?.imageUrl || '/tactical_soldier.png'}") center/cover no-repeat`,
+            border: '1px solid rgba(255, 92, 0, 0.15)',
+            borderRadius: '24px',
+            padding: '28px 24px',
+            position: 'relative',
+            overflow: 'hidden',
+            marginBottom: '24px',
+            boxShadow: '0 12px 36px rgba(255, 92, 0, 0.08)',
+            minHeight: '230px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end'
+          }}
+        >
+          <div style={{ position: 'relative', zIndex: 2 }}>
+            <span style={{
+              fontSize: '10px',
+              color: 'var(--primary-orange)',
+              fontWeight: '900',
+              letterSpacing: '3px',
+              textTransform: 'uppercase',
+              display: 'block',
+              marginBottom: '6px',
+              fontFamily: 'Outfit, sans-serif'
+            }}>
+              НАЙБЛИЖЧИЙ ТУРНІР
+            </span>
+            <h2 style={{
+              fontSize: '28px',
+              fontWeight: '900',
+              color: 'white',
+              letterSpacing: '0.5px',
+              marginBottom: '4px',
+              fontFamily: 'Outfit, sans-serif',
+              textTransform: 'uppercase',
+              textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+            }}>
+              {featuredTourney.name}
+            </h2>
+            <p style={{
+              fontSize: '12px',
+              color: '#8F8F9B',
+              fontWeight: '600',
+              marginBottom: '20px',
+              textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+            }}>
+              {featuredTourney.date}
+            </p>
+
+            <div style={{ display: 'flex', gap: '24px', marginBottom: '22px' }}>
+              <div>
+                <span style={{ fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase', display: 'block', fontWeight: '700', letterSpacing: '0.5px' }}>
+                  Призовий фонд
+                </span>
+                <span style={{ fontSize: '16px', fontWeight: '800', color: '#fff', fontFamily: 'Outfit, sans-serif' }}>
+                  {featuredTourney.prizePool}
+                </span>
+              </div>
+              <div style={{ borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '24px' }}>
+                <span style={{ fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase', display: 'block', fontWeight: '700', letterSpacing: '0.5px' }}>
+                  Формат
+                </span>
+                <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--primary-orange)', fontFamily: 'Outfit, sans-serif' }}>
+                  {featuredTourney.type}
+                </span>
+              </div>
+            </div>
+
+            <button 
+              className="btn-primary" 
+              onClick={() => onOpenRegister(featuredTourney.id)}
+              style={{ width: '100%', padding: '14px', fontSize: '13px', letterSpacing: '1px' }}
+            >
+              ЗАРЕЄСТРУВАТИСЬ
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div 
+          className="orange-glow"
+          style={{
+            background: 'linear-gradient(180deg, rgba(10, 10, 14, 0.6) 0%, rgba(10, 10, 14, 0.9) 100%), url("/tactical_soldier.png") center/cover no-repeat',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: '24px',
+            padding: '40px 24px',
+            textAlign: 'center',
+            marginBottom: '24px',
+            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.2)',
+            minHeight: '200px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          <Trophy size={48} color="#51515E" style={{ marginBottom: '16px' }} />
           <h2 style={{
-            fontSize: '28px',
+            fontSize: '20px',
             fontWeight: '900',
             color: 'white',
-            letterSpacing: '0.5px',
-            marginBottom: '4px',
+            marginBottom: '8px',
             fontFamily: 'Outfit, sans-serif',
-            textTransform: 'uppercase',
-            textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+            textTransform: 'uppercase'
           }}>
-            {featuredTourney.name}
+            Немає активних турнірів
           </h2>
           <p style={{
             fontSize: '12px',
             color: '#8F8F9B',
             fontWeight: '600',
-            marginBottom: '20px',
-            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+            maxWidth: '280px',
+            lineHeight: '1.5'
           }}>
-            {featuredTourney.date}
+            Очікуйте нових анонсів турнірів найближчим часом!
           </p>
-
-          <div style={{ display: 'flex', gap: '24px', marginBottom: '22px' }}>
-            <div>
-              <span style={{ fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase', display: 'block', fontWeight: '700', letterSpacing: '0.5px' }}>
-                Призовий фонд
-              </span>
-              <span style={{ fontSize: '16px', fontWeight: '800', color: '#fff', fontFamily: 'Outfit, sans-serif' }}>
-                {featuredTourney.prizePool}
-              </span>
-            </div>
-            <div style={{ borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '24px' }}>
-              <span style={{ fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase', display: 'block', fontWeight: '700', letterSpacing: '0.5px' }}>
-                Формат
-              </span>
-              <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--primary-orange)', fontFamily: 'Outfit, sans-serif' }}>
-                {featuredTourney.type}
-              </span>
-            </div>
-          </div>
-
-          <button 
-            className="btn-primary" 
-            onClick={() => onOpenRegister(featuredTourney.id)}
-            style={{ width: '100%', padding: '14px', fontSize: '13px', letterSpacing: '1px' }}
-          >
-            ЗАРЕЄСТРУВАТИСЬ
-          </button>
         </div>
-      </div>
+      )}
 
       {/* Quick Navigation Panel */}
       <div style={{

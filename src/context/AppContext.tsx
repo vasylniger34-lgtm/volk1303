@@ -201,34 +201,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 1. User state
   const [user, setUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('volk_user');
-    return saved ? JSON.parse(saved) : DEFAULT_USER;
+    try {
+      const saved = localStorage.getItem('volk_user');
+      return saved ? JSON.parse(saved) : DEFAULT_USER;
+    } catch (e) {
+      console.warn('[VOLKI] Failed to parse volk_user from localStorage:', e);
+      return DEFAULT_USER;
+    }
   });
 
   const isAdmin = user.role === 'admin';
 
   // 2. Tournaments — starts empty, created via admin
   const [tournaments, setTournaments] = useState<Tournament[]>(() => {
-    const saved = localStorage.getItem('volk_tournaments');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('volk_tournaments');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn('[VOLKI] Failed to parse volk_tournaments from localStorage:', e);
+      return [];
+    }
   });
 
   // 3. Teams — starts empty, registered by users
   const [teams, setTeams] = useState<Record<string, Team[]>>(() => {
-    const saved = localStorage.getItem('volk_teams');
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = localStorage.getItem('volk_teams');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.warn('[VOLKI] Failed to parse volk_teams from localStorage:', e);
+      return {};
+    }
   });
 
   // 4. Matches — starts empty, generated via admin bracket
   const [matches, setMatches] = useState<Match[]>(() => {
-    const saved = localStorage.getItem('volk_matches');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('volk_matches');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn('[VOLKI] Failed to parse volk_matches from localStorage:', e);
+      return [];
+    }
   });
 
   // 5. Predictions
   const [predictions, setPredictions] = useState<Prediction[]>(() => {
-    const saved = localStorage.getItem('volk_predictions');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('volk_predictions');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn('[VOLKI] Failed to parse volk_predictions from localStorage:', e);
+      return [];
+    }
   });
 
   // Toast

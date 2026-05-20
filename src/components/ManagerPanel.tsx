@@ -49,8 +49,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     return localStorage.getItem('volk_manager_session') === 'true';
   });
   const [managerUser, setManagerUser] = useState<Partial<ManagerProfile>>(() => {
-    const saved = localStorage.getItem('volk_manager_profile');
-    return saved ? JSON.parse(saved) : { email: 'manager@volki.gg', username: 'Volki Director', role: 'Super Admin' };
+    try {
+      const saved = localStorage.getItem('volk_manager_profile');
+      return saved ? JSON.parse(saved) : { email: 'manager@volki.gg', username: 'Volki Director', role: 'Super Admin' };
+    } catch (e) {
+      console.warn('[VOLKI] Failed to parse volk_manager_profile from localStorage:', e);
+      return { email: 'manager@volki.gg', username: 'Volki Director', role: 'Super Admin' };
+    }
   });
 
   // Auth Page Switch
@@ -116,8 +121,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
   // Manager Registry List (Stateful mock list sync'd with local storage)
   const [managers, setManagers] = useState<ManagerProfile[]>(() => {
-    const saved = localStorage.getItem('volk_managers_list');
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem('volk_managers_list');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('[VOLKI] Failed to parse volk_managers_list from localStorage:', e);
+    }
     return [
       { email: 'director@volki.gg', username: 'Volki Director', role: 'Super Admin', joinedAt: '20.05.2026', status: 'online' },
       { email: 'moderator1@volki.gg', username: 'Alex CS', role: 'Moderator', joinedAt: '20.05.2026', status: 'offline' }
