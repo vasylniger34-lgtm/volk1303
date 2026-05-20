@@ -87,6 +87,7 @@ export interface UserProfile {
   xp: number;
   xpNext: number;
   role: 'player' | 'admin' | 'moderator';
+  avatarGradient: number;
   stats: UserStats;
 }
 
@@ -121,6 +122,7 @@ interface AppContextType {
   createTournament: (tourney: Omit<Tournament, 'id' | 'participantsCount' | 'status'>) => void;
   resolveBetsForMatch: (matchId: string, winnerId: string, finalScoreA: number, finalScoreB: number) => void;
   generateBracketForTournament: (tournamentId: string) => void;
+  updateProfile: (data: { username?: string; avatarGradient?: number }) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -153,6 +155,7 @@ const DEFAULT_USER: UserProfile = {
   xp: 450,
   xpNext: 1000,
   role: 'admin', // Local dev mode = admin by default
+  avatarGradient: 0,
   stats: { wins: 28, losses: 14, predictionsPlaced: 47, predictionsWon: 31 }
 };
 
@@ -179,6 +182,7 @@ function profileToUser(row: ProfileRow): UserProfile {
     xp: row.xp,
     xpNext: row.xp_next,
     role: row.role,
+    avatarGradient: 0,
     stats: {
       wins: row.wins,
       losses: row.losses,
@@ -968,6 +972,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Reset ───
 
+  // ─── Update Profile (avatar + username) ───
+
+  const updateProfile = (data: { username?: string; avatarGradient?: number }) => {
+    setUser(prev => ({
+      ...prev,
+      ...(data.username !== undefined ? { username: data.username } : {}),
+      ...(data.avatarGradient !== undefined ? { avatarGradient: data.avatarGradient } : {})
+    }));
+    if (data.username) {
+      showToast('Нікнейм змінено!', 'success');
+      if (useSupabase) {
+        supabase.from('profiles').update({ username: data.username }).eq('id', user.id).then();
+      }
+    }
+    if (data.avatarGradient !== undefined) {
+      showToast('Аватар оновлено!', 'success');
+    }
+  };
+
+  // ─── Reset ───
+
   const resetAllData = () => {
     localStorage.removeItem('volk_user');
     localStorage.removeItem('volk_tournaments');
@@ -1001,7 +1026,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addFunds,
       createTournament,
       resolveBetsForMatch,
-      generateBracketForTournament
+      generateBracketForTournament,
+      updateProfile
     }}>
       {children}
     </AppContext.Provider>

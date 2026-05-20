@@ -383,10 +383,10 @@ h1, h2, h3, h4, h5, h6, .font-outfit {
 
 /* Toast alert styling */
 .toast-msg {
-  position: absolute;
-  bottom: 85px;
+  position: fixed;
+  bottom: 24px;
   left: 50%;
-  transform: translateX(-50%) translateY(100px);
+  transform: translateX(-50%) translateY(200px);
   background: rgba(14, 14, 19, 0.95);
   border: 1px solid var(--primary-orange);
   color: white;
@@ -395,17 +395,21 @@ h1, h2, h3, h4, h5, h6, .font-outfit {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px var(--primary-orange-glow);
   font-size: 13px;
   font-weight: 600;
-  z-index: 1000;
+  z-index: 10001;
   display: flex;
   align-items: center;
   gap: 8px;
   width: 90%;
   max-width: 380px;
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .toast-msg.show {
   transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Form input styling */
@@ -1000,4 +1004,32 @@ h1, h2, h3, h4, h5, h6, .font-outfit {
   margin-top: 24px;
   letter-spacing: 1px;
   text-transform: uppercase;
+}
+
+/* Admin Login Gate */
+.admin-login-overlay {
+  position: fixed;
+  inset: 0;
+  background: #0A0A10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  padding: 20px;
+}
+
+.admin-login-card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: rgba(14, 14, 22, 0.95);
+  border: 1px solid rgba(255, 92, 0, 0.12);
+  border-radius: 24px;
+  padding: 40px 28px 28px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(255, 92, 0, 0.04);
+}
+
+.admin-login-card .auth-orb-1 {
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.08), transparent 70%);
 }

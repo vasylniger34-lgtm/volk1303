@@ -12,8 +12,14 @@ import {
   ShieldAlert,
   ArrowLeft,
   ChevronRight,
-  Flame
+  Flame,
+  Lock,
+  Eye,
+  EyeOff,
+  Shield
 } from 'lucide-react';
+
+const ADMIN_PASSWORD = 'volki1303admin';
 
 interface AdminPanelProps {
   onExitAdmin?: () => void;
@@ -29,6 +35,105 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
     createTournament, 
     generateBracketForTournament 
   } = useApp();
+
+  // Admin auth state
+  const [isAdminAuthed, setIsAdminAuthed] = useState(() => {
+    return localStorage.getItem('volk_admin_auth') === 'true';
+  });
+  const [adminPass, setAdminPass] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [showPass, setShowPass] = useState(false);
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPass === ADMIN_PASSWORD) {
+      localStorage.setItem('volk_admin_auth', 'true');
+      setIsAdminAuthed(true);
+      setAdminError('');
+    } else {
+      setAdminError('Невірний пароль');
+      setAdminPass('');
+    }
+  };
+
+  const handleAdminLogout = () => {
+    localStorage.removeItem('volk_admin_auth');
+    setIsAdminAuthed(false);
+    setAdminPass('');
+    if (onExitAdmin) onExitAdmin();
+  };
+
+  // ─── Admin Login Gate ───
+  if (!isAdminAuthed) {
+    return (
+      <div className="admin-login-overlay">
+        <div className="admin-login-card">
+          <div className="auth-orb auth-orb-1" />
+          <div className="auth-orb auth-orb-2" />
+          
+          <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', marginBottom: '28px' }}>
+            <div style={{
+              width: '64px', height: '64px', margin: '0 auto 12px',
+              borderRadius: '18px',
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(255, 92, 0, 0.08))',
+              border: '1px solid rgba(255, 92, 0, 0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 8px 24px rgba(255, 92, 0, 0.1)'
+            }}>
+              <Shield size={32} color="#FF5C00" />
+            </div>
+            <h1 style={{
+              fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: '900',
+              letterSpacing: '4px', color: 'white', margin: 0
+            }}>ADMIN PANEL</h1>
+            <span style={{
+              fontSize: '10px', fontWeight: '800', letterSpacing: '3px',
+              color: '#FF5C00', textTransform: 'uppercase', marginTop: '4px', display: 'block'
+            }}>VOLKI 13:03</span>
+          </div>
+
+          <form onSubmit={handleAdminLogin} style={{ position: 'relative', zIndex: 1 }}>
+            <div className="auth-input-group" style={{ marginBottom: '14px' }}>
+              <Lock size={16} color="#FF5C00" style={{ marginRight: '8px' }} />
+              <input
+                type={showPass ? 'text' : 'password'}
+                className="auth-input"
+                placeholder="Пароль адміністратора"
+                value={adminPass}
+                onChange={e => { setAdminPass(e.target.value); setAdminError(''); }}
+                autoFocus
+              />
+              <button type="button" onClick={() => setShowPass(!showPass)} style={{
+                background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px'
+              }}>
+                {showPass ? <EyeOff size={16} color="#51515E" /> : <Eye size={16} color="#51515E" />}
+              </button>
+            </div>
+
+            {adminError && (
+              <p style={{
+                color: '#EF4444', fontSize: '12px', fontWeight: '600',
+                textAlign: 'center', marginBottom: '12px'
+              }}>{adminError}</p>
+            )}
+
+            <button type="submit" className="auth-btn-primary" disabled={!adminPass.trim()}>
+              <Lock size={16} />
+              Увійти в панель
+            </button>
+          </form>
+
+          {onExitAdmin && (
+            <button onClick={onExitAdmin} className="auth-btn-back" style={{ position: 'relative', zIndex: 1 }}>
+              ← Назад до додатку
+            </button>
+          )}
+
+          <div className="auth-version">Admin Access Only</div>
+        </div>
+      </div>
+    );
+  }
 
   // Selected tournament to manage brackets
   const [selectedTourneyId, setSelectedTourneyId] = useState<string>(
@@ -177,9 +282,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
               }}
               title="Вийти до інтерфейсу гравця"
             >
-              <LogOut size={14} />
+              <ArrowLeft size={14} />
             </button>
           )}
+          <button 
+            onClick={handleAdminLogout}
+            style={{
+              background: 'rgba(239, 68, 68, 0.05)',
+              border: '1px solid rgba(239, 68, 68, 0.15)',
+              color: '#EF4444',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            title="Вийти з адмін-панелі"
+          >
+            <LogOut size={14} />
+          </button>
         </div>
 
         {/* Quick Bento Stats (For sidebar layout on desktop) */}

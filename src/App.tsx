@@ -171,12 +171,7 @@ const AppContent: React.FC = () => {
 
         {/* Global Toast Alerts */}
         <div className={`toast-msg ${toast.show ? 'show' : ''}`} style={{
-          borderColor: toast.type === 'success' ? '#10B981' : toast.type === 'error' ? '#EF4444' : '#FF5C00',
-          position: 'fixed',
-          bottom: '24px',
-          left: '50%',
-          transform: toast.show ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(100px)',
-          zIndex: 9999
+          borderColor: toast.type === 'success' ? '#10B981' : toast.type === 'error' ? '#EF4444' : '#FF5C00'
         }}>
           <ShieldCheck size={18} color={toast.type === 'success' ? '#10B981' : toast.type === 'error' ? '#EF4444' : '#FF5C00'} />
           <span style={{ fontSize: '12px' }}>{toast.message}</span>
