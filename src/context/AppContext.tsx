@@ -121,7 +121,7 @@ interface AppContextType {
   updateMatchOdds: (matchId: string, oddsA: number, oddsB: number) => void;
   resetAllData: () => Promise<void>;
   addFunds: (amount: number) => void;
-  createTournament: (tourney: Omit<Tournament, 'id' | 'participantsCount'>) => void;
+  createTournament: (tourney: Omit<Tournament, 'id' | 'participantsCount' | 'status'> & { status?: 'upcoming' | 'active' | 'completed' }) => void;
   resolveBetsForMatch: (matchId: string, winnerId: string, finalScoreA: number, finalScoreB: number) => void;
   generateBracketForTournament: (tournamentId: string) => void;
   updateProfile: (data: { username?: string; avatarGradient?: number }) => void;
@@ -1061,12 +1061,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Create Tournament ───
 
-  const createTournament = (tourneyData: Omit<Tournament, 'id' | 'participantsCount'>) => {
+  const createTournament = (tourneyData: Omit<Tournament, 'id' | 'participantsCount' | 'status'> & { status?: 'upcoming' | 'active' | 'completed' }) => {
     const newId = generateUUID();
     const newTourney: Tournament = {
       ...tourneyData,
       id: newId,
-      participantsCount: 0
+      participantsCount: 0,
+      status: tourneyData.status || 'upcoming'
     };
 
     const isValidUUID = (str: string) => {
