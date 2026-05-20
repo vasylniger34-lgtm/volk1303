@@ -88,6 +88,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   // Broadcast state
   const [broadcastMsg, setBroadcastMsg] = useState('');
   const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastProgress, setBroadcastProgress] = useState<{current: number; total: number} | null>(null);
   const [broadcastResult, setBroadcastResult] = useState<{sent: number; failed: number} | null>(null);
 
   // Analytics real data state
@@ -660,39 +661,144 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       return;
     }
     setBroadcastSending(true);
+    setBroadcastProgress(null);
     setBroadcastResult(null);
 
+    setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Запуск розсилки в Telegram...`]);
+
     try {
-      // Call our Vercel serverless API proxy (avoids CORS issues with Telegram)
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.');
-      const apiUrl = isLocal ? 'https://volk1303.vercel.app/api/broadcast' : '/api/broadcast';
+      let chatIds: number[] = [];
 
-      const resp = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: broadcastMsg })
-      });
-
-      if (!resp.ok) {
-        const errText = await resp.text();
-        throw new Error(`API error ${resp.status}: ${errText}`);
+      // 1. Fetch active subscribers from Supabase bot_subscribers
+      try {
+        const { data: subs, error: subErr } = await supabase
+          .from('bot_subscribers')
+          .select('chat_id')
+          .eq('is_active', true);
+        
+        if (!subErr && subs) {
+          chatIds = subs.map(s => Number(s.chat_id)).filter(Boolean);
+        }
+      } catch (e) {
+        console.error('Failed to fetch subscribers:', e);
       }
 
-      const result = await resp.json();
-      const sent: number = result.sent || 0;
-      const failed: number = result.failed || 0;
-      const total: number = result.total || 0;
+      // 2. Fetch profiles with telegram_id
+      try {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('telegram_id')
+          .not('telegram_id', 'is', null);
+        
+        if (profiles) {
+          for (const p of profiles) {
+            const tgId = Number(p.telegram_id);
+            if (tgId && !chatIds.includes(tgId)) {
+              chatIds.push(tgId);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch profiles:', e);
+      }
+
+      if (chatIds.length === 0) {
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ⚠️ Не знайдено підписників або користувачів з Telegram ID для розсилки.`]);
+      }
+
+      const BOT_TOKEN = '8873845823:AAErjQiXP7InePLKku-MOhbqNPe-bMvt3LU';
+      const CHANNEL_ID = '@volki1303';
+      const replyMarkup = {
+        inline_keyboard: [[{ text: '🎮 Відкрити VOLKI 13:03', web_app: { url: 'https://volk1303.vercel.app' } }]]
+      };
+
+      let sent = 0;
+      let failed = 0;
+      const blockedIds: number[] = [];
+
+      setBroadcastProgress({ current: 0, total: chatIds.length });
+
+      // 3. Send to all subscribers sequentially
+      for (let i = 0; i < chatIds.length; i++) {
+        const chatId = chatIds[i];
+        setBroadcastProgress({ current: i + 1, total: chatIds.length });
+
+        try {
+          const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: broadcastMsg,
+              parse_mode: 'HTML',
+              disable_web_page_preview: true,
+              reply_markup: replyMarkup,
+            }),
+          });
+          const result = await r.json();
+          if (result.ok) {
+            sent++;
+          } else {
+            failed++;
+            const desc = result.description || '';
+            if (desc.toLowerCase().includes('blocked') || result.error_code === 403) {
+              blockedIds.push(chatId);
+            }
+          }
+        } catch (err) {
+          failed++;
+        }
+
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 80));
+      }
+
+      // 4. Mark blocked users as inactive in Supabase
+      if (blockedIds.length > 0) {
+        for (const blockedId of blockedIds) {
+          try {
+            await supabase
+              .from('bot_subscribers')
+              .update({ is_active: false })
+              .eq('chat_id', blockedId);
+          } catch (_) {}
+        }
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Позначено ${blockedIds.length} заблокованих чатів як неактивні.`]);
+      }
+
+      // 5. Send to Channel
+      let channelOk = false;
+      try {
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Надсилання анонсу в канал ${CHANNEL_ID}...`]);
+        const chanResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: CHANNEL_ID,
+            text: broadcastMsg,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+            reply_markup: replyMarkup,
+          }),
+        });
+        const chanResult = await chanResp.json();
+        channelOk = chanResult.ok;
+      } catch (e) {
+        console.error('Failed to post to channel:', e);
+      }
 
       setBroadcastResult({ sent, failed });
       setTerminalLogs(prev => [...prev,
-        `[${new Date().toLocaleTimeString()}] Broadcast sent: ✅ ${sent}/${total} delivered, ❌ ${failed} failed. Channel: ${result.channel ? '✅' : '❌'}`
+        `[${new Date().toLocaleTimeString()}] Розсилка завершена: ✅ ${sent}/${chatIds.length} доставлено, ❌ ${failed} помилок. Канал: ${channelOk ? '✅' : '❌'}`
       ]);
       showToast(`Розсилку виконано! ✅ ${sent} надіслано, ❌ ${failed} помилок`, sent > 0 ? 'success' : 'error');
       if (sent > 0) setBroadcastMsg('');
     } catch (err: any) {
       showToast('Помилка розсилки: ' + err.message, 'error');
+      setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Помилка розсилки: ${err.message}`]);
     } finally {
       setBroadcastSending(false);
+      setBroadcastProgress(null);
     }
   };
 
@@ -2252,6 +2358,33 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       </button>
                     </div>
                   </div>
+
+                  {/* Progress Indicator */}
+                  {broadcastProgress && (
+                    <div style={{
+                      marginTop: '16px', padding: '14px 16px', borderRadius: '12px',
+                      background: 'rgba(255, 92, 0, 0.05)',
+                      border: '1px solid rgba(255, 92, 0, 0.15)',
+                      display: 'flex', flexDirection: 'column', gap: '8px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '700', color: '#FF5C00', fontFamily: 'Outfit' }}>
+                          ⚡ Надсилання розсилки...
+                        </span>
+                        <span style={{ fontSize: '11px', fontWeight: '800', color: '#fff', fontFamily: 'monospace' }}>
+                          {broadcastProgress.current} / {broadcastProgress.total}
+                        </span>
+                      </div>
+                      <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${(broadcastProgress.current / broadcastProgress.total) * 100}%`,
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #FF5C00, #FF8C00)',
+                          transition: 'width 0.15s ease-out'
+                        }} />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Result */}
                   {broadcastResult && (
