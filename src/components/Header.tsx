@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Bell, Plus } from 'lucide-react';
+import { Bell } from 'lucide-react';
 
 interface HeaderProps {
   onNavigate: (view: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin') => void;
@@ -8,7 +8,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView: _currentView }) => {
-  const { user, addFunds, showToast } = useApp();
+  const { user, showToast } = useApp();
 
   return (
     <header className="glass-panel" style={{
@@ -58,24 +58,29 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView: _curren
             color: '#FF5C00',
             letterSpacing: '1.5px',
             lineHeight: 1.0,
-            display: 'block'
+            display: 'block',
+            textTransform: 'uppercase',
+            marginTop: '2px'
           }}>
             13:03
           </span>
         </div>
       </div>
 
-      {/* Right side items */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {/* Balance block */}
+      {/* User Actions */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px'
+      }}>
+        {/* Balance Display */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          backgroundColor: 'rgba(255, 255, 255, 0.03)',
+          background: 'rgba(255, 255, 255, 0.02)',
           border: '1px solid rgba(255, 255, 255, 0.05)',
           borderRadius: '8px',
-          padding: '4px 8px 4px 10px',
-          gap: '8px'
+          padding: '4px 10px',
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '8px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -85,26 +90,6 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView: _curren
               {user.balance.toLocaleString('uk-UA')} 🪙
             </span>
           </div>
-          <button 
-            onClick={() => addFunds(2500)}
-            style={{
-              width: '20px',
-              height: '20px',
-              borderRadius: '4px',
-              backgroundColor: '#FF5C00',
-              border: 'none',
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'transform 0.1s'
-            }}
-            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
-            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            <Plus size={12} strokeWidth={3} />
-          </button>
         </div>
 
         {/* Notifications */}

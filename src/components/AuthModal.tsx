@@ -49,9 +49,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isLoading = false
       if (user) {
         setIsTelegram(true);
         setTelegramUser(user);
+        
+        // If they have shared their contact before, auto-login them immediately
+        const hasSharedContact = localStorage.getItem('volk_contact_shared') === 'true';
+        if (hasSharedContact) {
+          onLogin({
+            id: String(user.id),
+            username: user.username || user.first_name,
+            first_name: user.first_name
+          });
+        }
       }
     }
-  }, []);
+  }, [onLogin]);
 
   // Auto-login if Telegram user data is available
   const handleTelegramAutoLogin = useCallback(() => {
@@ -84,6 +94,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isLoading = false
       
       if (sent && event?.responseUnsafe?.contact) {
         const contact = event.responseUnsafe.contact;
+        localStorage.setItem('volk_contact_shared', 'true');
         onLogin({
           id: String(contact.user_id || telegramUser?.id || Date.now()),
           username: telegramUser?.username || contact.first_name,
@@ -92,6 +103,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isLoading = false
       } else if (sent) {
         // Contact sent but no data in response — use telegramUser
         if (telegramUser) {
+          localStorage.setItem('volk_contact_shared', 'true');
           handleTelegramAutoLogin();
         }
       }
@@ -172,35 +184,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isLoading = false
                   )}
                 </button>
 
-                {telegramUser && (
-                  <button
-                    onClick={handleTelegramAutoLogin}
-                    className="auth-btn-secondary"
-                    disabled={isLoading}
-                    style={{
-                      marginTop: '10px',
-                      background: 'rgba(255,255,255,0.02)',
-                      border: '1px solid rgba(255,255,255,0.06)',
-                      borderRadius: '14px',
-                      padding: '12px 20px',
-                      color: '#8F8F9B',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      width: '100%',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      position: 'relative',
-                      zIndex: 1
-                    }}
-                  >
-                    <User size={14} />
-                    Увійти як @{telegramUser.username || telegramUser.first_name}
-                  </button>
-                )}
+
 
                 <p className="auth-hint">
                   Натисніть «Надіслати контакт» для реєстрації через Telegram

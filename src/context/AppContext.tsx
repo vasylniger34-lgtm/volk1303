@@ -146,13 +146,13 @@ function generateUUID() {
 const DEFAULT_USER: UserProfile = {
   id: 'local_user',
   username: 'volki_player',
-  balance: 12450,
-  level: 4,
-  xp: 450,
+  balance: 5000,
+  level: 1,
+  xp: 0,
   xpNext: 1000,
   role: 'admin', // Local dev mode = admin by default
   avatarGradient: 0,
-  stats: { wins: 28, losses: 14, predictionsPlaced: 47, predictionsWon: 31 }
+  stats: { wins: 0, losses: 0, predictionsPlaced: 0, predictionsWon: 0 }
 };
 
 // ─── Supabase helpers: convert DB rows to app types ───
@@ -858,6 +858,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let totalPayout = 0;
     let wonBetsCount = 0;
 
+    // Offline / Local state update first
     setPredictions(prev => prev.map(pred => {
       if (pred.matchId === matchId && pred.status === 'pending') {
         let won = false;
@@ -879,20 +880,102 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return pred;
     }));
 
-    if (totalPayout > 0) {
-      setUser(prev => ({
-        ...prev,
-        balance: prev.balance + totalPayout,
-        xp: prev.xp + 150 > prev.xpNext ? (prev.xp + 150) - prev.xpNext : prev.xp + 150,
-        level: prev.xp + 150 > prev.xpNext ? prev.level + 1 : prev.level,
-        stats: { ...prev.stats, predictionsWon: prev.stats.predictionsWon + wonBetsCount }
-      }));
-      setTimeout(() => showToast(`Виграш! +${totalPayout} 🪙!`, 'success'), 1000);
-    } else {
-      setUser(prev => ({ ...prev, stats: { ...prev.stats, losses: prev.stats.losses + 1 } }));
+    if (!useSupabase) {
+      if (totalPayout > 0) {
+        setUser(prev => ({
+          ...prev,
+          balance: prev.balance + totalPayout,
+          xp: prev.xp + 150 > prev.xpNext ? (prev.xp + 150) - prev.xpNext : prev.xp + 150,
+          level: prev.xp + 150 > prev.xpNext ? prev.level + 1 : prev.level,
+          stats: { 
+            ...prev.stats, 
+            predictionsWon: prev.stats.predictionsWon + wonBetsCount,
+            wins: prev.stats.wins + wonBetsCount
+          }
+        }));
+        setTimeout(() => showToast(`Виграш! +${totalPayout} 🪙!`, 'success'), 1000);
+      } else {
+        setUser(prev => ({ ...prev, stats: { ...prev.stats, losses: prev.stats.losses + 1 } }));
+      }
     }
 
-    // Auto-advance bracket
+    // Supabase DB update
+    if (useSupabase) {
+      supabase.from('predictions')
+        .select('*')
+        .eq('match_id', matchId)
+        .eq('status', 'pending')
+        .then(({ data: preds, error }) => {
+          if (error || !preds) return;
+
+          preds.forEach(async (pred) => {
+            let won = false;
+            if (pred.prediction_type === 'winner') {
+              won = pred.predicted_value === winningTeamName;
+            } else if (pred.prediction_type === 'total_rounds') {
+              if (pred.predicted_value === 'over' && totalRounds > 26.5) won = true;
+              if (pred.predicted_value === 'under' && totalRounds < 26.5) won = true;
+            }
+
+            const status = won ? 'won' : 'lost';
+            const payout = won ? Math.round(pred.wager * pred.odds) : 0;
+
+            // 1. Update prediction status
+            await supabase.from('predictions').update({ status, payout }).eq('id', pred.id);
+
+            // 2. Update user profile statistics and coins
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', pred.user_id).single();
+            if (profile) {
+              const newBalance = profile.balance + payout;
+              const newWins = won ? profile.wins + 1 : profile.wins;
+              const newLosses = won ? profile.losses : profile.losses + 1;
+              const newPredsWon = won ? profile.predictions_won + 1 : profile.predictions_won;
+              const xpGain = won ? 150 : 50;
+              let newXp = profile.xp + xpGain;
+              let newLevel = profile.level;
+              let newXpNext = profile.xp_next;
+
+              if (newXp >= newXpNext) {
+                newXp = newXp - newXpNext;
+                newLevel += 1;
+                newXpNext = Math.round(newXpNext * 1.5);
+              }
+
+              await supabase.from('profiles').update({
+                balance: newBalance,
+                wins: newWins,
+                losses: newLosses,
+                predictions_won: newPredsWon,
+                xp: newXp,
+                level: newLevel,
+                xp_next: newXpNext
+              }).eq('id', pred.user_id);
+
+              // Update state if it's the current user
+              if (pred.user_id === user.id) {
+                setUser(prev => ({
+                  ...prev,
+                  balance: newBalance,
+                  xp: newXp,
+                  level: newLevel,
+                  xpNext: newXpNext,
+                  stats: {
+                    ...prev.stats,
+                    wins: newWins,
+                    losses: newLosses,
+                    predictionsWon: newPredsWon
+                  }
+                }));
+                if (won) {
+                  showToast(`Виграш! +${payout} 🪙!`, 'success');
+                }
+              }
+            }
+          });
+        });
+    }
+
+    // Auto-advance bracket or complete tournament
     if (targetMatch.roundName === 'Semifinal') {
       const winnerTeamObj = targetMatch.teamA?.id === winnerId ? targetMatch.teamA : targetMatch.teamB;
       if (winnerTeamObj) {
@@ -915,6 +998,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               isSemi1 ? { team_a_id: winnerTeamObj.id } : { team_b_id: winnerTeamObj.id }
             ).eq('id', finalMatch.id).then();
           }
+        }
+      }
+    } else if (targetMatch.roundName === 'Final') {
+      // 1. Mark tournament as completed
+      setTournaments(prev => prev.map(t => {
+        if (t.id === targetMatch.tournamentId) {
+          return { ...t, status: 'completed' };
+        }
+        return t;
+      }));
+
+      if (useSupabase) {
+        supabase.from('tournaments')
+          .update({ status: 'completed' })
+          .eq('id', targetMatch.tournamentId)
+          .then();
+      }
+
+      // 2. Give tournament completion bonus to all users who participated
+      const bonusCoins = 1000;
+      if (useSupabase) {
+        supabase.from('predictions')
+          .select('user_id')
+          .eq('tournament_name', targetMatch.tournamentName)
+          .then(({ data: participants }) => {
+            if (!participants) return;
+            const uniqueUserIds = Array.from(new Set(participants.map(p => p.user_id)));
+
+            uniqueUserIds.forEach(async (uId) => {
+              const { data: profile } = await supabase.from('profiles').select('*').eq('id', uId).single();
+              if (profile) {
+                await supabase.from('profiles').update({
+                  balance: profile.balance + bonusCoins,
+                  wins: profile.wins + 1
+                }).eq('id', uId);
+
+                if (uId === user.id) {
+                  setUser(prev => ({
+                    ...prev,
+                    balance: prev.balance + bonusCoins,
+                    stats: { ...prev.stats, wins: prev.stats.wins + 1 }
+                  }));
+                  setTimeout(() => showToast(`Бонус за закриття турніру! +${bonusCoins} 🪙!`, 'success'), 2000);
+                }
+              }
+            });
+          });
+      } else {
+        const hasBets = predictions.some(p => p.tournamentName === targetMatch.tournamentName);
+        if (hasBets) {
+          setUser(prev => ({
+            ...prev,
+            balance: prev.balance + bonusCoins,
+            stats: { ...prev.stats, wins: prev.stats.wins + 1 }
+          }));
+          setTimeout(() => showToast(`Бонус за закриття турніру! +${bonusCoins} 🪙!`, 'success'), 2000);
         }
       }
     }
