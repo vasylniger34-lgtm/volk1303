@@ -17,16 +17,88 @@ export const HomeView: React.FC<HomeViewProps> = ({
 }) => {
   const { tournaments, matches } = useApp();
 
-  // Find featured tournament: prioritize any active (live) tournament, then the specific featured ID, then the first tournament in the list
-  const featuredTourney = tournaments.find(t => t.status === 'active') || 
-                          tournaments.find(t => t.id === '2x2_aim_cup') || 
-                          tournaments[0];
+  const parseTourneyDate = (dateStr: string): number => {
+    if (!dateStr) return Infinity;
+    const lower = dateStr.toLowerCase();
+    
+    // Try to parse standard ISO format first
+    const parsedTime = Date.parse(dateStr);
+    if (!isNaN(parsedTime)) return parsedTime;
+
+    const now = new Date();
+    let baseDate = new Date(now);
+    if (lower.includes('сьогодні') || lower.includes('сегодня')) {
+      // keep today
+    } else if (lower.includes('завтра')) {
+      baseDate.setDate(baseDate.getDate() + 1);
+    } else {
+      const months: Record<string, number> = {
+        'січ': 0, 'янв': 0,
+        'лют': 1, 'фев': 1,
+        'бер': 2, 'мар': 2,
+        'кві': 3, 'апр': 3,
+        'тра': 4, 'мая': 4, 'май': 4,
+        'чер': 5, 'июн': 5,
+        'лип': 6, 'июл': 6,
+        'сер': 7, 'авг': 7,
+        'вер': 8, 'сен': 8,
+        'жов': 9, 'окт': 9,
+        'лис': 10, 'ноя': 10,
+        'гру': 11, 'дек': 11
+      };
+
+      const dayMatch = lower.match(/\b(\d{1,2})\b/);
+      const day = dayMatch ? parseInt(dayMatch[1]) : 1;
+
+      let month = now.getMonth();
+      for (const key of Object.keys(months)) {
+        if (lower.includes(key)) {
+          month = months[key];
+          break;
+        }
+      }
+
+      baseDate.setMonth(month);
+      baseDate.setDate(day);
+    }
+
+    const timeMatch = lower.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      const hours = parseInt(timeMatch[1]);
+      const minutes = parseInt(timeMatch[2]);
+      baseDate.setHours(hours, minutes, 0, 0);
+    } else {
+      baseDate.setHours(12, 0, 0, 0);
+    }
+
+    return baseDate.getTime();
+  };
+
+  const getSortScore = (t: any): number => {
+    const timestamp = parseTourneyDate(t.date);
+    
+    // Prioritize active (live) tournaments first
+    if (t.status === 'active') return -1000000000000 + timestamp;
+    
+    // Then upcoming tournaments sorted chronologically ascending (closest first)
+    if (t.status === 'upcoming') return timestamp;
+    
+    // Completed tournaments go to the bottom sorted chronologically descending
+    return 1000000000000 - timestamp;
+  };
+
+  const sortedTournaments = [...tournaments].sort((a, b) => getSortScore(a) - getSortScore(b));
+
+  // Find featured tournament: prioritize any active (live) tournament, then the closest upcoming one
+  const featuredTourney = sortedTournaments.find(t => t.status === 'active') || 
+                          sortedTournaments.find(t => t.id === '2x2_aim_cup') || 
+                          sortedTournaments[0];
   
   // Find live match
   const liveMatch = matches.find(m => m.status === 'live');
   
   // Get other tournaments (excluding the featured one)
-  const upcomingTourneys = tournaments.filter(t => t.id !== featuredTourney?.id);
+  const upcomingTourneys = sortedTournaments.filter(t => t.id !== featuredTourney?.id);
 
   return (
     <div className="scroll-container" style={{ padding: '16px 20px' }}>
