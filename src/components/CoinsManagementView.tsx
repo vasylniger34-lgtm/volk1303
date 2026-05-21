@@ -15,17 +15,19 @@ export const CoinsManagementView: React.FC = () => {
   }, [searchQuery]);
 
   const fetchUsers = async () => {
-    if (!searchQuery.trim()) {
-      setUsers([]);
-      return;
-    }
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('id, username, user_coins(registration_number, coins)')
-        .ilike('username', `%${searchQuery}%`)
-        .limit(10);
+        .order('username', { ascending: true })
+        .limit(50);
+
+      if (searchQuery.trim()) {
+        query = query.ilike('username', `%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
       
       if (error) throw error;
       setUsers(data || []);
@@ -110,7 +112,9 @@ export const CoinsManagementView: React.FC = () => {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center'
           }} onClick={() => setSelectedUser(user)}>
             <div>
-              <h3 style={{ margin: '0 0 5px 0' }}>{user.username}</h3>
+              <h3 style={{ margin: '0 0 5px 0' }}>
+                {user.username}#{user.user_coins?.[0]?.registration_number || 'N/A'}
+              </h3>
               <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>
                 Reg #: {user.user_coins?.[0]?.registration_number || 'N/A'}
               </p>
@@ -124,7 +128,7 @@ export const CoinsManagementView: React.FC = () => {
 
       {selectedUser && (
         <div style={{ marginTop: '20px', background: '#222', padding: '20px', borderRadius: '8px' }}>
-          <h3>Manage Coins for {selectedUser.username}</h3>
+          <h3>Manage Coins for {selectedUser.username}#{selectedUser.user_coins?.[0]?.registration_number || 'N/A'}</h3>
           <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
             <input
               type="number"

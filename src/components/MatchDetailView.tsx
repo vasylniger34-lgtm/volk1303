@@ -92,12 +92,6 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
     if (ok) { setBetOpen(false); setSelectedBet(null); }
   };
 
-  // ─── Half-time stats ───
-  const firstHalfA  = Math.min(8, match.scoreA);
-  const firstHalfB  = Math.min(4, match.scoreB);
-  const secondHalfA = Math.max(0, match.scoreA - 8);
-  const secondHalfB = Math.max(0, match.scoreB - 4);
-
   // Pick button style helper
   const pickStyle = (active: boolean) => ({
     background: active ? 'rgba(255, 92, 0, 0.12)' : 'rgba(255,255,255,0.02)',
@@ -257,7 +251,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
             background: 'linear-gradient(180deg, rgba(255,92,0,0.06) 0%, rgba(16,16,22,0.98) 100%)',
             border: '1px solid rgba(255,92,0,0.22)',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '11px', color: 'white', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Zap size={12} color="#FF5C00" fill="#FF5C00" /> {match.map}
               </span>
@@ -265,17 +259,16 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
                 {match.scoreA} : {match.scoreB}
               </span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', fontSize: '11px' }}>
-              <div style={{ textAlign: 'center' }}>
-                <span style={{ color: '#51515E', display: 'block', marginBottom: '2px' }}>1st half</span>
-                <span style={{ fontWeight: '700', color: 'white' }}>{firstHalfA} : {firstHalfB}</span>
+            {match.mapScores && match.mapScores.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px', marginTop: '12px' }}>
+                {match.mapScores.map((score, index) => (
+                  <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                    <span style={{ color: '#8F8F9B' }}>Карта {index + 1}</span>
+                    <span style={{ fontWeight: '700', color: 'white' }}>{score.scoreA} : {score.scoreB}</span>
+                  </div>
+                ))}
               </div>
-              <div style={{ height: '20px', width: '1px', backgroundColor: 'rgba(255,255,255,0.05)' }} />
-              <div style={{ textAlign: 'center' }}>
-                <span style={{ color: '#51515E', display: 'block', marginBottom: '2px' }}>2nd half</span>
-                <span style={{ fontWeight: '700', color: 'white' }}>{secondHalfA} : {secondHalfB}</span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Quick bet picks - only when not finished */}
