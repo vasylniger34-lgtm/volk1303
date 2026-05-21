@@ -39,7 +39,7 @@ interface ManagerProfile {
 export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   const { 
     tournaments, matches, teams,
-    setMatchLive, setMatchScore, createTournament, 
+    setMatchLive, setMatchScore, addMapScore, createTournament, 
     generateBracketForTournament, deleteTournament, updateTournament,
     showToast, updateMatchOdds, fillTournamentWithBots,
     user, isAuthenticated
@@ -814,6 +814,43 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   // ─── STYLES & LAYOUTS ───
 
   const activeMatch = matches.find(m => m.id === selectedMatchId);
+
+  // Auto-win and Dynamic Odds Handler
+  const handleScoreChange = (team: 'A' | 'B', delta: number) => {
+    if (!activeMatch) return;
+    let newA = editScoreA;
+    let newB = editScoreB;
+    if (team === 'A') newA = Math.max(0, newA + delta);
+    if (team === 'B') newB = Math.max(0, newB + delta);
+    
+    setEditScoreA(newA);
+    setEditScoreB(newB);
+
+    const diff = newA - newB;
+    let newOddsA = 1.85;
+    let newOddsB = 1.85;
+
+    if (diff > 0) {
+      newOddsA = Math.max(1.05, Number((1.85 - diff * 0.08).toFixed(2)));
+      newOddsB = Math.min(10.0, Number((1.85 + diff * 0.2).toFixed(2)));
+    } else if (diff < 0) {
+      newOddsB = Math.max(1.05, Number((1.85 - Math.abs(diff) * 0.08).toFixed(2)));
+      newOddsA = Math.min(10.0, Number((1.85 + Math.abs(diff) * 0.2).toFixed(2)));
+    }
+    
+    setEditOddsA(newOddsA);
+    setEditOddsB(newOddsB);
+
+    // Save changes to server immediately to keep it snappy
+    setMatchScore(activeMatch.id, newA, newB, 'live', null);
+    updateMatchOdds(activeMatch.id, newOddsA, newOddsB);
+
+    // Auto-finish at 13
+    if (newA >= 13 || newB >= 13) {
+      finishMatchWithScore(activeMatch.id, newA, newB);
+      showToast(`Матч автоматично завершено: 13 раундів!`, 'success');
+    }
+  };
 
   // Stat Counters
   const liveMatchesCount = matches.filter(m => m.status === 'live').length;
@@ -2301,14 +2338,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                       </span>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <button 
-                                          onClick={() => setEditScoreA(prev => Math.max(0, prev - 1))}
+                                          onClick={() => handleScoreChange('A', -1)}
                                           style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.03)', color: 'white', cursor: 'pointer', fontWeight: '800' }}
                                         >
                                           -
                                         </button>
                                         <span style={{ fontSize: '28px', fontWeight: '950', fontFamily: 'Outfit', minWidth: '32px' }}>{editScoreA}</span>
                                         <button 
-                                          onClick={() => setEditScoreA(prev => prev + 1)}
+                                          onClick={() => handleScoreChange('A', 1)}
                                           style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,92,0,0.1)', color: '#FF5C00', cursor: 'pointer', fontWeight: '800' }}
                                         >
                                           +
@@ -2325,14 +2362,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                       </span>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <button 
-                                          onClick={() => setEditScoreB(prev => Math.max(0, prev - 1))}
+                                          onClick={() => handleScoreChange('B', -1)}
                                           style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.03)', color: 'white', cursor: 'pointer', fontWeight: '800' }}
                                         >
                                           -
                                         </button>
                                         <span style={{ fontSize: '28px', fontWeight: '950', fontFamily: 'Outfit', minWidth: '32px' }}>{editScoreB}</span>
                                         <button 
-                                          onClick={() => setEditScoreB(prev => prev + 1)}
+                                          onClick={() => handleScoreChange('B', 1)}
                                           style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,92,0,0.1)', color: '#FF5C00', cursor: 'pointer', fontWeight: '800' }}
                                         >
                                           +
@@ -2356,6 +2393,70 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                     >
                                       <Save size={14} /> Оновити рахунок на платформі
                                     </button>
+                                  )}
+
+                                  {/* Map Score Management (BO3/BO5) */}
+                                  {activeMatch.status === 'live' && (
+                                    <div style={{
+                                      background: '#040406',
+                                      border: '1px solid rgba(16, 185, 129, 0.15)',
+                                      borderRadius: '16px',
+                                      padding: '20px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '12px'
+                                    }}>
+                                      <span style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>
+                                        📊 Карти матчу (BO{activeMatch.mapScores.length > 0 ? activeMatch.mapScores.length * 2 + 1 : 3})
+                                      </span>
+
+                                      {/* Recorded map results */}
+                                      {activeMatch.mapScores.length > 0 && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                          {activeMatch.mapScores.map((ms, idx) => (
+                                            <div key={idx} style={{
+                                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                              padding: '6px 10px', background: 'rgba(255,255,255,0.02)',
+                                              borderRadius: '8px', fontSize: '11px'
+                                            }}>
+                                              <span style={{ color: '#8F8F9B' }}>Карта {idx + 1}</span>
+                                              <span style={{ fontWeight: '800', color: ms.scoreA > ms.scoreB ? '#10B981' : ms.scoreA < ms.scoreB ? '#EF4444' : 'white' }}>
+                                                {ms.scoreA} : {ms.scoreB}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Current map indicator */}
+                                      <div style={{ fontSize: '11px', color: '#8F8F9B' }}>
+                                        Поточна карта: <span style={{ color: '#FF5C00', fontWeight: '800' }}>Карта {activeMatch.currentMap}</span>
+                                        &nbsp;→ Рахунок: <span style={{ color: 'white', fontWeight: '800' }}>{editScoreA} : {editScoreB}</span>
+                                      </div>
+
+                                      {/* Commit map button */}
+                                      <button
+                                        onClick={() => {
+                                          if (editScoreA === 0 && editScoreB === 0) {
+                                            showToast('Рахунок карти 0:0 — спочатку встановіть результат!', 'error');
+                                            return;
+                                          }
+                                          addMapScore(activeMatch.id, editScoreA, editScoreB);
+                                          setEditScoreA(0);
+                                          setEditScoreB(0);
+                                          setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Карта ${activeMatch.currentMap} зафіксована: ${editScoreA}:${editScoreB}`]);
+                                          showToast(`✅ Карта ${activeMatch.currentMap} зафіксована! Рахунок скинуто для наступної карти.`, 'success');
+                                        }}
+                                        style={{
+                                          background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                                          borderRadius: '10px', padding: '11px 16px', fontSize: '12px', color: '#10B981',
+                                          fontWeight: '800', cursor: 'pointer',
+                                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                                        }}
+                                      >
+                                        <Check size={14} /> Зафіксувати карту {activeMatch.currentMap} ({editScoreA}:{editScoreB})
+                                      </button>
+                                    </div>
                                   )}
 
                                   {/* Match Odds (Coefficients) Editor */}

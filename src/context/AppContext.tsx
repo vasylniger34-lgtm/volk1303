@@ -122,6 +122,7 @@ interface AppContextType {
   placePrediction: (prediction: Omit<Prediction, 'id' | 'status' | 'payout' | 'date'>) => boolean;
   setMatchLive: (matchId: string) => void;
   setMatchScore: (matchId: string, scoreA: number, scoreB: number, status: 'live' | 'finished', winnerId?: string | null) => void;
+  addMapScore: (matchId: string, mapScoreA: number, mapScoreB: number) => void;
   updateMatchOdds: (matchId: string, oddsA: number, oddsB: number) => void;
   resetAllData: () => Promise<void>;
   addFunds: (amount: number) => void;
@@ -1355,6 +1356,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
+  // ─── Add Map Score (fix current map result, reset live score to 0:0) ───
+
+  const addMapScore = (matchId: string, mapScoreA: number, mapScoreB: number) => {
+    setMatches(prev => prev.map(m => {
+      if (m.id === matchId) {
+        const newMapScores = [...m.mapScores, { scoreA: mapScoreA, scoreB: mapScoreB }];
+        const newMapNum = m.currentMap + 1;
+        const logMsg = `Карта ${m.currentMap}: ${mapScoreA}:${mapScoreB} — зафіксовано`;
+
+        if (useSupabase) {
+          supabase.from('matches').update({
+            map_scores: newMapScores,
+            current_map: newMapNum,
+            score_a: 0,
+            score_b: 0,
+            live_logs: [...m.liveLogs, logMsg]
+          }).eq('id', matchId).then();
+        }
+
+        return {
+          ...m,
+          mapScores: newMapScores,
+          currentMap: newMapNum,
+          scoreA: 0,
+          scoreB: 0,
+          liveLogs: [...m.liveLogs, logMsg]
+        };
+      }
+      return m;
+    }));
+  };
+
   const updateMatchOdds = (matchId: string, oddsA: number, oddsB: number) => {
     setMatches(prev => prev.map(m => {
       if (m.id === matchId) {
@@ -2020,6 +2053,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       placePrediction,
       setMatchLive,
       setMatchScore,
+      addMapScore,
       updateMatchOdds,
       resetAllData,
       addFunds,
