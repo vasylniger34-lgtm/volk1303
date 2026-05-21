@@ -79,7 +79,7 @@ h1, h2, h3, h4, h5, h6, .font-outfit {
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
+  overflow: clip; /* clip instead of hidden: prevents horizontal overflow but allows child scroll */
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
 }
 
@@ -97,7 +97,8 @@ h1, h2, h3, h4, h5, h6, .font-outfit {
   overflow-y: auto;
   overflow-x: hidden;
   flex: 1;
-  padding-bottom: 90px; /* space for bottom nav */
+  min-height: 0; /* CRITICAL: allows flex child to shrink and enable scrolling */
+  -webkit-overflow-scrolling: touch; /* smooth scroll on iOS */
 }
 
 .scroll-container::-webkit-scrollbar {
