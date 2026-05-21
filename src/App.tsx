@@ -12,6 +12,7 @@ import { ProfileView } from './components/ProfileView';
 import { AdminPanel } from './components/AdminPanel';
 import { ManagerPanel } from './components/ManagerPanel';
 import { AuthModal } from './components/AuthModal';
+import { MatchesView } from './components/MatchesView';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -132,20 +133,10 @@ const AppContent: React.FC = () => {
         );
       case 'matches':
         return (
-          <div className="scroll-container" style={{ padding: '16px 16px 110px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '16px', fontFamily: 'Outfit, sans-serif' }}>
-              Турнірні Матчі
-            </h2>
-            <p style={{ fontSize: '11px', color: '#8F8F9B', marginBottom: '20px' }}>
-              Оберіть активну сітку в меню "Турніри" або відкрийте деталі гри нижче.
-            </p>
-            <HomeView 
-              onNavigate={navigateTo}
-              onSelectTournament={setSelectedTournamentId}
-              onSelectMatch={setSelectedMatchId}
-              onOpenRegister={setRegisteringTournamentId}
-            />
-          </div>
+          <MatchesView 
+            onSelectMatch={setSelectedMatchId}
+            onSelectTournament={setSelectedTournamentId}
+          />
         );
       case 'bets':
         return <BetsView />;
