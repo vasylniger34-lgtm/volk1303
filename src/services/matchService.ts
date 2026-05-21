@@ -1,5 +1,5 @@
 /**
- * matchService.ts — Match management + Realtime for VOLKI 13:03
+ * matchService.ts — Match management + Realtime for VOLK 1303
  *
  * Full match lifecycle: scheduling, going live, score updates,
  * finishing, bracket advancement, and Supabase Realtime subscriptions.

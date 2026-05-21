@@ -12,7 +12,7 @@ export const BetsView: React.FC = () => {
   const currentList = activeTab === 'ACTIVE' ? activePredictions : pastPredictions;
 
   return (
-    <div className="scroll-container" style={{ padding: '16px' }}>
+    <div className="scroll-container" style={{ padding: '16px 20px 120px 20px' }}>
       
       {/* Header */}
       <h2 style={{

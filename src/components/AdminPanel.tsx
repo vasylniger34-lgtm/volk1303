@@ -82,7 +82,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
               <Shield size={32} color="#FF5C00" />
             </div>
             <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '24px', fontWeight: '900', letterSpacing: '4px', color: 'white', margin: 0 }}>ADMIN PANEL</h1>
-            <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '3px', color: '#FF5C00', textTransform: 'uppercase', marginTop: '4px', display: 'block' }}>VOLKI 13:03</span>
+            <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '3px', color: '#FF5C00', textTransform: 'uppercase', marginTop: '4px', display: 'block' }}>VOLK 1303</span>
           </div>
           <form onSubmit={handleAdminLogin} style={{ position: 'relative', zIndex: 1 }}>
             <div className="auth-input-group" style={{ marginBottom: '14px' }}>
@@ -209,7 +209,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
               <Shield size={18} color="#FF5C00" />
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: '900', letterSpacing: '2px', fontFamily: 'Outfit, sans-serif' }}>VOLKI</div>
+              <div style={{ fontSize: '14px', fontWeight: '900', letterSpacing: '2px', fontFamily: 'Outfit, sans-serif' }}>VOLK 1303</div>
               <div style={{ fontSize: '9px', color: '#FF5C00', fontWeight: '700', letterSpacing: '2px' }}>ADMIN PANEL</div>
             </div>
           </div>

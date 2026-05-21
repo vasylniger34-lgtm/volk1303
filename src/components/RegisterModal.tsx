@@ -19,7 +19,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Form states
-  const [teamName, setTeamName] = useState(user?.username ? `${user.username.replace('@', '').toUpperCase()} Team` : 'VOLKI Team');
+  const [teamName, setTeamName] = useState(user?.username ? `${user.username.replace('@', '').toUpperCase()} Team` : 'VOLK Team');
   const [teamTag, setTeamTag] = useState(user?.username ? user.username.replace('@', '').substring(0, 3).toUpperCase() : 'VLK');
   const captain = userHandle;
   const [players, setPlayers] = useState<string[]>([userHandle]);

@@ -49,7 +49,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   const isUserRegistered = tourneyTeams.some(t => t.captain === userHandle || t.players?.some(p => p.username === userHandle));
 
   return (
-    <div className="scroll-container" style={{ position: 'relative' }}>
+    <div className="scroll-container" style={{ position: 'relative', paddingBottom: '120px' }}>
       
       {/* Cover / Hero header block */}
       <div style={{

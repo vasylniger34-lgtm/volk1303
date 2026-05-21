@@ -1,5 +1,5 @@
 /**
- * predictionService.ts — Betting / Predictions for VOLKI 13:03
+ * predictionService.ts — Betting / Predictions for VOLK 1303
  *
  * Users place predictions on match outcomes. After a match finishes,
  * predictions are resolved as won/lost with calculated payouts.

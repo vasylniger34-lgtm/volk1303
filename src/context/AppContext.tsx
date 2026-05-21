@@ -92,6 +92,7 @@ export interface UserProfile {
   role: 'player' | 'admin' | 'moderator';
   avatarGradient: number;
   avatarUrl?: string | null;
+  regNum: number;
   stats: UserStats;
 }
 
@@ -150,14 +151,15 @@ function generateUUID() {
 const DEFAULT_USER: UserProfile = {
   id: 'local_user',
   username: 'volki_player',
-  balance: 5000,
+  balance: 0,
   level: 1,
   xp: 0,
   xpNext: 1000,
   role: 'admin', // Local dev mode = admin by default
   avatarGradient: 0,
   avatarUrl: null,
-  stats: { wins: 0, losses: 0, predictionsPlaced: 0, predictionsWon: 0 }
+  stats: { wins: 0, losses: 0, predictionsPlaced: 0, predictionsWon: 0 },
+  regNum: 1001
 };
 
 // ─── Supabase helpers: convert DB rows to app types ───
@@ -185,6 +187,7 @@ function profileToUser(row: ProfileRow): UserProfile {
     role: row.role,
     avatarGradient: 0,
     avatarUrl: row.avatar_url,
+    regNum: row.reg_num || 1001,
     stats: {
       wins: row.wins,
       losses: row.losses,
@@ -799,124 +802,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── LIVE scores simulator ───
 
+  // Match scoring is now strictly manual by administrators. Auto-simulation is disabled.
   useEffect(() => {
-    const isManagerSite = typeof window !== 'undefined' && (
-      window.location.pathname.startsWith('/admin') ||
-      window.location.search.includes('manager=true') ||
-      window.location.search.includes('admin=true')
-    );
-
-    // If using Supabase, only run simulation if the manager is active on the admin panel
-    if (useSupabase && (!isManagerSite || user.role !== 'admin')) return;
-
-    const interval = setInterval(() => {
-      if (useSupabase) {
-        // Supabase mode: simulate and write directly to Supabase
-        const liveMatches = matches.filter(m => m.status === 'live');
-        if (liveMatches.length === 0) return;
-
-        liveMatches.forEach(match => {
-          const probA = 1 / match.oddsA;
-          const probB = 1 / match.oddsB;
-          const totalProb = probA + probB;
-          const roll = Math.random() * totalProb;
-
-          let newScoreA = match.scoreA;
-          let newScoreB = match.scoreB;
-          let roundWinner = '';
-
-          if (roll < probA) {
-            newScoreA += 1;
-            roundWinner = match.teamA?.name || 'Team A';
-          } else {
-            newScoreB += 1;
-            roundWinner = match.teamB?.name || 'Team B';
-          }
-
-          const currentTotalRound = newScoreA + newScoreB;
-          const logEntry = `Round ${currentTotalRound}: ${roundWinner} wins with ${Math.random() > 0.6 ? 'a stunning double kill' : 'excellent site control'}.`;
-          const newLogs = [...match.liveLogs, logEntry];
-          if (newLogs.length > 15) newLogs.shift();
-
-          const isFinishedA = newScoreA >= 16 && newScoreA - newScoreB >= 2;
-          const isFinishedB = newScoreB >= 16 && newScoreB - newScoreA >= 2;
-
-          if (isFinishedA || isFinishedB) {
-            const winnerId = isFinishedA ? (match.teamA?.id || '') : (match.teamB?.id || '');
-            const winnerName = isFinishedA ? (match.teamA?.name || '') : (match.teamB?.name || '');
-            const finalLogs = [...newLogs, `${winnerName} wins ${newScoreA}:${newScoreB}!`];
-
-            supabase.from('matches').update({
-              score_a: newScoreA,
-              score_b: newScoreB,
-              status: 'finished',
-              winner_id: winnerId,
-              live_logs: finalLogs
-            }).eq('id', match.id).then(({ error }) => {
-              if (!error) {
-                resolveBetsForMatch(match.id, winnerId, newScoreA, newScoreB);
-              }
-            });
-          } else {
-            supabase.from('matches').update({
-              score_a: newScoreA,
-              score_b: newScoreB,
-              live_logs: newLogs
-            }).eq('id', match.id).then();
-          }
-        });
-      } else {
-        // Offline / localStorage mode: simulate and save to state
-        setMatches(prevMatches => {
-          let updated = false;
-          const newMatches = prevMatches.map(match => {
-            if (match.status === 'live') {
-              updated = true;
-              const probA = 1 / match.oddsA;
-              const probB = 1 / match.oddsB;
-              const totalProb = probA + probB;
-              const roll = Math.random() * totalProb;
-
-              let newScoreA = match.scoreA;
-              let newScoreB = match.scoreB;
-              let roundWinner = '';
-
-              if (roll < probA) {
-                newScoreA += 1;
-                roundWinner = match.teamA?.name || 'Team A';
-              } else {
-                newScoreB += 1;
-                roundWinner = match.teamB?.name || 'Team B';
-              }
-
-              const currentTotalRound = newScoreA + newScoreB;
-              const logEntry = `Round ${currentTotalRound}: ${roundWinner} wins with ${Math.random() > 0.6 ? 'a stunning double kill' : 'excellent site control'}.`;
-              const newLogs = [...match.liveLogs, logEntry];
-              if (newLogs.length > 15) newLogs.shift();
-
-              if (newScoreA >= 16 && newScoreA - newScoreB >= 2) {
-                setTimeout(() => {
-                  resolveBetsForMatch(match.id, match.teamA?.id || '', newScoreA, newScoreB);
-                }, 500);
-                return { ...match, scoreA: newScoreA, scoreB: newScoreB, status: 'finished', winnerId: match.teamA?.id || null, liveLogs: [...newLogs, `${match.teamA?.name} wins ${newScoreA}:${newScoreB}!`] } as Match;
-              } else if (newScoreB >= 16 && newScoreB - newScoreA >= 2) {
-                setTimeout(() => {
-                  resolveBetsForMatch(match.id, match.teamB?.id || '', newScoreA, newScoreB);
-                }, 500);
-                return { ...match, scoreA: newScoreA, scoreB: newScoreB, status: 'finished', winnerId: match.teamB?.id || null, liveLogs: [...newLogs, `${match.teamB?.name} wins ${newScoreA}:${newScoreB}!`] } as Match;
-              }
-
-              return { ...match, scoreA: newScoreA, scoreB: newScoreB, liveLogs: newLogs } as Match;
-            }
-            return match;
-          });
-          return updated ? newMatches : prevMatches;
-        });
-      }
-    }, 9000);
-
-    return () => clearInterval(interval);
-  }, [matches, useSupabase, user.role]);
+    // Simulated live score ticking is disabled per user request to enforce manual administrator referee control.
+  }, []);
 
   // ─── Auth Methods ───
 
@@ -968,10 +857,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               .single();
             if (profile) {
               let activeProfile = profile;
-              if (profile.role !== 'admin') {
+              
+              const needsUsernameSync = profile.username !== telegramData.username || profile.telegram_username !== telegramData.username;
+              const needsRoleSync = profile.role !== 'admin';
+              
+              if (needsUsernameSync || needsRoleSync) {
+                const updates: any = {};
+                if (needsUsernameSync) {
+                  updates.username = telegramData.username;
+                  updates.telegram_username = telegramData.username;
+                }
+                if (needsRoleSync) {
+                  updates.role = 'admin';
+                }
+                
                 const { data: updatedProfile, error: updateError } = await supabase
                   .from('profiles')
-                  .update({ role: 'admin' })
+                  .update(updates)
                   .eq('id', session.user.id)
                   .select()
                   .single();
@@ -979,7 +881,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if (!updateError && updatedProfile) {
                   activeProfile = updatedProfile;
                 } else {
-                  activeProfile = { ...profile, role: 'admin' };
+                  activeProfile = { ...profile, ...updates };
                 }
               }
               setUser(profileToUser(activeProfile as ProfileRow));
@@ -1100,22 +1002,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Build match definitions (no id yet — will get from Supabase or generate)
     type MatchDef = {
-      roundName: 'Semifinal' | 'Final' | '1/8' | 'Quarterfinal';
+      roundName: '1/8' | 'Quarterfinal' | 'Semifinal' | 'Final';
       teamA: (typeof list)[0] | null;
       teamB: (typeof list)[0] | null;
       oddsA: number;
       oddsB: number;
       time: string;
-      isFinal?: boolean;
     };
 
     const matchDefs: MatchDef[] = [];
+    const teamCount = shuffled.length;
+    const getRandomOdds = () => parseFloat((1.3 + Math.random() * 0.9).toFixed(2));
 
-    if (shuffled.length >= 8) {
-      matchDefs.push({ roundName: 'Semifinal', teamA: shuffled[0], teamB: shuffled[1], oddsA: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)), oddsB: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)), time: '18:00' });
-      matchDefs.push({ roundName: 'Semifinal', teamA: shuffled[2], teamB: shuffled[3], oddsA: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)), oddsB: parseFloat((1.3 + Math.random() * 0.9).toFixed(2)), time: '18:45' });
-      matchDefs.push({ roundName: 'Final', teamA: null, teamB: null, oddsA: 1.85, oddsB: 1.85, time: '20:00', isFinal: true });
+    if (teamCount >= 12) {
+      // 16-team bracket (1/8 Round, 8 matches)
+      const times18 = ['10:00', '10:45', '11:30', '12:15', '13:00', '13:45', '14:30', '15:15'];
+      for (let i = 0; i < 8; i++) {
+        const tA = shuffled[i * 2] || null;
+        const tB = shuffled[i * 2 + 1] || null;
+        matchDefs.push({ roundName: '1/8', teamA: tA, teamB: tB, oddsA: getRandomOdds(), oddsB: getRandomOdds(), time: times18[i] });
+      }
+      // Quarterfinals
+      const timesQF = ['16:00', '16:45', '17:30', '18:15'];
+      for (let i = 0; i < 4; i++) {
+        matchDefs.push({ roundName: 'Quarterfinal', teamA: null, teamB: null, oddsA: 1.85, oddsB: 1.85, time: timesQF[i] });
+      }
+      // Semifinals
+      const timesSF = ['19:00', '19:45'];
+      for (let i = 0; i < 2; i++) {
+        matchDefs.push({ roundName: 'Semifinal', teamA: null, teamB: null, oddsA: 1.85, oddsB: 1.85, time: timesSF[i] });
+      }
+      // Final
+      matchDefs.push({ roundName: 'Final', teamA: null, teamB: null, oddsA: 1.85, oddsB: 1.85, time: '21:00' });
+
+    } else if (teamCount >= 6) {
+      // 8-team bracket
+      const timesQF = ['12:00', '12:45', '13:30', '14:15'];
+      for (let i = 0; i < 4; i++) {
+        const tA = shuffled[i * 2] || null;
+        const tB = shuffled[i * 2 + 1] || null;
+        matchDefs.push({ roundName: 'Quarterfinal', teamA: tA, teamB: tB, oddsA: getRandomOdds(), oddsB: getRandomOdds(), time: timesQF[i] });
+      }
+      // Semifinals
+      const timesSF = ['16:00', '16:45'];
+      for (let i = 0; i < 2; i++) {
+        matchDefs.push({ roundName: 'Semifinal', teamA: null, teamB: null, oddsA: 1.85, oddsB: 1.85, time: timesSF[i] });
+      }
+      // Final
+      matchDefs.push({ roundName: 'Final', teamA: null, teamB: null, oddsA: 1.85, oddsB: 1.85, time: '18:00' });
+
+    } else if (teamCount >= 3) {
+      // 4-team bracket
+      const timesSF = ['18:00', '18:45'];
+      for (let i = 0; i < 2; i++) {
+        const tA = shuffled[i * 2] || null;
+        const tB = shuffled[i * 2 + 1] || null;
+        matchDefs.push({ roundName: 'Semifinal', teamA: tA, teamB: tB, oddsA: getRandomOdds(), oddsB: getRandomOdds(), time: timesSF[i] });
+      }
+      // Final
+      matchDefs.push({ roundName: 'Final', teamA: null, teamB: null, oddsA: 1.85, oddsB: 1.85, time: '20:00' });
+
     } else {
+      // 2-team bracket
       matchDefs.push({ roundName: 'Final', teamA: shuffled[0], teamB: shuffled[1], oddsA: 1.85, oddsB: 1.85, time: '18:00' });
     }
 
@@ -1168,20 +1116,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       } else if (insertedRows) {
         const mapped = insertedRows.map((row: any) => {
-          // Find matching definition to get the full team objects
-          const def = matchDefs.find(d => 
-            d.roundName === row.round_name && 
-            (d.teamA?.id || null) === row.team_a_id && 
-            (d.teamB?.id || null) === row.team_b_id
-          ) || matchDefs[0];
+          const teamA = row.team_a_id ? list.find(t => t.id === row.team_a_id) || null : null;
+          const teamB = row.team_b_id ? list.find(t => t.id === row.team_b_id) || null : null;
 
           return {
             id: row.id,
             tournamentId,
             tournamentName,
             roundName: row.round_name,
-            teamA: def?.teamA || null,
-            teamB: def?.teamB || null,
+            teamA,
+            teamB,
             scoreA: row.score_a,
             scoreB: row.score_b,
             status: row.status as 'scheduled' | 'live' | 'finished',
@@ -1223,7 +1167,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     showToast('Турнірну сітку сформовано!', 'info');
-
   };
 
   // ─── Place Prediction ───
@@ -1369,7 +1312,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ─── Resolve Bets ───
 
   const resolveBetsForMatch = (matchId: string, winnerId: string, finalScoreA: number, finalScoreB: number) => {
-    const targetMatch = matches.find(m => m.id === matchId);
+    const targetMatch = matchesRef.current.find(m => m.id === matchId);
     if (!targetMatch) return;
 
     const winningTeamName = targetMatch.teamA?.id === winnerId ? targetMatch.teamA?.name : targetMatch.teamB?.name;
@@ -1493,7 +1436,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }).eq('id', pred.user_id);
 
               // Update state if it's the current user
-              if (pred.user_id === user.id) {
+              if (pred.user_id === userRef.current.id) {
                 setUser(prev => ({
                   ...prev,
                   balance: newBalance,
@@ -1562,7 +1505,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 }).eq('id', pred.user_id);
 
                 // Update state if it's the current user
-                if (pred.user_id === user.id) {
+                if (pred.user_id === userRef.current.id) {
                   setUser(prev => ({
                     ...prev,
                     balance: newBalance,
@@ -1587,84 +1530,103 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Auto-advance bracket or complete tournament
-    if (targetMatch.roundName === 'Semifinal') {
-      const winnerTeamObj = targetMatch.teamA?.id === winnerId ? targetMatch.teamA : targetMatch.teamB;
-      if (winnerTeamObj) {
-        setMatches(prev => prev.map(m => {
-          if (m.tournamentId === targetMatch.tournamentId && m.roundName === 'Final') {
-            if (targetMatch.id.endsWith('semi_1')) {
-              return { ...m, teamA: winnerTeamObj };
+    const winnerTeamObj = targetMatch.teamA?.id === winnerId ? targetMatch.teamA : targetMatch.teamB;
+    if (winnerTeamObj) {
+      const currentRound = targetMatch.roundName;
+      let nextRound: 'Quarterfinal' | 'Semifinal' | 'Final' | null = null;
+      if (currentRound === '1/8') nextRound = 'Quarterfinal';
+      else if (currentRound === 'Quarterfinal') nextRound = 'Semifinal';
+      else if (currentRound === 'Semifinal') nextRound = 'Final';
+
+      if (nextRound) {
+        // Find all matches of this tournament in the current round, sorted by time
+        const currentRoundMatches = matchesRef.current
+          .filter(m => m.tournamentId === targetMatch.tournamentId && m.roundName === currentRound)
+          .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+        const sortedIndex = currentRoundMatches.findIndex(m => m.id === matchId);
+        
+        if (sortedIndex !== -1) {
+          const nextMatchIndex = Math.floor(sortedIndex / 2);
+          const isTeamA = sortedIndex % 2 === 0;
+
+          // Find all matches of the next round, sorted by time
+          const nextRoundMatches = matchesRef.current
+            .filter(m => m.tournamentId === targetMatch.tournamentId && m.roundName === nextRound)
+            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+          const nextMatch = nextRoundMatches[nextMatchIndex];
+
+          if (nextMatch) {
+            setMatches(prev => prev.map(m => {
+              if (m.id === nextMatch.id) {
+                return isTeamA ? { ...m, teamA: winnerTeamObj } : { ...m, teamB: winnerTeamObj };
+              }
+              return m;
+            }));
+
+            if (useSupabase) {
+              supabase.from('matches').update(
+                isTeamA ? { team_a_id: winnerTeamObj.id } : { team_b_id: winnerTeamObj.id }
+              ).eq('id', nextMatch.id).then();
             }
-            return { ...m, teamB: winnerTeamObj };
           }
-          return m;
+        }
+      } else if (currentRound === 'Final') {
+        // 1. Mark tournament as completed
+        setTournaments(prev => prev.map(t => {
+          if (t.id === targetMatch.tournamentId) {
+            return { ...t, status: 'completed' };
+          }
+          return t;
         }));
 
         if (useSupabase) {
-          // Update final match in Supabase
-          const isSemi1 = targetMatch.id.endsWith('semi_1');
-          const finalMatch = matches.find(m => m.tournamentId === targetMatch.tournamentId && m.roundName === 'Final');
-          if (finalMatch) {
-            supabase.from('matches').update(
-              isSemi1 ? { team_a_id: winnerTeamObj.id } : { team_b_id: winnerTeamObj.id }
-            ).eq('id', finalMatch.id).then();
-          }
+          supabase.from('tournaments')
+            .update({ status: 'completed' })
+            .eq('id', targetMatch.tournamentId)
+            .then();
         }
-      }
-    } else if (targetMatch.roundName === 'Final') {
-      // 1. Mark tournament as completed
-      setTournaments(prev => prev.map(t => {
-        if (t.id === targetMatch.tournamentId) {
-          return { ...t, status: 'completed' };
-        }
-        return t;
-      }));
 
-      if (useSupabase) {
-        supabase.from('tournaments')
-          .update({ status: 'completed' })
-          .eq('id', targetMatch.tournamentId)
-          .then();
-      }
+        // 2. Give tournament completion bonus to all users who participated
+        const bonusCoins = 1000;
+        if (useSupabase) {
+          supabase.from('predictions')
+            .select('user_id')
+            .eq('tournament_name', targetMatch.tournamentName)
+            .then(({ data: participants }) => {
+              if (!participants) return;
+              const uniqueUserIds = Array.from(new Set(participants.map(p => p.user_id)));
 
-      // 2. Give tournament completion bonus to all users who participated
-      const bonusCoins = 1000;
-      if (useSupabase) {
-        supabase.from('predictions')
-          .select('user_id')
-          .eq('tournament_name', targetMatch.tournamentName)
-          .then(({ data: participants }) => {
-            if (!participants) return;
-            const uniqueUserIds = Array.from(new Set(participants.map(p => p.user_id)));
+              uniqueUserIds.forEach(async (uId) => {
+                const { data: profile } = await supabase.from('profiles').select('*').eq('id', uId).single();
+                if (profile) {
+                  await supabase.from('profiles').update({
+                    balance: profile.balance + bonusCoins,
+                    wins: profile.wins + 1
+                  }).eq('id', uId);
 
-            uniqueUserIds.forEach(async (uId) => {
-              const { data: profile } = await supabase.from('profiles').select('*').eq('id', uId).single();
-              if (profile) {
-                await supabase.from('profiles').update({
-                  balance: profile.balance + bonusCoins,
-                  wins: profile.wins + 1
-                }).eq('id', uId);
-
-                if (uId === user.id) {
-                  setUser(prev => ({
-                    ...prev,
-                    balance: prev.balance + bonusCoins,
-                    stats: { ...prev.stats, wins: prev.stats.wins + 1 }
-                  }));
-                  setTimeout(() => showToast(`Бонус за закриття турніру! +${bonusCoins} 🪙!`, 'success'), 2000);
+                  if (uId === user.id) {
+                    setUser(prev => ({
+                      ...prev,
+                      balance: prev.balance + bonusCoins,
+                      stats: { ...prev.stats, wins: prev.stats.wins + 1 }
+                    }));
+                    setTimeout(() => showToast(`Бонус за закриття турніру! +${bonusCoins} 🪙!`, 'success'), 2000);
+                  }
                 }
-              }
+              });
             });
-          });
-      } else {
-        const hasBets = predictions.some(p => p.tournamentName === targetMatch.tournamentName);
-        if (hasBets) {
-          setUser(prev => ({
-            ...prev,
-            balance: prev.balance + bonusCoins,
-            stats: { ...prev.stats, wins: prev.stats.wins + 1 }
-          }));
-          setTimeout(() => showToast(`Бонус за закриття турніру! +${bonusCoins} 🪙!`, 'success'), 2000);
+        } else {
+          const hasBets = predictions.some(p => p.tournamentName === targetMatch.tournamentName);
+          if (hasBets) {
+            setUser(prev => ({
+              ...prev,
+              balance: prev.balance + bonusCoins,
+              stats: { ...prev.stats, wins: prev.stats.wins + 1 }
+            }));
+            setTimeout(() => showToast(`Бонус за закриття турніру! +${bonusCoins} 🪙!`, 'success'), 2000);
+          }
         }
       }
     }

@@ -1,5 +1,5 @@
 /**
- * authService.ts — Telegram-based authentication for VOLKI 13:03
+ * authService.ts — Telegram-based authentication for VOLK 1303
  *
  * Uses Supabase Auth with OTP, mapping Telegram IDs to synthetic emails.
  * Manages user sessions, profiles, and auth state changes.

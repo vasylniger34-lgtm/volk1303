@@ -1,5 +1,5 @@
 /**
- * teamService.ts — Team registration for VOLKI 13:03
+ * teamService.ts — Team registration for VOLK 1303
  *
  * Handles team creation and retrieval for tournament brackets.
  * Teams are linked to tournaments via `tournament_id`.

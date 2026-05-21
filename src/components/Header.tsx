@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Bell } from 'lucide-react';
 
 interface HeaderProps {
-  onNavigate: (view: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin') => void;
+  onNavigate: (view: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager' | 'streams') => void;
   currentView: string;
 }
 
@@ -32,37 +32,34 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView: _curren
         }}
       >
         <img 
-          src="/wolf_logo.png" 
-          alt="VOLKI logo" 
+          src="/wolf_logo.svg" 
+          alt="VOLK 1303 logo" 
           style={{
             width: '32px',
             height: '32px',
             objectFit: 'contain'
           }} 
         />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <h1 style={{
-            fontSize: '15px',
+            fontSize: '16px',
             fontWeight: '900',
             fontFamily: 'Outfit, sans-serif',
             letterSpacing: '0.5px',
             color: '#fff',
             lineHeight: 1.0
           }}>
-            VOLKI
+            VOLK
           </h1>
           <span style={{
-            fontSize: '11px',
+            fontSize: '16px',
             fontWeight: '900',
             fontFamily: 'Outfit, sans-serif',
             color: '#FF5C00',
-            letterSpacing: '1.5px',
+            letterSpacing: '0.5px',
             lineHeight: 1.0,
-            display: 'block',
-            textTransform: 'uppercase',
-            marginTop: '2px'
           }}>
-            13:03
+            1303
           </span>
         </div>
       </div>

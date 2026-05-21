@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { ChevronLeft, Share2, Zap, Tv2, ExternalLink, TrendingUp, Coins, CheckCircle, XCircle, Clock, X } from 'lucide-react';
+import { ChevronLeft, Share2, Zap, Tv2, ExternalLink, TrendingUp, Coins, CheckCircle, XCircle, Clock, X, Maximize2 } from 'lucide-react';
 
 interface MatchDetailViewProps {
   matchId: string;
@@ -30,6 +30,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
   const tourney = tournaments.find(t => t.id === match?.tournamentId);
 
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'STREAM' | 'BETS'>('OVERVIEW');
+  const [fullscreenUrl, setFullscreenUrl] = useState<string | null>(null);
 
   // ─── Betting State ───
   const [betOpen, setBetOpen] = useState(false);
@@ -58,7 +59,8 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
 
   // ─── Stream embed ───
   const rawStream = tourney?.streamUrl || '';
-  const embedUrl  = getEmbedUrl(rawStream);
+  const streamUrls = rawStream ? rawStream.split(/[\s,]+/).map(url => url.trim()).filter(Boolean) : [];
+  const embedUrls = streamUrls.map(url => ({ url, embed: getEmbedUrl(url) }));
 
   // ─── Bet Handlers ───
   const openBet = (type: 'winner' | 'total_rounds', value: string, odds: number) => {
@@ -343,66 +345,93 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
          ══════════════════════════════════════ */}
       {activeTab === 'STREAM' && (
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {rawStream ? (
+          {embedUrls.length > 0 ? (
             <>
-              {embedUrl ? (
-                <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,92,0,0.2)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
-                  <iframe
-                    src={embedUrl}
-                    width="100%"
-                    height="220"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                    title="Live Stream"
-                    style={{ display: 'block' }}
-                  />
-                </div>
-              ) : (
-                <div className="esports-card" style={{ padding: '20px', textAlign: 'center' }}>
-                  <Tv2 size={32} color="#FF5C00" style={{ margin: '0 auto 12px' }} />
-                  <p style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '6px' }}>Ефір доступний за посиланням</p>
-                  <p style={{ fontSize: '11px', color: '#8F8F9B', marginBottom: '16px' }}>Платформа не підтримує вбудований плеєр</p>
-                  <a
-                    href={rawStream}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '6px',
-                      backgroundColor: '#FF5C00', borderRadius: '10px', padding: '10px 20px',
-                      color: 'white', fontWeight: '800', fontSize: '12px', textDecoration: 'none',
-                    }}
-                  >
-                    <ExternalLink size={14} /> Відкрити ефір
-                  </a>
-                </div>
-              )}
+              {embedUrls.map(({ url, embed }, index) => (
+                <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {embed ? (
+                    <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,92,0,0.2)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', position: 'relative' }}>
+                      <iframe
+                        src={embed}
+                        width="100%"
+                        height="220"
+                        frameBorder="0"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                        title={`Live Stream ${index + 1}`}
+                        style={{ display: 'block' }}
+                      />
+                      {/* Webview-safe Fullscreen overlay trigger */}
+                      <button
+                        onClick={() => setFullscreenUrl(embed)}
+                        style={{
+                          position: 'absolute',
+                          bottom: '12px',
+                          right: '12px',
+                          backgroundColor: 'rgba(10, 10, 14, 0.85)',
+                          border: '1px solid rgba(255, 92, 0, 0.4)',
+                          borderRadius: '8px',
+                          color: '#fff',
+                          padding: '8px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 10
+                        }}
+                      >
+                        <Maximize2 size={14} color="#FF5C00" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="esports-card" style={{ padding: '20px', textAlign: 'center' }}>
+                      <Tv2 size={32} color="#FF5C00" style={{ margin: '0 auto 12px' }} />
+                      <p style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '6px' }}>Ефір {embedUrls.length > 1 ? `#${index + 1}` : ''} доступний за посиланням</p>
+                      <p style={{ fontSize: '11px', color: '#8F8F9B', marginBottom: '16px' }}>Вбудований плеєр недоступний для цієї платформи</p>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '6px',
+                          backgroundColor: '#FF5C00', borderRadius: '10px', padding: '10px 20px',
+                          color: 'white', fontWeight: '800', fontSize: '12px', textDecoration: 'none',
+                        }}
+                      >
+                        <ExternalLink size={14} /> Відкрити ефір {embedUrls.length > 1 ? `#${index + 1}` : ''}
+                      </a>
+                    </div>
+                  )}
 
-              {/* Stream info card */}
-              <div className="esports-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '40px', height: '40px', borderRadius: '10px',
-                  background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))',
-                  border: '1px solid rgba(239,68,68,0.25)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Tv2 size={20} color="#EF4444" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>
-                    {match.teamA?.name} vs {match.teamB?.name}
+                  {/* Stream info card */}
+                  <div className="esports-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '40px', height: '40px', borderRadius: '10px',
+                      background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))',
+                      border: '1px solid rgba(239,68,68,0.25)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Tv2 size={20} color="#EF4444" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>
+                        {match.teamA?.name} vs {match.teamB?.name}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#8F8F9B', marginTop: '2px' }}>
+                        {match.tournamentName} • Офіційна трансляція {embedUrls.length > 1 ? `#${index + 1}` : ''}
+                      </div>
+                    </div>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#FF5C00', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontSize: '11px', fontWeight: '700' }}
+                    >
+                      Дивитись <ExternalLink size={14} />
+                    </a>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#8F8F9B', marginTop: '2px' }}>{match.tournamentName} • Офіційний ефір</div>
                 </div>
-                <a
-                  href={rawStream}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#8F8F9B', display: 'flex', alignItems: 'center' }}
-                >
-                  <ExternalLink size={16} />
-                </a>
-              </div>
+              ))}
             </>
           ) : (
             <div className="esports-card" style={{ padding: '40px 20px', textAlign: 'center' }}>
@@ -611,6 +640,58 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
             </button>
           </div>
         </>
+      )}
+
+      {/* ─── Webview-safe Fullscreen Overlay Render ─── */}
+      {fullscreenUrl && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#000',
+          zIndex: 99999,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          {/* Close button */}
+          <button
+            onClick={() => setFullscreenUrl(null)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              backgroundColor: 'rgba(10, 10, 14, 0.75)',
+              border: '1px solid rgba(255, 92, 0, 0.4)',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              cursor: 'pointer',
+              zIndex: 100000
+            }}
+          >
+            <X size={20} color="#FF5C00" />
+          </button>
+
+          {/* Iframe */}
+          <iframe
+            src={fullscreenUrl}
+            width="100%"
+            height="100%"
+            frameBorder="0"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+            title="Fullscreen Live Stream"
+            style={{ border: 'none' }}
+          />
+        </div>
       )}
 
       <style>{`

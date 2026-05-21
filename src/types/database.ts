@@ -21,6 +21,7 @@ export interface ProfileRow {
   telegram_id: string | null;
   telegram_username: string | null;
   created_at: string;
+  reg_num: number;
 }
 
 export interface TournamentRow {
@@ -79,11 +80,11 @@ export interface MatchRow {
 export interface PredictionRow {
   id: string;
   user_id: string;
-  match_id: string;
+  match_id: string | null;
   tournament_name: string | null;
   team_a: string | null;
   team_b: string | null;
-  prediction_type: 'winner' | 'total_rounds';
+  prediction_type: 'winner' | 'total_rounds' | 'tournament_winner';
   predicted_value: string;
   odds: number;
   wager: number;

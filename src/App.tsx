@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HomeView } from './components/HomeView';
 import { TournamentsView } from './components/TournamentsView';
+import { MatchesView } from './components/MatchesView';
 import { TournamentDetailView } from './components/TournamentDetailView';
 import { RegisterModal } from './components/RegisterModal';
 import { MatchDetailView } from './components/MatchDetailView';
@@ -12,11 +13,12 @@ import { ProfileView } from './components/ProfileView';
 import { AdminPanel } from './components/AdminPanel';
 import { ManagerPanel } from './components/ManagerPanel';
 import { AuthModal } from './components/AuthModal';
+import { StreamsView } from './components/StreamsView';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   // Navigation states
-  const [view, setView] = useState<'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager'>('home');
+  const [view, setView] = useState<'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager' | 'streams'>('home');
   
   // Selection states
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
@@ -26,7 +28,7 @@ const AppContent: React.FC = () => {
   const { toast, hideToast, isAuthenticated, isLoading, authLogin } = useApp();
 
   // Navigation controller helper
-  const navigateTo = (targetView: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager') => {
+  const navigateTo = (targetView: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager' | 'streams') => {
     setView(targetView);
     setSelectedTournamentId(null);
     setSelectedMatchId(null);
@@ -76,7 +78,7 @@ const AppContent: React.FC = () => {
           letterSpacing: '3px',
           textTransform: 'uppercase'
         }}>
-          VOLKI 13:03
+          VOLK 1303
         </span>
       </div>
     );
@@ -130,22 +132,18 @@ const AppContent: React.FC = () => {
             onSelectTournament={(id) => setSelectedTournamentId(id)}
           />
         );
+      case 'streams':
+        return (
+          <StreamsView 
+            onSelectMatch={(id) => setSelectedMatchId(id)}
+          />
+        );
       case 'matches':
         return (
-          <div className="scroll-container" style={{ padding: '16px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '16px', fontFamily: 'Outfit, sans-serif' }}>
-              Турнірні Матчі
-            </h2>
-            <p style={{ fontSize: '11px', color: '#8F8F9B', marginBottom: '20px' }}>
-              Оберіть активну сітку в меню "Турніри" або відкрийте деталі гри нижче.
-            </p>
-            <HomeView 
-              onNavigate={navigateTo}
-              onSelectTournament={setSelectedTournamentId}
-              onSelectMatch={setSelectedMatchId}
-              onOpenRegister={setRegisteringTournamentId}
-            />
-          </div>
+          <MatchesView 
+            onSelectMatch={setSelectedMatchId}
+            onSelectTournament={setSelectedTournamentId}
+          />
         );
       case 'bets':
         return <BetsView />;

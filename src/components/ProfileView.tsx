@@ -76,7 +76,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
   };
 
   return (
-    <div className="scroll-container" style={{ padding: '16px' }}>
+    <div className="scroll-container" style={{ padding: '16px 20px 120px 20px' }}>
       
       {/* Profile Header Title */}
       <h2 style={{
@@ -201,7 +201,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'white', fontFamily: 'Outfit, sans-serif' }}>
-                {user.username}
+                {user.username}#{user.regNum}
               </h3>
               <button onClick={() => setIsEditingName(true)} style={{
                 background: 'transparent',

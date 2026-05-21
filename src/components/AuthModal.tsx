@@ -137,8 +137,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isLoading = false
           <div className="auth-logo-icon">
             <Shield size={32} color="#FF5C00" />
           </div>
-          <h1 className="auth-title">VOLKI</h1>
-          <span className="auth-subtitle">13:03 ESPORTS</span>
+          <h1 className="auth-title">VOLK 1303</h1>
+          <span className="auth-subtitle">ESPORTS PLATFORM</span>
         </div>
 
         {step === 'welcome' ? (

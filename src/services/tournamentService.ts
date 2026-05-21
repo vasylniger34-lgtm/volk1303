@@ -1,5 +1,5 @@
 /**
- * tournamentService.ts — Tournament CRUD for VOLKI 13:03
+ * tournamentService.ts — Tournament CRUD for VOLK 1303
  *
  * Manages tournament lifecycle: creation, updates, deletion,
  * and participant tracking against the `tournaments` table.
