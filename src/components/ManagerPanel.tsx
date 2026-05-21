@@ -54,10 +54,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   const [managerUser, setManagerUser] = useState<Partial<ManagerProfile>>(() => {
     try {
       const saved = localStorage.getItem('volk_manager_profile');
-      return saved ? JSON.parse(saved) : { email: '1303volk@ukr.net', username: 'VOLK1303', role: 'Owner' };
+      return saved ? JSON.parse(saved) : { email: 'manager@volki.gg', username: 'Volki Director', role: 'Super Admin' };
     } catch (e) {
-      console.warn('[VOLK] Failed to parse volk_manager_profile from localStorage:', e);
-      return { email: '1303volk@ukr.net', username: 'VOLK1303', role: 'Owner' };
+      console.warn('[VOLKI] Failed to parse volk_manager_profile from localStorage:', e);
+      return { email: 'manager@volki.gg', username: 'Volki Director', role: 'Super Admin' };
     }
   });
 
@@ -85,7 +85,6 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
   // Dashboard workspace navigation
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tournaments' | 'matches' | 'broadcast' | 'analytics' | 'coins' | 'settings'>('dashboard');
-
 
   // Broadcast state
   const [broadcastMsg, setBroadcastMsg] = useState('');
@@ -154,24 +153,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   const [managers, setManagers] = useState<ManagerProfile[]>(() => {
     try {
       const saved = localStorage.getItem('volk_managers_list');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Filter out mock "director" entries
-          const filtered = parsed.filter((m: any) => m.email !== 'director@volki.gg' && m.username !== 'Volki Director');
-          // Ensure VOLK1303 is in there
-          const hasVolk = filtered.some((m: any) => m.username?.toLowerCase() === 'volk1303');
-          if (!hasVolk) {
-            filtered.unshift({ email: '1303volk@ukr.net', username: 'VOLK1303', role: 'Owner', joinedAt: '20.05.2026', status: 'online' });
-          }
-          return filtered;
-        }
-      }
+      if (saved) return JSON.parse(saved);
     } catch (e) {
-      console.warn('[VOLK] Failed to parse volk_managers_list from localStorage:', e);
+      console.warn('[VOLKI] Failed to parse volk_managers_list from localStorage:', e);
     }
     return [
-      { email: '1303volk@ukr.net', username: 'VOLK1303', role: 'Owner', joinedAt: '20.05.2026', status: 'online' }
+      { email: 'director@volki.gg', username: 'Volki Director', role: 'Super Admin', joinedAt: '20.05.2026', status: 'online' },
+      { email: 'moderator1@volki.gg', username: 'Alex CS', role: 'Moderator', joinedAt: '20.05.2026', status: 'offline' }
     ];
   });
 
@@ -196,14 +184,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     if (!isAuthed) return;
 
     const mockActions = [
-      "User @aim_bot placed a bet of 800 рџЄ™ on tournament match",
+      "User @aim_bot placed a bet of 800 🪙 on tournament match",
       "New player registered on platform: @cs2_enjoyer",
       "API request received: FetchActiveTournaments (200 OK)",
       "Resolved prediction bets for match in tournament bracket",
       "Player request received: JoinTeam (200 OK)",
       "Server status healthy: CPU 12%, Memory 48%, Active websockets: 28",
       "Telegram bot ping received from Webhook handler",
-      "Deposited +5000 рџЄ™ to wallet for testing admin role",
+      "Deposited +5000 🪙 to wallet for testing admin role",
       "Refreshed bracket connector graphics in user application"
     ];
 
@@ -218,16 +206,16 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     return () => clearInterval(interval);
   }, [isAuthed]);
 
-  // в”Ђв”Ђв”Ђ AUTHENTICATION HANDLERS в”Ђв”Ђв”Ђ
+  // ─── AUTHENTICATION HANDLERS ───
 
   const handleExpressActivate = async () => {
     if (!user || !user.id) {
-      showToast('РЎРїРѕС‡Р°С‚РєСѓ СѓРІС–Р№РґС–С‚СЊ Сѓ СЃРІС–Р№ Р°РєР°СѓРЅС‚', 'error');
+      showToast('Спочатку увійдіть у свій акаунт', 'error');
       return;
     }
 
     if (expressCode.trim() !== '11111111') {
-      showToast('РќРµРІС–СЂРЅРёР№ РєРѕРґ РґРѕСЃС‚СѓРїСѓ!', 'error');
+      showToast('Невірний код доступу!', 'error');
       return;
     }
 
@@ -243,7 +231,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           .eq('id', user.id);
 
         if (profileError) {
-          throw new Error('РќРµ РІРґР°Р»РѕСЃСЏ РѕРЅРѕРІРёС‚Рё СЂРѕР»СЊ Сѓ Р±Р°Р·С– РґР°РЅРёС…: ' + profileError.message);
+          throw new Error('Не вдалося оновити роль у базі даних: ' + profileError.message);
         }
       }
 
@@ -260,9 +248,9 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       localStorage.setItem('volk_manager_profile', JSON.stringify(adminManager));
       localStorage.setItem('volk_manager_session', 'true');
       setIsAuthed(true);
-      showToast('вљЎ РџСЂР°РІР° РђРґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂР° Р°РєС‚РёРІРѕРІР°РЅРѕ! Р’С–С‚Р°С”РјРѕ Сѓ РџР°РЅРµР»С– РљРµСЂСѓРІР°РЅРЅСЏ.', 'success');
+      showToast('⚡ Права Адміністратора активовано! Вітаємо у Панелі Керування.', 'success');
     } catch (err: any) {
-      setAuthError(err.message || 'РџРѕРјРёР»РєР° РїС–Рґ С‡Р°СЃ Р°РєС‚РёРІР°С†С–С— Р°РґРјС–РЅР°');
+      setAuthError(err.message || 'Помилка під час активації адміна');
     } finally {
       setAuthLoading(false);
     }
@@ -274,7 +262,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     setAuthLoading(true);
 
     if (regCode.trim().toLowerCase() !== managerInviteCode.trim().toLowerCase() && regCode.trim() !== '11111111') {
-      setAuthError('РќРµРІС–СЂРЅРёР№ РєРѕРґ РґРѕСЃС‚СѓРїСѓ РєРµСЂСѓСЋС‡РѕРіРѕ! Р—РІРµСЂРЅС–С‚СЊСЃСЏ РґРѕ РіРѕР»РѕРІРЅРѕРіРѕ Р°РґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂР°.');
+      setAuthError('Невірний код доступу керуючого! Зверніться до головного адміністратора.');
       setAuthLoading(false);
       return;
     }
@@ -306,8 +294,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               console.warn('[VOLKI Admin] Could not update profile role:', profileError);
             }
           } else if (signUpError) {
-            // Supabase auth failed вЂ” rate limit, anonymous disabled, SMTP error, etc.
-            // This is NOT fatal вЂ” admin panel uses localStorage-based session
+            // Supabase auth failed — rate limit, anonymous disabled, SMTP error, etc.
+            // This is NOT fatal — admin panel uses localStorage-based session
             console.warn('[VOLKI Admin] Supabase signUp unavailable (rate limit / anonymous disabled / SMTP):', signUpError.message);
           }
         } catch (signError: any) {
@@ -329,9 +317,9 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       localStorage.setItem('volk_manager_profile', JSON.stringify(newManager));
       localStorage.setItem('volk_manager_session', 'true');
       setIsAuthed(true);
-      showToast('Р РµС”СЃС‚СЂР°С†С–СЏ СѓСЃРїС–С€РЅР°! Р›Р°СЃРєР°РІРѕ РїСЂРѕСЃРёРјРѕ РґРѕ РїР°РЅРµР»С– РєРµСЂСѓРІР°РЅРЅСЏ.', 'success');
+      showToast('Реєстрація успішна! Ласкаво просимо до панелі керування.', 'success');
     } catch (err: any) {
-      setAuthError(err.message || 'РЎС‚Р°Р»Р°СЃСЏ РїРѕРјРёР»РєР° РїСЂРё СЂРµС”СЃС‚СЂР°С†С–С—');
+      setAuthError(err.message || 'Сталася помилка при реєстрації');
     } finally {
       setAuthLoading(false);
     }
@@ -343,10 +331,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     setAuthLoading(true);
 
     try {
-      // в”Ђв”Ђ STEP 1: Check local managers list first (works after registration without email confirm) в”Ђв”Ђ
+      // ── STEP 1: Check local managers list first (works after registration without email confirm) ──
       const localMatch = managers.find(m => m.email === loginEmail || m.username === loginEmail);
       if (localMatch && loginPass.length >= 6) {
-        // Valid local manager вЂ” grant access immediately
+        // Valid local manager — grant access immediately
         const activeManager: ManagerProfile = {
           ...localMatch,
           status: 'online'
@@ -355,7 +343,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
         localStorage.setItem('volk_manager_profile', JSON.stringify(activeManager));
         localStorage.setItem('volk_manager_session', 'true');
         setIsAuthed(true);
-        showToast('Р’С…С–Рґ СѓСЃРїС–С€РЅРёР№! РЎРµСЃС–СЏ Р°РґРјС–РЅС–СЃС‚СЂСѓРІР°РЅРЅСЏ СЂРѕР·РїРѕС‡Р°С‚Р°.', 'success');
+        showToast('Вхід успішний! Сесія адміністрування розпочата.', 'success');
         setAuthLoading(false);
         return;
       }
@@ -380,7 +368,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
             if (!profileErr && profile && profile.role !== 'admin') {
               await supabase.auth.signOut();
-              throw new Error('Р”РѕСЃС‚СѓРї Р·Р°Р±Р»РѕРєРѕРІР°РЅРѕ: Р¦РµР№ РѕР±Р»С–РєРѕРІРёР№ Р·Р°РїРёСЃ РЅРµ С” Р°РґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂРѕРј.');
+              throw new Error('Доступ заблоковано: Цей обліковий запис не є адміністратором.');
             }
 
             activeManager = {
@@ -410,7 +398,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               status: 'online'
             };
           } else {
-            throw new Error('РќРµРІС–СЂРЅРёР№ email/РїР°СЂРѕР»СЊ. РЇРєС‰Рѕ РІРё С‰РѕР№РЅРѕ Р·Р°СЂРµС”СЃС‚СЂСѓРІР°Р»Рё Р°РєР°СѓРЅС‚ вЂ” РїСЂРѕСЃС‚Рѕ РЅР°С‚РёСЃРЅС–С‚СЊ "Р’С…С–Рґ" Р· С‚РёРјРё СЃР°РјРёРјРё РґР°РЅРёРјРё.');
+            throw new Error('Невірний email/пароль. Якщо ви щойно зареєстрували акаунт — просто натисніть "Вхід" з тими самими даними.');
           }
         }
 
@@ -431,15 +419,15 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           setManagerUser(activeManager);
           localStorage.setItem('volk_manager_profile', JSON.stringify(activeManager));
         } else {
-          throw new Error('Р’РІРµРґС–С‚СЊ РєРѕСЂРµРєС‚РЅСѓ Р°РґСЂРµСЃСѓ С‚Р° РїР°СЂРѕР»СЊ (РјС–РЅ. 6 СЃРёРјРІРѕР»С–РІ)');
+          throw new Error('Введіть коректну адресу та пароль (мін. 6 символів)');
         }
       }
 
       localStorage.setItem('volk_manager_session', 'true');
       setIsAuthed(true);
-      showToast('Р’С…С–Рґ СѓСЃРїС–С€РЅРёР№! РЎРµСЃС–СЏ Р°РґРјС–РЅС–СЃС‚СЂСѓРІР°РЅРЅСЏ СЂРѕР·РїРѕС‡Р°С‚Р°.', 'success');
+      showToast('Вхід успішний! Сесія адміністрування розпочата.', 'success');
     } catch (err: any) {
-      setAuthError(err.message || 'РџРѕРјРёР»РєР° Р°РІС‚РѕСЂРёР·Р°С†С–С—. РџРµСЂРµРІС–СЂС‚Рµ РґР°РЅС– Р°Р±Рѕ СЃРєРѕСЂРёСЃС‚Р°Р№С‚РµСЃСЊ РєРЅРѕРїРєРѕСЋ В«РђРєС‚РёРІСѓРІР°С‚РёВ».');
+      setAuthError(err.message || 'Помилка авторизації. Перевірте дані або скористайтесь кнопкою «Активувати».');
     } finally {
       setAuthLoading(false);
     }
@@ -449,7 +437,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     localStorage.removeItem('volk_manager_session');
     localStorage.removeItem('volk_manager_profile');
     setIsAuthed(false);
-    showToast('Р’Рё РІРёР№С€Р»Рё Р· РїР°РЅРµР»С– РєРµСЂСѓРІР°РЅРЅСЏ.', 'info');
+    showToast('Ви вийшли з панелі керування.', 'info');
   };
 
   const handleImageUpload = async (file: File, isEdit: boolean) => {
@@ -458,11 +446,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     const filePath = `banners/${fileName}`;
 
     if (useSupabase) {
-      showToast('Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ Р·РѕР±СЂР°Р¶РµРЅРЅСЏ...', 'info');
+      showToast('Завантаження зображення...', 'info');
       const { error } = await supabase.storage.from('banners').upload(filePath, file);
       if (error) {
         console.error('Supabase upload error:', error);
-        showToast('РџРѕРјРёР»РєР° Р·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ. РЎС‚РІРѕСЂС–С‚СЊ Р±Р°РєРµС‚ "banners" Сѓ Supabase Р°Р±Рѕ РІСЃС‚Р°РІС‚Рµ РїРѕСЃРёР»Р°РЅРЅСЏ.', 'error');
+        showToast('Помилка завантаження. Створіть бакет "banners" у Supabase або вставте посилання.', 'error');
         return;
       }
       const { data: urlData } = supabase.storage.from('banners').getPublicUrl(filePath);
@@ -471,7 +459,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       } else {
         setTourneyForm(prev => ({ ...prev, imageUrl: urlData.publicUrl }));
       }
-      showToast('Р—РѕР±СЂР°Р¶РµРЅРЅСЏ Р·Р°РІР°РЅС‚Р°Р¶РµРЅРѕ РІ Supabase!', 'success');
+      showToast('Зображення завантажено в Supabase!', 'success');
     } else {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -505,7 +493,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           } else {
             setTourneyForm(prev => ({ ...prev, imageUrl: dataUrl }));
           }
-          showToast('Р—РѕР±СЂР°Р¶РµРЅРЅСЏ СЃС‚РёСЃРЅСѓС‚Рѕ Р»РѕРєР°Р»СЊРЅРѕ!', 'success');
+          showToast('Зображення стиснуто локально!', 'success');
         };
         img.src = event.target?.result as string;
       };
@@ -522,12 +510,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     updateTournament(editingTourney.id, {
       name: editTourneyForm.name.toUpperCase(),
       type: editTourneyForm.type,
-      date: editTourneyForm.date || 'РЎСЊРѕРіРѕРґРЅС–, 20:00',
-      prizePool: `${prizeNum.toLocaleString('uk-UA')} рџЄ™`,
+      date: editTourneyForm.date || 'Сьогодні, 20:00',
+      prizePool: `${prizeNum.toLocaleString('uk-UA')} 🪙`,
       prizePlaces: {
-        first: `${(parseInt(editTourneyForm.prizeFirst.replace(/\D/g, '')) || Math.round(prizeNum * 0.5)).toLocaleString('uk-UA')} рџЄ™`,
-        second: `${(parseInt(editTourneyForm.prizeSecond.replace(/\D/g, '')) || Math.round(prizeNum * 0.3)).toLocaleString('uk-UA')} рџЄ™`,
-        third: `${(parseInt(editTourneyForm.prizeThird.replace(/\D/g, '')) || Math.round(prizeNum * 0.2)).toLocaleString('uk-UA')} рџЄ™`
+        first: `${(parseInt(editTourneyForm.prizeFirst.replace(/\D/g, '')) || Math.round(prizeNum * 0.5)).toLocaleString('uk-UA')} 🪙`,
+        second: `${(parseInt(editTourneyForm.prizeSecond.replace(/\D/g, '')) || Math.round(prizeNum * 0.3)).toLocaleString('uk-UA')} 🪙`,
+        third: `${(parseInt(editTourneyForm.prizeThird.replace(/\D/g, '')) || Math.round(prizeNum * 0.2)).toLocaleString('uk-UA')} 🪙`
       },
       maxParticipants: editTourneyForm.maxParticipants,
       map: editTourneyForm.map,
@@ -545,7 +533,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     setEditingTourney(null);
   };
 
-  // в”Ђв”Ђв”Ђ TOURNAMENT MANAGEMENT HANDLERS в”Ђв”Ђв”Ђ
+  // ─── TOURNAMENT MANAGEMENT HANDLERS ───
 
   const handleCreateTourneySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -554,16 +542,16 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     const prizeNum = parseInt(tourneyForm.prize.replace(/\D/g, '')) || 25000;
     
     const pFirst = tourneyForm.prizeFirst.trim() 
-      ? `${parseInt(tourneyForm.prizeFirst.replace(/\D/g, '')).toLocaleString('uk-UA')} рџЄ™`
-      : `${Math.round(prizeNum * 0.5).toLocaleString('uk-UA')} рџЄ™`;
+      ? `${parseInt(tourneyForm.prizeFirst.replace(/\D/g, '')).toLocaleString('uk-UA')} 🪙`
+      : `${Math.round(prizeNum * 0.5).toLocaleString('uk-UA')} 🪙`;
       
     const pSecond = tourneyForm.prizeSecond.trim() 
-      ? `${parseInt(tourneyForm.prizeSecond.replace(/\D/g, '')).toLocaleString('uk-UA')} рџЄ™`
-      : `${Math.round(prizeNum * 0.3).toLocaleString('uk-UA')} рџЄ™`;
+      ? `${parseInt(tourneyForm.prizeSecond.replace(/\D/g, '')).toLocaleString('uk-UA')} 🪙`
+      : `${Math.round(prizeNum * 0.3).toLocaleString('uk-UA')} 🪙`;
       
     const pThird = tourneyForm.prizeThird.trim() 
-      ? `${parseInt(tourneyForm.prizeThird.replace(/\D/g, '')).toLocaleString('uk-UA')} рџЄ™`
-      : `${Math.round(prizeNum * 0.2).toLocaleString('uk-UA')} рџЄ™`;
+      ? `${parseInt(tourneyForm.prizeThird.replace(/\D/g, '')).toLocaleString('uk-UA')} 🪙`
+      : `${Math.round(prizeNum * 0.2).toLocaleString('uk-UA')} 🪙`;
       
     let formattedDate = tourneyForm.date;
     if (tourneyForm.date) {
@@ -581,14 +569,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
         console.error("Date formatting error:", err);
       }
     } else {
-      formattedDate = 'РЎСЊРѕРіРѕРґРЅС–, 20:00';
+      formattedDate = 'Сьогодні, 20:00';
     }
 
     createTournament({
       name: tourneyForm.name.toUpperCase(),
       type: tourneyForm.type,
       date: formattedDate,
-      prizePool: `${prizeNum.toLocaleString('uk-UA')} рџЄ™`,
+      prizePool: `${prizeNum.toLocaleString('uk-UA')} 🪙`,
       prizePlaces: {
         first: pFirst,
         second: pSecond,
@@ -606,7 +594,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     // Add log entry
     setTerminalLogs(prev => [
       ...prev,
-      `[${new Date().toLocaleTimeString()}] Created new tournament: "${tourneyForm.name.toUpperCase()}" (${tourneyForm.type}) with a prize pool of ${prizeNum.toLocaleString()} рџЄ™`
+      `[${new Date().toLocaleTimeString()}] Created new tournament: "${tourneyForm.name.toUpperCase()}" (${tourneyForm.type}) with a prize pool of ${prizeNum.toLocaleString()} 🪙`
     ]);
 
     setTourneyForm({
@@ -626,10 +614,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     });
 
     setActiveTab('tournaments');
-    showToast('РўСѓСЂРЅС–СЂ СѓСЃРїС–С€РЅРѕ СЃС‚РІРѕСЂРµРЅРѕ!', 'success');
+    showToast('Турнір успішно створено!', 'success');
   };
 
-  // в”Ђв”Ђв”Ђ MATCH SIMULATOR INJECTORS в”Ђв”Ђв”Ђ
+  // ─── MATCH SIMULATOR INJECTORS ───
 
   const startSelectedMatchLive = (matchId: string) => {
     setMatchLive(matchId);
@@ -652,7 +640,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       ...prev,
       `[${new Date().toLocaleTimeString()}] Resolved match finished: winner [${winnerId?.substring(0, 8)}] Score [${finalA}:${finalB}]`
     ]);
-    showToast('РњР°С‚С‡ Р·Р°РІРµСЂС€РµРЅРѕ, СЃС‚Р°РІРєРё СЂРѕР·СЂР°С…РѕРІР°РЅС–!', 'success');
+    showToast('Матч завершено, ставки розраховані!', 'success');
   };
 
   const injectMatchLog = (_matchId: string) => {
@@ -665,21 +653,21 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     ]);
 
     setCustomLog('');
-    showToast('РљРѕРјРµРЅС‚Р°СЂ РІРїСЂРѕРІР°РґР¶РµРЅРѕ РІ С‚СЂР°РЅСЃР»СЏС†С–СЋ!', 'success');
+    showToast('Коментар впроваджено в трансляцію!', 'success');
   };
 
-  // в”Ђв”Ђв”Ђ BROADCAST HANDLER в”Ђв”Ђв”Ђ
+  // ─── BROADCAST HANDLER ───
 
   const handleSendBroadcast = async () => {
     if (!broadcastMsg.trim()) {
-      showToast('Р’РІРµРґС–С‚СЊ С‚РµРєСЃС‚ РїРѕРІС–РґРѕРјР»РµРЅРЅСЏ!', 'error');
+      showToast('Введіть текст повідомлення!', 'error');
       return;
     }
     setBroadcastSending(true);
     setBroadcastProgress(null);
     setBroadcastResult(null);
 
-    setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Р—Р°РїСѓСЃРє СЂРѕР·СЃРёР»РєРё РІ Telegram...`]);
+    setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Запуск розсилки в Telegram...`]);
 
     try {
       let chatIds: number[] = [8472692319, 6239669001]; // Hardcoded fallbacks so user and managers always receive it
@@ -723,13 +711,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       }
 
       if (chatIds.length === 0) {
-        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] вљ пёЏ РќРµ Р·РЅР°Р№РґРµРЅРѕ РїС–РґРїРёСЃРЅРёРєС–РІ Р°Р±Рѕ РєРѕСЂРёСЃС‚СѓРІР°С‡С–РІ Р· Telegram ID РґР»СЏ СЂРѕР·СЃРёР»РєРё.`]);
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ⚠️ Не знайдено підписників або користувачів з Telegram ID для розсилки.`]);
       }
 
       const BOT_TOKEN = '8873845823:AAErjQiXP7InePLKku-MOhbqNPe-bMvt3LU';
       const CHANNEL_ID = '@volki1303';
+      const finalMsg = broadcastMsg;
       const replyMarkup = {
-        inline_keyboard: [[{ text: 'рџЋ® Р’С–РґРєСЂРёС‚Рё VOLK 1303', web_app: { url: 'https://volk1303.vercel.app' } }]]
+        inline_keyboard: [[{ text: '🎮 В БОТ VOLK 1303', web_app: { url: 'https://volk1303.vercel.app' } }]]
       };
 
       let sent = 0;
@@ -749,7 +738,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: chatId,
-              text: broadcastMsg,
+              text: finalMsg,
               parse_mode: 'HTML',
               disable_web_page_preview: true,
               reply_markup: replyMarkup,
@@ -783,19 +772,19 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               .eq('chat_id', blockedId);
           } catch (_) {}
         }
-        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] РџРѕР·РЅР°С‡РµРЅРѕ ${blockedIds.length} Р·Р°Р±Р»РѕРєРѕРІР°РЅРёС… С‡Р°С‚С–РІ СЏРє РЅРµР°РєС‚РёРІРЅС–.`]);
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Позначено ${blockedIds.length} заблокованих чатів як неактивні.`]);
       }
 
       // 5. Send to Channel
       let channelOk = false;
       try {
-        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] РќР°РґСЃРёР»Р°РЅРЅСЏ Р°РЅРѕРЅСЃСѓ РІ РєР°РЅР°Р» ${CHANNEL_ID}...`]);
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Надсилання анонсу в канал ${CHANNEL_ID}...`]);
         const chanResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: CHANNEL_ID,
-            text: broadcastMsg,
+            text: finalMsg,
             parse_mode: 'HTML',
             disable_web_page_preview: true,
             reply_markup: replyMarkup,
@@ -809,20 +798,20 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
       setBroadcastResult({ sent, failed });
       setTerminalLogs(prev => [...prev,
-        `[${new Date().toLocaleTimeString()}] Р РѕР·СЃРёР»РєР° Р·Р°РІРµСЂС€РµРЅР°: вњ… ${sent}/${chatIds.length} РґРѕСЃС‚Р°РІР»РµРЅРѕ, вќЊ ${failed} РїРѕРјРёР»РѕРє. РљР°РЅР°Р»: ${channelOk ? 'вњ…' : 'вќЊ'}`
+        `[${new Date().toLocaleTimeString()}] Розсилка завершена: ✅ ${sent}/${chatIds.length} доставлено, ❌ ${failed} помилок. Канал: ${channelOk ? '✅' : '❌'}`
       ]);
-      showToast(`Р РѕР·СЃРёР»РєСѓ РІРёРєРѕРЅР°РЅРѕ! вњ… ${sent} РЅР°РґС–СЃР»Р°РЅРѕ, вќЊ ${failed} РїРѕРјРёР»РѕРє`, sent > 0 ? 'success' : 'error');
+      showToast(`Розсилку виконано! ✅ ${sent} надіслано, ❌ ${failed} помилок`, sent > 0 ? 'success' : 'error');
       if (sent > 0) setBroadcastMsg('');
     } catch (err: any) {
-      showToast('РџРѕРјРёР»РєР° СЂРѕР·СЃРёР»РєРё: ' + err.message, 'error');
-      setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] вќЊ РџРѕРјРёР»РєР° СЂРѕР·СЃРёР»РєРё: ${err.message}`]);
+      showToast('Помилка розсилки: ' + err.message, 'error');
+      setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Помилка розсилки: ${err.message}`]);
     } finally {
       setBroadcastSending(false);
       setBroadcastProgress(null);
     }
   };
 
-  // в”Ђв”Ђв”Ђ STYLES & LAYOUTS в”Ђв”Ђв”Ђ
+  // ─── STYLES & LAYOUTS ───
 
   const activeMatch = matches.find(m => m.id === selectedMatchId);
 
@@ -844,7 +833,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     });
   }, [useSupabase, isAuthed]);
 
-  // в”Ђв”Ђв”Ђ RENDER: AUTH GATE в”Ђв”Ђв”Ђ
+  // ─── RENDER: AUTH GATE ───
 
   if (!isAuthed) {
     return (
@@ -923,7 +912,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 cursor: 'pointer', transition: 'all 0.25s'
               }}
             >
-              Р’С…С–Рґ
+              Вхід
             </button>
             <button 
               type="button" 
@@ -936,7 +925,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 cursor: 'pointer', transition: 'all 0.25s'
               }}
             >
-              Р РµС”СЃС‚СЂР°С†С–СЏ РєРµСЂСѓСЋС‡РёС…
+              Реєстрація керуючих
             </button>
           </div>
 
@@ -965,19 +954,19 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   <User size={16} color="#FF5C00" />
                 </div>
                 <div>
-                  <div style={{ fontSize: '11px', color: '#8F8F9B', fontWeight: '700', textTransform: 'uppercase' }}>Р’Рё СѓРІС–Р№С€Р»Рё СЏРє РіСЂР°РІРµС†СЊ</div>
+                  <div style={{ fontSize: '11px', color: '#8F8F9B', fontWeight: '700', textTransform: 'uppercase' }}>Ви увійшли як гравець</div>
                   <div style={{ fontSize: '14px', color: '#fff', fontWeight: '800' }}>@{user.username}</div>
                 </div>
               </div>
               
               <div style={{ fontSize: '11px', color: '#B5B5BE', lineHeight: '1.4' }}>
-                Р’Рё РјРѕР¶РµС‚Рµ РјРёС‚С‚С”РІРѕ Р°РєС‚РёРІСѓРІР°С‚Рё С†РµР№ Р°РєР°СѓРЅС‚ СЏРє <strong>РђРґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂР°</strong> Р±РµР· СЂРµС”СЃС‚СЂР°С†С–С— РЅРѕРІРёС… РїРѕС€С‚ С‚Р° Р»С–РјС–С‚С–РІ!
+                Ви можете миттєво активувати цей акаунт як <strong>Адміністратора</strong> без реєстрації нових пошт та лімітів!
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <input 
                   type="text" 
-                  placeholder="Р’РІРµРґС–С‚СЊ РєРѕРґ 11111111"
+                  placeholder="Введіть код 11111111"
                   value={expressCode}
                   onChange={e => setExpressCode(e.target.value)}
                   style={{
@@ -1012,7 +1001,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     gap: '6px'
                   }}
                 >
-                  {authLoading ? 'РђРєС‚РёРІР°С†С–СЏ...' : 'вљЎ РђРєС‚РёРІСѓРІР°С‚Рё С‚Р° СѓРІС–Р№С‚Рё'}
+                  {authLoading ? 'Активація...' : '⚡ Активувати та увійти'}
                 </button>
               </div>
             </div>
@@ -1035,7 +1024,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     transition: 'all 0.2s',
                   }}
                 >
-                  в†ђ РџРµСЂРµР№С‚Рё РґРѕ РіРѕР»РѕРІРЅРѕРіРѕ СЃР°Р№С‚Сѓ
+                  ← Перейти до головного сайту
                 </button>
               </div>
             ) : null
@@ -1058,7 +1047,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Р•Р»РµРєС‚СЂРѕРЅРЅР° РџРѕС€С‚Р°
+                  Електронна Пошта
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '0 16px' }}>
                   <Mail size={16} color="#FF5C00" style={{ marginRight: '12px', flexShrink: 0 }} />
@@ -1077,13 +1066,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  РџР°СЂРѕР»СЊ
+                  Пароль
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '0 16px' }}>
                   <Lock size={16} color="#FF5C00" style={{ marginRight: '12px', flexShrink: 0 }} />
                   <input 
                     type={showLoginPass ? 'text' : 'password'}
-                    placeholder="вЂўвЂўвЂўвЂўвЂўвЂўвЂўвЂў"
+                    placeholder="••••••••"
                     required
                     value={loginPass}
                     onChange={e => setLoginPass(e.target.value)}
@@ -1103,14 +1092,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 className="btn-primary"
                 style={{ width: '100%', padding: '16px', borderRadius: '14px', marginTop: '12px', fontSize: '13px' }}
               >
-                {authLoading ? 'РџС–РґРєР»СЋС‡РµРЅРЅСЏ...' : 'РђРІС‚РѕСЂРёР·СѓРІР°С‚РёСЃСЊ РІ СЃРёСЃС‚РµРјС–'}
+                {authLoading ? 'Підключення...' : 'Авторизуватись в системі'}
               </button>
             </form>
           ) : (
             <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  РђРґСЂРµСЃР° Р•Р». РџРѕС€С‚Рё
+                  Адреса Ел. Пошти
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '0 16px' }}>
                   <Mail size={16} color="#FF5C00" style={{ marginRight: '12px', flexShrink: 0 }} />
@@ -1129,7 +1118,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Р†Рј'СЏ РљРѕСЂРёСЃС‚СѓРІР°С‡Р°
+                  Ім'я Користувача
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '0 16px' }}>
                   <User size={16} color="#FF5C00" style={{ marginRight: '12px', flexShrink: 0 }} />
@@ -1148,13 +1137,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  РџР°СЂРѕР»СЊ
+                  Пароль
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '0 16px' }}>
                   <Lock size={16} color="#FF5C00" style={{ marginRight: '12px', flexShrink: 0 }} />
                   <input 
                     type={showRegPass ? 'text' : 'password'}
-                    placeholder="РњС–РЅС–РјСѓРј 6 Р·РЅР°РєС–РІ"
+                    placeholder="Мінімум 6 знаків"
                     required
                     minLength={6}
                     value={regPass}
@@ -1171,13 +1160,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#EF4444', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Key size={10} /> РљРѕРґ Р”РѕСЃС‚СѓРїСѓ РљРµСЂСѓСЋС‡РѕРіРѕ
+                  <Key size={10} /> Код Доступу Керуючого
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '14px', padding: '0 16px' }}>
                   <Key size={16} color="#EF4444" style={{ marginRight: '12px', flexShrink: 0 }} />
                   <input 
                     type="text" 
-                    placeholder="Р’РІРµРґС–С‚СЊ СЃРµРєСЂРµС‚РЅРёР№ РєРѕРґ Р°РґРјС–РЅР°"
+                    placeholder="Введіть секретний код адміна"
                     required
                     value={regCode}
                     onChange={e => setRegCode(e.target.value)}
@@ -1194,7 +1183,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 className="btn-primary"
                 style={{ width: '100%', padding: '15px', borderRadius: '14px', marginTop: '10px', fontSize: '13px' }}
               >
-                {authLoading ? 'РЎС‚РІРѕСЂРµРЅРЅСЏ...' : 'Р—Р°СЂРµС”СЃС‚СЂСѓРІР°С‚Рё Р°РєРєР°СѓРЅС‚ РєРµСЂСѓСЋС‡РѕРіРѕ'}
+                {authLoading ? 'Створення...' : 'Зареєструвати аккаунт керуючого'}
               </button>
             </form>
           )}
@@ -1220,18 +1209,18 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               onMouseEnter={e => e.currentTarget.style.color = '#fff'}
               onMouseLeave={e => e.currentTarget.style.color = '#8F8F9B'}
             >
-              в†ђ РџРѕРІРµСЂРЅСѓС‚РёСЃСЏ РґРѕ Р“РѕР»РѕРІРЅРѕРіРѕ РЎР°Р№С‚Сѓ
+              ← Повернутися до Головного Сайту
             </button>
           )}
           <div style={{ textAlign: 'center', color: '#51515E', fontSize: '10px', marginTop: '32px', letterSpacing: '0.5px' }}>
-            РЎРµСЃС–СЏ Р·Р°С…РёС‰РµРЅР° С€РёС„СЂСѓРІР°РЅРЅСЏРј. РўС–Р»СЊРєРё Р°РІС‚РѕСЂРёР·РѕРІР°РЅС– РјРµРЅРµРґР¶РµСЂРё.
+            Сесія захищена шифруванням. Тільки авторизовані менеджери.
           </div>
         </div>
       </div>
     );
   }
 
-  // в”Ђв”Ђв”Ђ RENDER: COMMAND CENTER DASHBOARD в”Ђв”Ђв”Ђ
+  // ─── RENDER: COMMAND CENTER DASHBOARD ───
 
   return (
     <div style={{
@@ -1242,7 +1231,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       fontFamily: 'Inter, Outfit, sans-serif'
     }}>
       
-      {/* в”Ђв”Ђв”Ђ SIDEBAR в”Ђв”Ђв”Ђ */}
+      {/* ─── SIDEBAR ─── */}
       <div style={{
         width: '280px',
         background: '#0B0B11',
@@ -1266,8 +1255,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             <Shield size={20} color="#FF5C00" />
           </div>
           <div>
-            <div style={{ fontSize: '16px', fontWeight: '950', fontFamily: 'Outfit', letterSpacing: '2px' }}>VOLK 1303</div>
-            <div style={{ fontSize: '9px', color: '#FF5C00', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase' }}>ADMIN PANEL</div>
+            <div style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '2px', fontFamily: 'Outfit, sans-serif' }}>VOLK 1303</div>
+            <div style={{ fontSize: '9px', color: '#FF5C00', fontWeight: '800', letterSpacing: '3px' }}>COMMAND CENTER</div>
           </div>
         </div>
 
@@ -1301,13 +1290,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
         {/* Menu Navigation */}
         <div style={{ flex: 1, padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {[
-            { id: 'dashboard', label: 'РћРіР»СЏРґ РЎРёСЃС‚РµРјРё', icon: <Activity size={16} /> },
-            { id: 'tournaments', label: 'РўСѓСЂРЅС–СЂРё & РЎС–С‚РєРё', icon: <Trophy size={16} /> },
-            { id: 'matches', label: 'РџСЂРѕРІРµРґРµРЅРЅСЏ С‚СѓСЂРЅС–СЂС–РІ', icon: <Swords size={16} /> },
-            { id: 'broadcast', label: 'Telegram Р РѕР·СЃРёР»РєРё', icon: <MessageSquare size={16} /> },
-            { id: 'analytics', label: 'РђРЅР°Р»С–С‚РёРєР° & Р”Р°РЅС–', icon: <BarChart3 size={16} /> },
-            { id: 'coins', label: 'РљРµСЂСѓРІР°РЅРЅСЏ РјРѕРЅРµС‚Р°РјРё', icon: <Coins size={16} /> },
-            { id: 'settings', label: 'РќР°Р»Р°С€С‚СѓРІР°РЅРЅСЏ', icon: <Settings size={16} /> }
+            { id: 'dashboard', label: 'Огляд Системи', icon: <Activity size={16} /> },
+            { id: 'tournaments', label: 'Турніри & Сітки', icon: <Trophy size={16} /> },
+            { id: 'matches', label: 'Проведення турнірів', icon: <Swords size={16} /> },
+            { id: 'broadcast', label: 'Telegram Розсилки', icon: <MessageSquare size={16} /> },
+            { id: 'analytics', label: 'Аналітика & Дані', icon: <BarChart3 size={16} /> },
+            { id: 'coins', label: 'Керування монетами', icon: <Coins size={16} /> },
+            { id: 'settings', label: 'Налаштування', icon: <Settings size={16} /> }
           ].map(item => {
             const isTabActive = activeTab === item.id;
             return (
@@ -1351,7 +1340,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 color: '#ccc', cursor: 'pointer', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: '0.5px'
               }}
             >
-              в†ђ Р”Рѕ Р“РѕР»РѕРІРЅРѕРіРѕ РЎР°Р№С‚Сѓ
+              ← До Головного Сайту
             </button>
           )}
           <button
@@ -1363,12 +1352,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               color: '#EF4444', cursor: 'pointer', fontFamily: 'Outfit', textTransform: 'uppercase', letterSpacing: '0.5px'
             }}
           >
-            <LogOut size={12} /> Р—Р°РІРµСЂС€РёС‚Рё РЎРµСЃС–СЋ
+            <LogOut size={12} /> Завершити Сесію
           </button>
         </div>
       </div>
 
-      {/* в”Ђв”Ђв”Ђ MAIN WORKSPACE PANEL в”Ђв”Ђв”Ђ */}
+      {/* ─── MAIN WORKSPACE PANEL ─── */}
       <div style={{
         flex: 1,
         display: 'flex',
@@ -1391,13 +1380,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
         }}>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '0.5px', fontFamily: 'Outfit', textTransform: 'uppercase', margin: 0 }}>
-              {activeTab === 'dashboard' && 'рџ“Љ РџР°РЅРµР»СЊ РћРіР»СЏРґСѓ РЎРёСЃС‚РµРјРё'}
-              {activeTab === 'tournaments' && 'рџЏ† РљРµСЂСѓРІР°РЅРЅСЏ РўСѓСЂРЅС–СЂР°РјРё & РЎС–С‚РєР°РјРё'}
-              {activeTab === 'matches' && 'вљ”пёЏ РџСЂРѕРІРµРґРµРЅРЅСЏ С‚СѓСЂРЅС–СЂС–РІ & РЈРїСЂР°РІР»С–РЅРЅСЏ Р Р°С…СѓРЅРєР°РјРё'}
-              {activeTab === 'broadcast' && 'рџ“ў Telegram Р РѕР·СЃРёР»РєРё РґР»СЏ РџС–РґРїРёСЃРЅРёРєС–РІ'}
-              {activeTab === 'analytics' && 'рџ“€ РђРЅР°Р»С–С‚РёРєР° РџР»Р°С‚С„РѕСЂРјРё (Р РµР°Р»СЊРЅС– Р”Р°РЅС–)'}
-              {activeTab === 'coins' && 'рџЄ™ РљРµСЂСѓРІР°РЅРЅСЏ РњРѕРЅРµС‚Р°РјРё'}
-              {activeTab === 'settings' && 'вљ™пёЏ РќР°Р»Р°С€С‚СѓРІР°РЅРЅСЏ & РљРµСЂСѓСЋС‡С– РЎР°Р№С‚РѕРј'}
+              {activeTab === 'dashboard' && '📊 Панель Огляду Системи'}
+              {activeTab === 'tournaments' && '🏆 Керування Турнірами & Сітками'}
+              {activeTab === 'matches' && '⚔️ Проведення турнірів & Управління Рахунками'}
+              {activeTab === 'broadcast' && '📢 Telegram Розсилки для Підписників'}
+              {activeTab === 'analytics' && '📈 Аналітика Платформи (Реальні Дані)'}
+              {activeTab === 'coins' && '🪙 Керування Монетами'}
+              {activeTab === 'settings' && '⚙️ Налаштування & Керуючі Сайтом'}
             </h2>
           </div>
 
@@ -1405,16 +1394,16 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981', boxShadow: '0 0 8px #10B981', display: 'inline-block' }}></span>
-              <span style={{ fontSize: '11px', color: '#8F8F9B', fontWeight: '600' }}>Р‘Р°Р·Р° РґР°РЅРёС…: {useSupabase ? 'Supabase Cloud' : 'Р›РѕРєР°Р»СЊРЅР°'}</span>
+              <span style={{ fontSize: '11px', color: '#8F8F9B', fontWeight: '600' }}>База даних: {useSupabase ? 'Supabase Cloud' : 'Локальна'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981', boxShadow: '0 0 8px #10B981', display: 'inline-block' }}></span>
-              <span style={{ fontSize: '11px', color: '#8F8F9B', fontWeight: '600' }}>РЎС‚Р°С‚СѓСЃ СЃРµСЂРІРµСЂР°: ACTIVE</span>
+              <span style={{ fontSize: '11px', color: '#8F8F9B', fontWeight: '600' }}>Статус сервера: ACTIVE</span>
             </div>
           </div>
         </div>
 
-        {/* в”Ђв”Ђв”Ђ SCROLLABLE WORKSPACE CONTAINER в”Ђв”Ђв”Ђ */}
+        {/* ─── SCROLLABLE WORKSPACE CONTAINER ─── */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
@@ -1431,10 +1420,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               {/* Stats Bento Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '18px' }}>
                 {[
-                  { title: 'РђРєС‚РёРІРЅС– РўСѓСЂРЅС–СЂРё', count: tournaments.length, color: '#FF5C00', desc: 'РЈСЃСЊРѕРіРѕ СЃС‚РІРѕСЂРµРЅРѕ СЃС–С‚РѕРє' },
-                  { title: 'Р—Р°СЂРµС”СЃС‚СЂРѕРІР°РЅРѕ РљРѕРјР°РЅРґ', count: totalRegisteredTeams, color: '#10B981', desc: 'РЎРєР»Р°РґРё РіСЂР°РІС†С–РІ РїР»Р°С‚С„РѕСЂРјРё' },
-                  { title: 'РњР°С‚С‡С– LIVE / Scheduled', count: `${liveMatchesCount} / ${upcomingMatchesCount}`, color: '#3B82F6', desc: 'РђРєС‚РёРІРЅРёР№ СЂРѕР·РєР»Р°Рґ С–РіРѕСЂ' },
-                  { title: "РћР±'С”Рј РЎС‚Р°РІРѕРє (Mock)", count: '142 850 рџЄ™', color: '#8B5CF6', desc: 'РџСЂРёР№РЅСЏС‚РёР№ РѕР±СЃСЏРі РїСЂРѕРіРЅРѕР·С–РІ' }
+                  { title: 'Активні Турніри', count: tournaments.length, color: '#FF5C00', desc: 'Усього створено сіток' },
+                  { title: 'Зареєстровано Команд', count: totalRegisteredTeams, color: '#10B981', desc: 'Склади гравців платформи' },
+                  { title: 'Матчі LIVE / Scheduled', count: `${liveMatchesCount} / ${upcomingMatchesCount}`, color: '#3B82F6', desc: 'Активний розклад ігор' },
+                  { title: "Об'єм Ставок (Mock)", count: '142 850 🪙', color: '#8B5CF6', desc: 'Прийнятий обсяг прогнозів' }
                 ].map((stat, i) => (
                   <div key={i} className="esports-card" style={{
                     padding: '24px',
@@ -1455,10 +1444,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 <div className="esports-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', minHeight: '380px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Activity size={14} color="#FF5C00" /> LIVE РўРµСЂРјС–РЅР°Р» РђРєС‚РёРІРЅРѕСЃС‚С– РџР»Р°С‚С„РѕСЂРјРё
+                      <Activity size={14} color="#FF5C00" /> LIVE Термінал Активності Платформи
                     </h3>
                     <span style={{ fontSize: '9px', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
-                      в—Џ LIVE РЎРўР Р†Рњ
+                      ● LIVE СТРІМ
                     </span>
                   </div>
 
@@ -1491,14 +1480,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   {/* Platform Health Widget */}
                   <div className="esports-card" style={{ padding: '20px' }}>
                     <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '14px' }}>
-                      РЎРёСЃС‚РµРјРЅС– Р†РЅРґРёРєР°С‚РѕСЂРё
+                      Системні Індикатори
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {[
-                        { label: 'РќР°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ CPU', val: '14%', color: '#10B981' },
-                        { label: 'Р’РёРєРѕСЂРёСЃС‚Р°РЅРЅСЏ RAM', val: '54%', color: '#10B981' },
-                        { label: 'Р’РµР±СЃРѕРєРµС‚Рё СЃРїРѕР»СѓС‡РµРЅРЅСЏ', val: '28 / 200 max', color: '#3B82F6' },
-                        { label: 'Р§Р°СЃ Р±РµР·РїРµСЂРµР±С–Р№РЅРѕС— СЂРѕР±РѕС‚Рё', val: '32d 14h 28m', color: '#FF5C00' }
+                        { label: 'Навантаження CPU', val: '14%', color: '#10B981' },
+                        { label: 'Використання RAM', val: '54%', color: '#10B981' },
+                        { label: 'Вебсокети сполучення', val: '28 / 200 max', color: '#3B82F6' },
+                        { label: 'Час безперебійної роботи', val: '32d 14h 28m', color: '#FF5C00' }
                       ].map((item, idx) => (
                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
                           <span style={{ color: '#8F8F9B' }}>{item.label}</span>
@@ -1511,7 +1500,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   {/* Dev / Manager Quick Actions */}
                   <div className="esports-card" style={{ padding: '20px' }}>
                     <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '14px' }}>
-                      РЁРІРёРґРєС– РџРѕСЃРёР»Р°РЅРЅСЏ
+                      Швидкі Посилання
                     </h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
                       <button 
@@ -1523,7 +1512,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                         }}
                       >
-                        РЎС‚РІРѕСЂРёС‚Рё РўСѓСЂРЅС–СЂРЅСѓСЋ РЎС–С‚РєСѓ <PlusCircle size={14} />
+                        Створити Турнірную Сітку <PlusCircle size={14} />
                       </button>
                       <button 
                         onClick={() => setActiveTab('matches')}
@@ -1534,7 +1523,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                         }}
                       >
-                        РљРµСЂСѓРІР°С‚Рё Live Р Р°С…СѓРЅРєР°РјРё <Swords size={14} />
+                        Керувати Live Рахунками <Swords size={14} />
                       </button>
                     </div>
                   </div>
@@ -1555,15 +1544,15 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', margin: 0 }}>
-                    РђРєС‚РёРІРЅС– РўСѓСЂРЅС–СЂРЅС– РЎС–С‚РєРё ({tournaments.length})
+                    Активні Турнірні Сітки ({tournaments.length})
                   </h3>
                   {tournaments.length > 0 && (
                     <button
                       onClick={() => {
-                        if (confirm('Р’Рё РІРїРµРІРЅРµРЅС–, С‰Рѕ С…РѕС‡РµС‚Рµ РІРёРґР°Р»РёС‚Рё Р’РЎР† С‚СѓСЂРЅС–СЂРё? Р¦Рµ С‚Р°РєРѕР¶ РІРёРґР°Р»РёС‚СЊ СѓСЃС– РїРѕРІ\'СЏР·Р°РЅС– РјР°С‚С‡С–, РєРѕРјР°РЅРґРё С‚Р° СЃС‚Р°РІРєРё.')) {
+                        if (confirm('Ви впевнені, що хочете видалити ВСІ турніри? Це також видалить усі пов\'язані матчі, команди та ставки.')) {
                           tournaments.forEach(t => deleteTournament(t.id));
                           setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Deleted all tournaments.`]);
-                          showToast('РЈСЃС– С‚СѓСЂРЅС–СЂРё РІРёРґР°Р»РµРЅРѕ', 'info');
+                          showToast('Усі турніри видалено', 'info');
                         }
                       }}
                       style={{
@@ -1572,7 +1561,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                         fontFamily: 'Outfit', cursor: 'pointer'
                       }}
                     >
-                      Р’РёРґР°Р»РёС‚Рё РІСЃС–
+                      Видалити всі
                     </button>
                   )}
                 </div>
@@ -1580,8 +1569,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 {tournaments.length === 0 ? (
                   <div className="esports-card" style={{ padding: '60px', textAlign: 'center', color: '#51515E' }}>
                     <Trophy size={48} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
-                    <p style={{ fontSize: '15px', fontWeight: '700', color: '#8F8F9B' }}>РўСѓСЂРЅС–СЂС–РІ С‰Рµ РЅРµ СЃС‚РІРѕСЂРµРЅРѕ</p>
-                    <p style={{ fontSize: '11px', marginTop: '6px' }}>РЎРєРѕСЂРёСЃС‚Р°Р№С‚РµСЃСЏ РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂРѕРј РїСЂР°РІРѕСЂСѓС‡ РґР»СЏ СЃС‚РІРѕСЂРµРЅРЅСЏ</p>
+                    <p style={{ fontSize: '15px', fontWeight: '700', color: '#8F8F9B' }}>Турнірів ще не створено</p>
+                    <p style={{ fontSize: '11px', marginTop: '6px' }}>Скористайтеся конструктором праворуч для створення</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -1600,7 +1589,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                 padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '800', textTransform: 'uppercase',
                                 marginTop: '4px', display: 'inline-block'
                               }}>
-                                {t.status === 'active' ? 'РђРљРўРР’РќРР™' : t.status === 'completed' ? 'Р—РђР’Р•Р РЁР•РќРР™' : 'РћР§Р†РљРЈР’РђРќРќРЇ'}
+                                {t.status === 'active' ? 'АКТИВНИЙ' : t.status === 'completed' ? 'ЗАВЕРШЕНИЙ' : 'ОЧІКУВАННЯ'}
                               </span>
                             </div>
                             
@@ -1610,7 +1599,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                 <button 
                                   onClick={() => {
                                     updateTournament(t.id, { status: 'active' });
-                                    showToast('РўСѓСЂРЅС–СЂ РїРµСЂРµРІРµРґРµРЅРѕ РІ Р°РєС‚РёРІРЅРёР№ СЃС‚Р°С‚СѓСЃ!', 'info');
+                                    showToast('Турнір переведено в активний статус!', 'info');
                                   }}
                                   style={{
                                     background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)',
@@ -1618,7 +1607,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                     fontFamily: 'Outfit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
                                   }}
                                 >
-                                  <Play size={10} /> Р—Р°РїСѓСЃС‚РёС‚Рё
+                                  <Play size={10} /> Запустити
                                 </button>
                               )}
                               {tTeams.length < t.maxParticipants && (
@@ -1633,7 +1622,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                     fontFamily: 'Outfit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
                                   }}
                                 >
-                                  рџ¤– РќР°РїРѕРІРЅРёС‚Рё Р±РѕС‚Р°РјРё
+                                  🤖 Наповнити ботами
                                 </button>
                               )}
                               <button 
@@ -1647,7 +1636,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   fontFamily: 'Outfit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
                                 }}
                               >
-                                <RefreshCw size={10} /> Р—РіРµРЅРµСЂСѓРІР°С‚Рё СЃС–С‚РєСѓ
+                                <RefreshCw size={10} /> Згенерувати сітку
                               </button>
                               <button 
                                 onClick={() => {
@@ -1656,10 +1645,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                     id: t.id,
                                     name: t.name,
                                     type: t.type,
-                                    prizePool: t.prizePool.replace(' рџЄ™', ''),
-                                    prizeFirst: t.prizePlaces.first.replace(' рџЄ™', ''),
-                                    prizeSecond: t.prizePlaces.second.replace(' рџЄ™', ''),
-                                    prizeThird: t.prizePlaces.third.replace(' рџЄ™', ''),
+                                    prizePool: t.prizePool.replace(' 🪙', ''),
+                                    prizeFirst: t.prizePlaces.first.replace(' 🪙', ''),
+                                    prizeSecond: t.prizePlaces.second.replace(' 🪙', ''),
+                                    prizeThird: t.prizePlaces.third.replace(' 🪙', ''),
                                     maxParticipants: t.maxParticipants,
                                     map: t.map,
                                     date: t.date,
@@ -1673,13 +1662,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)',
                                   borderRadius: '8px', padding: '8px', color: '#3B82F6', cursor: 'pointer'
                                 }}
-                                title="Р РµРґР°РіСѓРІР°С‚Рё"
+                                title="Редагувати"
                               >
                                 <Edit3 size={12} />
                               </button>
                               <button 
                                 onClick={() => {
-                                  if (confirm(`Р’Рё РІРїРµРІРЅРµРЅС–, С‰Рѕ С…РѕС‡РµС‚Рµ РІРёРґР°Р»РёС‚Рё С‚СѓСЂРЅС–СЂ "${t.name}"?`)) {
+                                  if (confirm(`Ви впевнені, що хочете видалити турнір "${t.name}"?`)) {
                                     deleteTournament(t.id);
                                     setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Deleted tournament: "${t.name}"`]);
                                   }
@@ -1690,25 +1679,25 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   fontFamily: 'Outfit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
                                 }}
                               >
-                                <Trash2 size={10} /> Р’РёРґР°Р»РёС‚Рё
+                                <Trash2 size={10} /> Видалити
                               </button>
                             </div>
                           </div>
 
                           {/* Tournament stats bar */}
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '11px', color: '#8F8F9B', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '12px', marginTop: '12px' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Activity size={12} color="#FF5C00" /> Р¤РѕСЂРјР°С‚: {t.type}</span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} /> РљР°СЂС‚Р°: {t.map}</span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Users size={12} /> {tTeams.length} / {t.maxParticipants} РєРѕРјР°РЅРґ</span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Swords size={12} /> {tMatches.length} РјР°С‚С‡С–РІ</span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#FF5C00', fontWeight: '800' }}><Award size={12} /> Р¤РѕРЅРґ: {t.prizePool}</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Activity size={12} color="#FF5C00" /> Формат: {t.type}</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} /> Карта: {t.map}</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Users size={12} /> {tTeams.length} / {t.maxParticipants} команд</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Swords size={12} /> {tMatches.length} матчів</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#FF5C00', fontWeight: '800' }}><Award size={12} /> Фонд: {t.prizePool}</span>
                           </div>
                           
                           {/* Twitch Stream Preview */}
                           {t.streamUrl && (
                             <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '16px' }}>
                               <a href={t.streamUrl.startsWith('https://') ? t.streamUrl : `https://${t.streamUrl}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginBottom: '12px', background: '#9146FF', color: '#fff', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '12px', fontFamily: 'Outfit' }}>
-                                рџ“є Р”РёРІРёС‚РёСЃСЊ РЅР° Twitch
+                                📺 Дивитись на Twitch
                               </a>
                               {t.streamUrl.includes('twitch.tv') ? (
                                 <iframe
@@ -1735,12 +1724,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               {/* Tournament Generator Console */}
               <div className="esports-card" style={{ padding: '24px', height: 'fit-content' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Plus size={16} color="#FF5C00" /> РљРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ РќРѕРІРёС… РўСѓСЂРЅС–СЂС–РІ
+                  <Plus size={16} color="#FF5C00" /> Конструктор Нових Турнірів
                 </h3>
 
                 <form onSubmit={handleCreateTourneySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>РќР°Р·РІР° РўСѓСЂРЅС–СЂСѓ</label>
+                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Назва Турніру</label>
                     <input 
                       type="text" 
                       required
@@ -1756,7 +1745,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Р¤РѕСЂРјР°С‚ Р“СЂРё</label>
+                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Формат Гри</label>
                       <select 
                         value={tourneyForm.type}
                         onChange={e => setTourneyForm({ ...tourneyForm, type: e.target.value as any })}
@@ -1767,12 +1756,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       >
                         <option value="2X2">2x2 Aim Match</option>
                         <option value="4X4">4x4 Classic</option>
-                        <option value="BCI">Р‘РёС‚РІР° РљР»Р°РЅС–РІ</option>
+                        <option value="BCI">Битва Кланів</option>
                       </select>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Р›РѕРєР°С†С–СЏ / РљР°СЂС‚Р°</label>
+                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Локація / Карта</label>
                       <select 
                         value={tourneyForm.map}
                         onChange={e => setTourneyForm({ ...tourneyForm, map: e.target.value })}
@@ -1788,7 +1777,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>РЎС‚Р°С‚СѓСЃ РўСѓСЂРЅС–СЂСѓ</label>
+                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Статус Турніру</label>
                       <select 
                         value={tourneyForm.status}
                         onChange={e => setTourneyForm({ ...tourneyForm, status: e.target.value as any })}
@@ -1797,14 +1786,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit', cursor: 'pointer'
                         }}
                       >
-                        <option value="upcoming">РњР°Р№Р±СѓС‚РЅС–Р№ (Upcoming)</option>
-                        <option value="active">РђРєС‚РёРІРЅРёР№ (Active)</option>
-                        <option value="completed">Р—Р°РІРµСЂС€РµРЅРёР№ (Completed)</option>
+                        <option value="upcoming">Майбутній (Upcoming)</option>
+                        <option value="active">Активний (Active)</option>
+                        <option value="completed">Завершений (Completed)</option>
                       </select>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>РњР°РєСЃ. РЈС‡Р°СЃРЅРёРєС–РІ</label>
+                      <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Макс. Учасників</label>
                       <select 
                         value={tourneyForm.maxParticipants}
                         onChange={e => setTourneyForm({ ...tourneyForm, maxParticipants: Number(e.target.value) })}
@@ -1813,13 +1802,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit', cursor: 'pointer'
                         }}
                       >
-                        {[4, 8, 16, 32].map(n => <option key={n} value={n}>{n} РєРѕРјР°РЅРґ</option>)}
+                        {[4, 8, 16, 32].map(n => <option key={n} value={n}>{n} команд</option>)}
                       </select>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Р—Р°РіР°Р»СЊРЅРёР№ РџСЂРёР·РѕРІРёР№ Р¤РѕРЅРґ (рџЄ™)</label>
+                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Загальний Призовий Фонд (🪙)</label>
                     <input 
                       type="text" 
                       required
@@ -1835,10 +1824,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '9px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>1-Рµ РјС–СЃС†Рµ (РѕРїС†)</label>
+                      <label style={{ fontSize: '9px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>1-е місце (опц)</label>
                       <input 
                         type="text" 
-                        placeholder="РђРІС‚Рѕ (50%)"
+                        placeholder="Авто (50%)"
                         value={tourneyForm.prizeFirst}
                         onChange={e => setTourneyForm({ ...tourneyForm, prizeFirst: e.target.value })}
                         style={{
@@ -1848,10 +1837,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '9px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>2-Рµ РјС–СЃС†Рµ (РѕРїС†)</label>
+                      <label style={{ fontSize: '9px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>2-е місце (опц)</label>
                       <input 
                         type="text" 
-                        placeholder="РђРІС‚Рѕ (30%)"
+                        placeholder="Авто (30%)"
                         value={tourneyForm.prizeSecond}
                         onChange={e => setTourneyForm({ ...tourneyForm, prizeSecond: e.target.value })}
                         style={{
@@ -1861,10 +1850,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '9px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>3-Рµ РјС–СЃС†Рµ (РѕРїС†)</label>
+                      <label style={{ fontSize: '9px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>3-е місце (опц)</label>
                       <input 
                         type="text" 
-                        placeholder="РђРІС‚Рѕ (20%)"
+                        placeholder="Авто (20%)"
                         value={tourneyForm.prizeThird}
                         onChange={e => setTourneyForm({ ...tourneyForm, prizeThird: e.target.value })}
                         style={{
@@ -1876,7 +1865,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Р”Р°С‚Р° РўР° Р§Р°СЃ</label>
+                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Дата Та Час</label>
                     <input 
                       type="datetime-local" 
                       required
@@ -1891,7 +1880,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>РџСЂР°РІРёР»Р° РўСѓСЂРЅС–СЂСѓ</label>
+                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Правила Турніру</label>
                     <textarea 
                       rows={3}
                       value={tourneyForm.rules}
@@ -1905,7 +1894,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                   {/* Photo / Banner configuration */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Р‘Р°РЅРЅРµСЂ / Р¤РѕС‚Рѕ РўСѓСЂРЅС–СЂСѓ</label>
+                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Баннер / Фото Турніру</label>
                     
                     {/* Presets Grid */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '8px' }}>
@@ -1940,7 +1929,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     {/* Custom URL */}
                     <input 
                       type="text" 
-                      placeholder="Р’СЃС‚Р°РІС‚Рµ URL Р·РѕР±СЂР°Р¶РµРЅРЅСЏ Р°Р±Рѕ РІРёР±РµСЂС–С‚СЊ РїСЂРµСЃРµС‚ РІРёС‰Рµ"
+                      placeholder="Вставте URL зображення або виберіть пресет вище"
                       value={tourneyForm.imageUrl}
                       onChange={e => setTourneyForm({ ...tourneyForm, imageUrl: e.target.value })}
                       style={{
@@ -1969,17 +1958,17 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           color: '#fff', cursor: 'pointer', fontFamily: 'Outfit', display: 'inline-block'
                         }}
                       >
-                        Р—Р°РІР°РЅС‚Р°Р¶РёС‚Рё С„Р°Р№Р»
+                        Завантажити файл
                       </label>
                       {tourneyForm.imageUrl && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '700' }}>вњ“ Р—РѕР±СЂР°Р¶РµРЅРЅСЏ РіРѕС‚РѕРІРµ</span>
+                          <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '700' }}>✓ Зображення готове</span>
                           <button 
                             type="button" 
                             onClick={() => setTourneyForm({ ...tourneyForm, imageUrl: '' })}
                             style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '10px', fontWeight: '700' }}
                           >
-                            РћС‡РёСЃС‚РёС‚Рё
+                            Очистити
                           </button>
                         </div>
                       )}
@@ -1988,11 +1977,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '10px', fontWeight: '800', color: '#EF4444', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      рџ“Ў РџРѕСЃРёР»Р°РЅРЅСЏ РЅР° LIVE Р•С„С–СЂ (YouTube / Twitch)
+                      📡 Посилання на LIVE Ефір (YouTube / Twitch)
                     </label>
                     <input
                       type="url"
-                      placeholder="https://youtube.com/live/... Р°Р±Рѕ https://twitch.tv/channel"
+                      placeholder="https://youtube.com/live/... або https://twitch.tv/channel"
                       value={tourneyForm.streamUrl}
                       onChange={e => setTourneyForm({ ...tourneyForm, streamUrl: e.target.value })}
                       style={{
@@ -2001,7 +1990,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       }}
                     />
                     <span style={{ fontSize: '10px', color: '#51515E' }}>
-                      Р“СЂР°РІС†С– РїРѕР±Р°С‡Р°С‚СЊ С†РµР№ РµС„С–СЂ РЅР° СЃС‚РѕСЂС–РЅС†С– РјР°С‚С‡Сѓ РїС–Рґ С‡Р°СЃ Live СЃС‚Р°С‚СѓСЃСѓ
+                      Гравці побачать цей ефір на сторінці матчу під час Live статусу
                     </span>
                   </div>
 
@@ -2010,7 +1999,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     className="btn-primary" 
                     style={{ width: '100%', padding: '14px', borderRadius: '10px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px' }}
                   >
-                    <PlusCircle size={14} /> РЎС‚РІРѕСЂРёС‚Рё РўСѓСЂРЅС–СЂ С‚Р° РџСЂРѕС„С–Р»С–
+                    <PlusCircle size={14} /> Створити Турнір та Профілі
                   </button>
                 </form>
               </div>
@@ -2027,7 +2016,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 /* Level 1: Tournament Selection */
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: '950', fontFamily: 'Outfit', color: 'white', textTransform: 'uppercase', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Trophy size={18} color="#FF5C00" /> Р’РёР±РµСЂС–С‚СЊ Р°РєС‚РёРІРЅРёР№ С‚СѓСЂРЅС–СЂ РґР»СЏ РїСЂРѕРІРµРґРµРЅРЅСЏ С–РіРѕСЂ
+                    <Trophy size={18} color="#FF5C00" /> Виберіть активний турнір для проведення ігор
                   </h3>
                   
                   {(() => {
@@ -2036,8 +2025,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       return (
                         <div className="esports-card" style={{ padding: '60px 20px', textAlign: 'center', color: '#51515E' }}>
                           <Swords size={48} style={{ margin: '0 auto 16px', opacity: 0.2, color: '#FF5C00' }} />
-                          <p style={{ fontSize: '15px', fontWeight: '750', color: '#8F8F9B' }}>РќР°СЂР°Р·С– РЅРµРјР°С” Р°РєС‚РёРІРЅРёС… Р°Р±Рѕ Р·Р°РїР»Р°РЅРѕРІР°РЅРёС… С‚СѓСЂРЅС–СЂС–РІ</p>
-                          <p style={{ fontSize: '11px', marginTop: '6px' }}>РЎС‚РІРѕСЂС–С‚СЊ С‚СѓСЂРЅС–СЂ Сѓ РІРєР»Р°РґС†С– В«РўСѓСЂРЅС–СЂРё & РЎС–С‚РєРёВ»</p>
+                          <p style={{ fontSize: '15px', fontWeight: '750', color: '#8F8F9B' }}>Наразі немає активних або запланованих турнірів</p>
+                          <p style={{ fontSize: '11px', marginTop: '6px' }}>Створіть турнір у вкладці «Турніри & Сітки»</p>
                         </div>
                       );
                     }
@@ -2070,7 +2059,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                     color: t.status === 'active' ? '#10B981' : '#FF5C00',
                                     padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '800', textTransform: 'uppercase'
                                   }}>
-                                    {t.status === 'active' ? 'РђРљРўРР’РќРР™' : 'РћР§Р†РљРЈР’РђРќРќРЇ'}
+                                    {t.status === 'active' ? 'АКТИВНИЙ' : 'ОЧІКУВАННЯ'}
                                   </span>
                                   {liveMatches > 0 && (
                                     <span style={{ 
@@ -2099,10 +2088,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   {t.name}
                                 </h4>
                                 <div style={{ fontSize: '12px', color: '#8F8F9B', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-                                  <div>рџ“… Р”Р°С‚Р°: <span style={{ color: 'white', fontWeight: '600' }}>{t.date || 'РќРµ РІРєР°Р·Р°РЅРѕ'}</span></div>
-                                  <div>рџ—єпёЏ РљР°СЂС‚Р°: <span style={{ color: 'white', fontWeight: '600' }}>{t.map || 'РќРµРІС–РґРѕРјРѕ'}</span></div>
-                                  <div>рџ‘Ґ РљРѕРјР°РЅРґРё: <span style={{ color: '#10B981', fontWeight: '700' }}>{tTeams.length} / {t.maxParticipants}</span></div>
-                                  <div>рџ“Љ РњР°С‚С‡С–: <span style={{ color: '#3B82F6', fontWeight: '750' }}>{finishedMatches} Р·С–РіСЂР°РЅРѕ / {tMatches.length} РІСЃСЊРѕРіРѕ</span></div>
+                                  <div>📅 Дата: <span style={{ color: 'white', fontWeight: '600' }}>{t.date || 'Не вказано'}</span></div>
+                                  <div>🗺️ Карта: <span style={{ color: 'white', fontWeight: '600' }}>{t.map || 'Невідомо'}</span></div>
+                                  <div>👥 Команди: <span style={{ color: '#10B981', fontWeight: '700' }}>{tTeams.length} / {t.maxParticipants}</span></div>
+                                  <div>📊 Матчі: <span style={{ color: '#3B82F6', fontWeight: '750' }}>{finishedMatches} зіграно / {tMatches.length} всього</span></div>
                                 </div>
                               </div>
                               
@@ -2125,7 +2114,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   cursor: 'pointer'
                                 }}
                               >
-                                <Swords size={14} /> РљРµСЂСѓРІР°С‚Рё РјР°С‚С‡Р°РјРё
+                                <Swords size={14} /> Керувати матчами
                               </button>
                             </div>
                           );
@@ -2165,11 +2154,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                               fontFamily: 'Outfit'
                             }}
                           >
-                            в†ђ Р”Рѕ СЃРїРёСЃРєСѓ С‚СѓСЂРЅС–СЂС–РІ
+                            ← До списку турнірів
                           </button>
                           
                           <h3 style={{ fontSize: '15px', fontWeight: '950', fontFamily: 'Outfit', color: 'white', textTransform: 'uppercase', margin: 0 }}>
-                            рџЏ† {activeTourney?.name} вЂ” РЈРїСЂР°РІР»С–РЅРЅСЏ С–РіСЂР°РјРё
+                            🏆 {activeTourney?.name} — Управління іграми
                           </h3>
                         </div>
 
@@ -2179,14 +2168,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           {/* Matches List */}
                           <div className="esports-card" style={{ padding: '24px', height: 'fit-content' }}>
                             <h3 style={{ fontSize: '13px', fontWeight: '850', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', marginBottom: '16px' }}>
-                              РЎРїРёСЃРѕРє С–РіРѕСЂ С‚СѓСЂРЅС–СЂСѓ ({tourneyMatches.length})
+                              Список ігор турніру ({tourneyMatches.length})
                             </h3>
 
                             {tourneyMatches.length === 0 ? (
                               <div style={{ padding: '40px 10px', textAlign: 'center', color: '#51515E' }}>
                                 <Swords size={32} style={{ margin: '0 auto 12px', opacity: 0.2 }} />
-                                <p style={{ fontSize: '13px', fontWeight: '750' }}>РњР°С‚С‡С– РґР»СЏ С†СЊРѕРіРѕ С‚СѓСЂРЅС–СЂСѓ С‰Рµ РЅРµ Р·РіРµРЅРµСЂРѕРІР°РЅС–</p>
-                                <p style={{ fontSize: '11px', marginTop: '4px' }}>РЎС„РѕСЂРјСѓР№С‚Рµ СЃС–С‚РєСѓ Сѓ РІРєР»Р°РґС†С– В«РўСѓСЂРЅС–СЂРё & РЎС–С‚РєРёВ»</p>
+                                <p style={{ fontSize: '13px', fontWeight: '750' }}>Матчі для цього турніру ще не згенеровані</p>
+                                <p style={{ fontSize: '11px', marginTop: '4px' }}>Сформуйте сітку у вкладці «Турніри & Сітки»</p>
                               </div>
                             ) : (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -2237,7 +2226,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                           color: m.status === 'live' ? '#EF4444' : m.status === 'finished' ? '#10B981' : '#FF5C00',
                                           padding: '2px 6px', borderRadius: '4px', fontSize: '8px', fontWeight: '800'
                                         }}>
-                                          {m.status === 'live' ? 'рџ”ґ LIVE' : m.status === 'finished' ? 'DONE' : 'WAIT'}
+                                          {m.status === 'live' ? '🔴 LIVE' : m.status === 'finished' ? 'DONE' : 'WAIT'}
                                         </span>
                                       </div>
                                     </div>
@@ -2253,7 +2242,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                               <div className="esports-card" style={{ padding: '28px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '16px', marginBottom: '20px' }}>
                                   <div>
-                                    <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase' }}>РЎРёРјСѓР»СЏС‚РѕСЂ Live Р“СЂРё</span>
+                                    <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase' }}>Симулятор Live Гри</span>
                                     <h3 style={{ fontSize: '18px', fontWeight: '900', fontFamily: 'Outfit', marginTop: '4px' }}>
                                       {activeMatch.teamA?.name || 'TBD'} vs {activeMatch.teamB?.name || 'TBD'}
                                     </h3>
@@ -2278,7 +2267,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                         className="btn-primary"
                                         style={{ padding: '12px 20px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer' }}
                                       >
-                                        <Play size={12} style={{ marginRight: '6px' }} /> Р—Р°РїСѓСЃС‚РёС‚Рё LIVE РњР°С‚С‡
+                                        <Play size={12} style={{ marginRight: '6px' }} /> Запустити LIVE Матч
                                       </button>
                                     )}
                                     {activeMatch.status === 'live' && (
@@ -2290,7 +2279,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                           display: 'flex', alignItems: 'center', gap: '6px'
                                         }}
                                       >
-                                        <Check size={12} /> Р—Р°РІРµСЂС€РёС‚Рё РњР°С‚С‡ & Р’РёРїР»Р°С‚РёС‚Рё РЎС‚Р°РІРєРё
+                                        <Check size={12} /> Завершити Матч & Виплатити Ставки
                                       </button>
                                     )}
                                   </div>
@@ -2357,7 +2346,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                     <button 
                                       onClick={() => {
                                         setMatchScore(activeMatch.id, editScoreA, editScoreB, 'live', null);
-                                        showToast('Р Р°С…СѓРЅРѕРє РјР°С‚С‡Сѓ РѕРЅРѕРІР»РµРЅРѕ!', 'info');
+                                        showToast('Рахунок матчу оновлено!', 'info');
                                       }}
                                       style={{
                                         background: 'rgba(255, 92, 0, 0.15)', border: '1px solid rgba(255, 92, 0, 0.3)',
@@ -2365,7 +2354,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                                       }}
                                     >
-                                      <Save size={14} /> РћРЅРѕРІРёС‚Рё СЂР°С…СѓРЅРѕРє РЅР° РїР»Р°С‚С„РѕСЂРјС–
+                                      <Save size={14} /> Оновити рахунок на платформі
                                     </button>
                                   )}
 
@@ -2380,13 +2369,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                     gap: '12px'
                                   }}>
                                     <span style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>
-                                      РљРѕРµС„С–С†С–С”РЅС‚Рё РјР°С‚С‡Сѓ (СЃС‚Р°РІРєРё РЅР° РјРѕРЅРµС‚РєРё)
+                                      Коефіцієнти матчу (ставки на монетки)
                                     </span>
                                     
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                                       {/* Odds A */}
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={{ fontSize: '10px', color: '#8F8F9B' }}>РљРѕРµС„. РЅР° {activeMatch.teamA?.name || 'Team A'}</label>
+                                        <label style={{ fontSize: '10px', color: '#8F8F9B' }}>Коеф. на {activeMatch.teamA?.name || 'Team A'}</label>
                                         <input 
                                           type="number" 
                                           step="0.01" 
@@ -2402,7 +2391,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                                       {/* Odds B */}
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={{ fontSize: '10px', color: '#8F8F9B' }}>РљРѕРµС„. РЅР° {activeMatch.teamB?.name || 'Team B'}</label>
+                                        <label style={{ fontSize: '10px', color: '#8F8F9B' }}>Коеф. на {activeMatch.teamB?.name || 'Team B'}</label>
                                         <input 
                                           type="number" 
                                           step="0.01" 
@@ -2428,19 +2417,19 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '4px'
                                       }}
                                     >
-                                      <Save size={12} /> Р—Р±РµСЂРµРіС‚Рё РєРѕРµС„С–С†С–С”РЅС‚Рё
+                                      <Save size={12} /> Зберегти коефіцієнти
                                     </button>
                                   </div>
 
                                   {/* Live commentary logger simulation injection */}
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '20px' }}>
                                     <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>
-                                      Р’РїСЂРѕРІР°РґРёС‚Рё РљРѕРјРµРЅС‚Р°СЂ LIVE Р›РћР“РЈ
+                                      Впровадити Коментар LIVE ЛОГУ
                                     </label>
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                       <input 
                                         type="text" 
-                                        placeholder="Р“СЂР°РІРµС†СЊ 1 СЂРѕР±РёС‚СЊ РЅРµР№РјРѕРІС–СЂРЅРёР№ РґР°Р±Р»РєС–Р» РЅР° С‚РѕС‡С†С– Рђ..."
+                                        placeholder="Гравець 1 робить неймовірний даблкіл на точці А..."
                                         value={customLog}
                                         onChange={e => setCustomLog(e.target.value)}
                                         style={{
@@ -2466,8 +2455,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                             ) : (
                               <div className="esports-card" style={{ padding: '60px', textAlign: 'center', color: '#51515E' }}>
                                 <Swords size={48} style={{ margin: '0 auto 16px', opacity: 0.15 }} />
-                                <p style={{ fontSize: '15px', fontWeight: '700', color: '#8F8F9B' }}>Р–РѕРґРЅРѕС— РіСЂРё РЅРµ РІРёР±СЂР°РЅРѕ</p>
-                                <p style={{ fontSize: '11px', marginTop: '4px' }}>РљР»Р°С†РЅС–С‚СЊ РЅР° РјР°С‚С‡ С–Р· Р»С–РІРѕРіРѕ СЃРїРёСЃРєСѓ, С‰РѕР± РѕС‚СЂРёРјР°С‚Рё РґРѕСЃС‚СѓРї РґРѕ СЃРёРјСѓР»СЏС‚РѕСЂР°</p>
+                                <p style={{ fontSize: '15px', fontWeight: '700', color: '#8F8F9B' }}>Жодної гри не вибрано</p>
+                                <p style={{ fontSize: '11px', marginTop: '4px' }}>Клацніть на матч із лівого списку, щоб отримати доступ до симулятора</p>
                               </div>
                             )}
                           </div>
@@ -2482,18 +2471,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           )}
 
           {/* ============================================================
-              TAB: MANAGERS LIST
-             ============================================================ */}
-
-
-          {/* ============================================================
               TAB: TELEGRAM BROADCAST
              ============================================================ */}
           {activeTab === 'broadcast' && (
             <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start' }}>
               {/* Broadcast Composer */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {/* рџ“ў Telegram Bot Deep Link & Broadcast Guide Banner */}
                 <div className="esports-card" style={{
                   padding: '20px 24px',
                   background: 'linear-gradient(135deg, rgba(255, 92, 0, 0.08) 0%, rgba(16, 16, 25, 0.4) 100%)',
@@ -2506,135 +2489,56 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '50%',
-                      background: 'rgba(255, 92, 0, 0.1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '20px',
-                      flexShrink: 0
-                    }}>
-                      рџ“ў
-                    </div>
+                      width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(255, 92, 0, 0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0
+                    }}>📢</div>
                     <div>
-                      <h4 style={{ fontSize: '13px', fontWeight: '900', fontFamily: 'Outfit', color: 'white', margin: '0 0 4px 0' }}>
-                        РњРѕР±С–Р»СЊРЅР° СЂРѕР·СЃРёР»РєР° С‡РµСЂРµР· Telegram-Р±РѕС‚
-                      </h4>
+                      <h4 style={{ fontSize: '13px', fontWeight: '900', fontFamily: 'Outfit', color: 'white', margin: '0 0 4px 0' }}>Мобільна розсилка через Telegram-бот</h4>
                       <p style={{ fontSize: '11px', color: '#8F8F9B', margin: 0, lineHeight: '1.4' }}>
-                        Р’Рё РјРѕР¶РµС‚Рµ СЂРѕР±РёС‚Рё СЂРѕР·СЃРёР»РєРё РїСЂСЏРјРѕ Р·С– СЃРІРѕРіРѕ С‚РµР»РµС„РѕРЅСѓ! РџРµСЂРµР№РґС–С‚СЊ Сѓ РЅР°С€ Р±РѕС‚ С– СЃРєРѕСЂРёСЃС‚Р°Р№С‚РµСЃСЏ РєРѕРјР°РЅРґРѕСЋ <code style={{ color: '#FF5C00', background: 'rgba(255,92,0,0.1)', padding: '2px 6px', borderRadius: '4px' }}>/broadcast</code>.
+                        Ви можете робити розсилки прямо зі свого телефону! Перейдіть у наш бот і скористайтеся командою <code style={{ color: '#FF5C00', background: 'rgba(255,92,0,0.1)', padding: '2px 6px', borderRadius: '4px' }}>/broadcast</code>.
                       </p>
                     </div>
                   </div>
-                  <a
-                    href="https://t.me/volki1303_bot"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-primary"
-                    style={{
-                      padding: '10px 18px',
-                      borderRadius: '10px',
-                      fontSize: '11px',
-                      fontWeight: '800',
-                      textDecoration: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <span>Р’С–РґРєСЂРёС‚Рё Р±РѕС‚</span> вћ”
+                  <a href="https://t.me/volki1303_bot" target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ padding: '10px 18px', borderRadius: '10px', fontSize: '11px', fontWeight: '800', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+                    <span>Відкрити бот</span> ➔
                   </a>
                 </div>
 
                 <div className="esports-card" style={{ padding: '28px' }}>
                   <h3 style={{ fontSize: '15px', fontWeight: '900', fontFamily: 'Outfit', color: '#fff', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MessageSquare size={18} color="#FF5C00" /> РќРѕРІР° Р РѕР·СЃРёР»РєР°
+                    <MessageSquare size={18} color="#FF5C00" /> Нова Розсилка
                   </h3>
-                  <p style={{ fontSize: '11px', color: '#8F8F9B', marginBottom: '20px' }}>
-                    РџРѕРІС–РґРѕРјР»РµРЅРЅСЏ Р±СѓРґРµ РЅР°РґС–СЃР»Р°РЅРѕ РІСЃС–Рј Р°РєС‚РёРІРЅРёРј РїС–РґРїРёСЃРЅРёРєР°Рј Telegram-Р±РѕС‚Р°. РџС–РґС‚СЂРёРјСѓС”С‚СЊСЃСЏ HTML-С„РѕСЂРјР°С‚СѓРІР°РЅРЅСЏ: <code style={{color:'#FF5C00'}}>&lt;b&gt;</code>, <code style={{color:'#FF5C00'}}>&lt;i&gt;</code>, <code style={{color:'#FF5C00'}}>&lt;code&gt;</code>.
-                  </p>
-
-                  {/* Quick templates */}
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-                    <span style={{ fontSize: '10px', color: '#8F8F9B', fontWeight: '700', textTransform: 'uppercase', alignSelf: 'center' }}>РЁР°Р±Р»РѕРЅРё:</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                     {[
-                      { label: 'рџЏ† РќРѕРІРёР№ С‚СѓСЂРЅС–СЂ', text: 'рџљЁ <b>РђРќРћРќРЎ РўРЈР РќР†Р РЈ!</b>\n\nрџЏ† РќРµР·Р°Р±Р°СЂРѕРј РІС–РґР±СѓРґРµС‚СЊСЃСЏ РЅРѕРІРёР№ С‚СѓСЂРЅС–СЂ VOLK 1303!\nрџ“… Р”Р°С‚Р°: [Р”РђРўРђ]\nрџ’° РџСЂРёР·РѕРІРёР№ С„РѕРЅРґ: [Р¤РћРќР”]\n\nР РµС”СЃС‚СЂСѓР№СЃСЏ Р·Р°СЂР°Р· Сѓ РґРѕРґР°С‚РєСѓ! рџ‘‡' },
-                      { label: 'вљ™пёЏ РўРµС…. СЂРѕР±РѕС‚Рё', text: 'вљ™пёЏ <b>РўРµС…РЅС–С‡РЅС– СЂРѕР±РѕС‚Рё</b>\n\nРџР»Р°С‚С„РѕСЂРјР° VOLK 1303 С‚РёРјС‡Р°СЃРѕРІРѕ РЅРµРґРѕСЃС‚СѓРїРЅР° РґР»СЏ РїСЂРѕС„С–Р»Р°РєС‚РёС‡РЅРёС… СЂРѕР±С–С‚.\nРћС‡С–РєСѓРІР°РЅРёР№ С‡Р°СЃ РІС–РґРЅРѕРІР»РµРЅРЅСЏ: [Р§РђРЎ]\n\nР”СЏРєСѓС”РјРѕ Р·Р° СЂРѕР·СѓРјС–РЅРЅСЏ! рџђє' },
-                      { label: 'рџЋ‰ Р РµР·СѓР»СЊС‚Р°С‚Рё', text: 'рџЋ‰ <b>Р Р•Р—РЈР›Р¬РўРђРўР РўРЈР РќР†Р РЈ!</b>\n\nрџҐ‡ РџРµСЂРµРјРѕР¶РµС†СЊ: [РљРћРњРђРќР”Рђ]\nрџҐ€ 2-Рµ РјС–СЃС†Рµ: [РљРћРњРђРќР”Рђ]\nрџҐ‰ 3-С” РјС–СЃС†Рµ: [РљРћРњРђРќР”Рђ]\n\nР’С–С‚Р°С”РјРѕ РІСЃС–С… СѓС‡Р°СЃРЅРёРєС–РІ! рџЏ†' }
-                    ].map(tmpl => (
-                      <button
-                        key={tmpl.label}
-                        onClick={() => setBroadcastMsg(tmpl.text)}
-                        style={{
-                          background: 'rgba(255, 92, 0, 0.06)', border: '1px solid rgba(255, 92, 0, 0.15)',
-                          borderRadius: '8px', padding: '6px 12px', fontSize: '11px', color: '#FF5C00',
-                          fontWeight: '700', cursor: 'pointer', fontFamily: 'Outfit'
-                        }}
-                      >
-                        {tmpl.label}
+                      { label: '🏆 Анонс турніру', text: '🔥 <b>Новий турнір!</b>\n\n🏆 Реєстрацію відкрито!\n📅 Формат: [формат]\n💰 Призовий фонд: [сума]\n\nЗалітай в додаток та реєструй команду! 👇' },
+                      { label: '🔴 Live матч', text: '🔴 <b>МАТЧ LIVE!</b>\n\nЗараз розпочався матч на платформі VOLK 1303!\n⚔️ [Команда A] vs [Команда B]\n\nЗаходь та став свої прогнози! 👇' },
+                      { label: 'Тех. роботи', text: '🛠 <b>Технічні роботи</b>\n\nПлатформа VOLK 1303 тимчасово недоступна через технічні роботи.\nЧас відновлення: [час]\n\nДякуємо за розуміння! 🙏' },
+                      { label: '💰 Нарахування монет', text: '🪙 <b>Бонусні монети!</b>\n\nУсім активним користувачам платформи нараховано бонусні монети.\nЗаходьте в додаток і перевіряйте баланс! 👇' },
+                    ].map((tpl, i) => (
+                      <button key={i} onClick={() => setBroadcastMsg(tpl.text)} style={{ background: 'rgba(255, 92, 0, 0.06)', border: '1px solid rgba(255, 92, 0, 0.15)', borderRadius: '8px', padding: '8px', fontSize: '10px', color: '#FF5C00', fontWeight: '700', cursor: 'pointer', fontFamily: 'Outfit' }}>
+                        {tpl.label}
                       </button>
                     ))}
                   </div>
 
-                  <textarea
-                    rows={8}
-                    placeholder={'рџљЁ <b>РђРќРћРќРЎ!</b>\n\nРўРµРєСЃС‚ РІР°С€РѕРіРѕ РїРѕРІС–РґРѕРјР»РµРЅРЅСЏ...\n\n#volki1303'}
-                    value={broadcastMsg}
-                    onChange={e => setBroadcastMsg(e.target.value)}
-                    style={{
-                      width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '13px', outline: 'none',
-                      fontFamily: 'monospace', resize: 'vertical', boxSizing: 'border-box', lineHeight: '1.6'
-                    }}
-                  />
+                  <textarea rows={8} placeholder={'🚨 <b>АНОНС!</b>\n\nТекст повідомлення...'} value={broadcastMsg} onChange={e => setBroadcastMsg(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '13px', outline: 'none', fontFamily: 'monospace', resize: 'vertical', boxSizing: 'border-box', lineHeight: '1.6' }} />
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-                    <span style={{ fontSize: '11px', color: '#51515E' }}>
-                      {broadcastMsg.length} СЃРёРјРІРѕР»С–РІ
-                    </span>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button
-                        onClick={() => setBroadcastMsg('')}
-                        style={{
-                          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '10px', padding: '10px 16px', color: '#8F8F9B', fontSize: '12px',
-                          fontWeight: '700', cursor: 'pointer', fontFamily: 'Outfit'
-                        }}
-                      >
-                        РћС‡РёСЃС‚РёС‚Рё
-                      </button>
-                      <button
-                        onClick={handleSendBroadcast}
-                        disabled={broadcastSending || !broadcastMsg.trim()}
-                        className="btn-primary"
-                        style={{ padding: '10px 24px', borderRadius: '10px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', opacity: broadcastSending ? 0.7 : 1 }}
-                      >
-                        {broadcastSending ? (
-                          <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> РќР°РґСЃРёР»Р°РЅРЅСЏ...</>
-                        ) : (
-                          <><Send size={14} /> РќР°РґС–СЃР»Р°С‚Рё РІСЃС–Рј</>
-                        )}
-                      </button>
-                    </div>
+                    <span style={{ fontSize: '11px', color: '#51515E' }}>{broadcastMsg.length} символів</span>
+                    <button onClick={handleSendBroadcast} disabled={broadcastSending || !broadcastMsg.trim()} className="btn-primary" style={{ padding: '10px 24px', borderRadius: '10px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', opacity: broadcastSending ? 0.7 : 1 }}>
+                      {broadcastSending ? (
+                        <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Надсилання...</>
+                      ) : (
+                        <><Send size={14} /> Надіслати всім</>
+                      )}
+                    </button>
                   </div>
 
-                  {/* Progress Indicator */}
                   {broadcastProgress && (
-                    <div style={{
-                      marginTop: '16px', padding: '14px 16px', borderRadius: '12px',
-                      background: 'rgba(255, 92, 0, 0.05)',
-                      border: '1px solid rgba(255, 92, 0, 0.15)',
-                      display: 'flex', flexDirection: 'column', gap: '8px'
-                    }}>
+                    <div style={{ marginTop: '16px', padding: '14px 16px', borderRadius: '12px', background: 'rgba(255, 92, 0, 0.05)', border: '1px solid rgba(255, 92, 0, 0.15)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', fontWeight: '700', color: '#FF5C00', fontFamily: 'Outfit' }}>
-                          вљЎ РќР°РґСЃРёР»Р°РЅРЅСЏ СЂРѕР·СЃРёР»РєРё...
-                        </span>
-                        <span style={{ fontSize: '11px', fontWeight: '800', color: '#fff', fontFamily: 'monospace' }}>
-                          {broadcastProgress.current} / {broadcastProgress.total}
-                        </span>
+                        <span style={{ fontSize: '12px', fontWeight: '700', color: '#FF5C00', fontFamily: 'Outfit' }}>⚡ Надсилання розсилки...</span>
+                        <span style={{ fontSize: '11px', fontWeight: '800', color: '#fff', fontFamily: 'monospace' }}>{broadcastProgress.current} / {broadcastProgress.total}</span>
                       </div>
                       <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
                         <div style={{
@@ -2657,8 +2561,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     }}>
                       <CheckCircle2 size={18} color={broadcastResult.sent > 0 ? '#10B981' : '#EF4444'} />
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>
-                        вњ… РќР°РґС–СЃР»Р°РЅРѕ: <strong style={{ color: '#10B981' }}>{broadcastResult.sent}</strong>
-                        &nbsp;&nbsp;вќЊ РџРѕРјРёР»РѕРє: <strong style={{ color: '#EF4444' }}>{broadcastResult.failed}</strong>
+                        ✅ Надіслано: <strong style={{ color: '#10B981' }}>{broadcastResult.sent}</strong>
+                        &nbsp;&nbsp;❌ Помилок: <strong style={{ color: '#EF4444' }}>{broadcastResult.failed}</strong>
                       </span>
                     </div>
                   )}
@@ -2669,14 +2573,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               <div style={{ width: '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* Subscriber count */}
                 <div className="esports-card" style={{ padding: '20px' }}>
-                  <h4 style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', marginBottom: '14px' }}>РђСѓРґРёС‚РѕСЂС–СЏ</h4>
+                  <h4 style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', marginBottom: '14px' }}>Аудиторія</h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#8F8F9B' }}>РџС–РґРїРёСЃРЅРёРєРё Р±РѕС‚Р°</span>
+                      <span style={{ fontSize: '12px', color: '#8F8F9B' }}>Підписники бота</span>
                       <span style={{ fontSize: '18px', fontWeight: '900', fontFamily: 'Outfit', color: '#FF5C00' }}>{botSubscribersCount}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#8F8F9B' }}>Р“СЂР°РІС†С–РІ РЅР° РїР»Р°С‚С„РѕСЂРјС–</span>
+                      <span style={{ fontSize: '12px', color: '#8F8F9B' }}>Гравців на платформі</span>
                       <span style={{ fontSize: '18px', fontWeight: '900', fontFamily: 'Outfit', color: '#3B82F6' }}>{profilesCount}</span>
                     </div>
                   </div>
@@ -2684,16 +2588,16 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                 {/* Telegram preview */}
                 <div className="esports-card" style={{ padding: '20px' }}>
-                  <h4 style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', marginBottom: '12px' }}>РџСЂРµРІ'СЋ Сѓ Telegram</h4>
+                  <h4 style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', marginBottom: '12px' }}>Прев'ю у Telegram</h4>
                   <div style={{
                     background: '#1C1C22', borderRadius: '12px', padding: '14px',
                     border: '1px solid rgba(255,255,255,0.04)', minHeight: '80px'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #FF5C00, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>рџђє</div>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #FF5C00, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🐺</div>
                       <div>
-                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#fff' }}>VOLK 1303</div>
-                        <div style={{ fontSize: '9px', color: '#8F8F9B' }}>Р‘РѕС‚</div>
+                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#fff' }}>VOLKI 1303</div>
+                        <div style={{ fontSize: '9px', color: '#8F8F9B' }}>Бот</div>
                       </div>
                     </div>
                     <div
@@ -2704,7 +2608,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           .replace(/&lt;b&gt;/g, '<strong>').replace(/&lt;\/b&gt;/g, '</strong>')
                           .replace(/&lt;i&gt;/g, '<em>').replace(/&lt;\/i&gt;/g, '</em>')
                           .replace(/&lt;code&gt;/g, '<code style="background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px">').replace(/&lt;\/code&gt;/g, '</code>')
-                          || '<span style="color:#51515E;font-style:italic">Р’РІРµРґС–С‚СЊ С‚РµРєСЃС‚ РїРѕРІС–РґРѕРјР»РµРЅРЅСЏ Р·Р»С–РІР°...</span>'
+                          || '<span style="color:#51515E;font-style:italic">Введіть текст повідомлення зліва...</span>'
                       }}
                     />
                   </div>
@@ -2722,12 +2626,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               {/* Real Analytics Stats Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                 {[
-                  { label: 'Р“СЂР°РІС†С–РІ РЅР° РїР»Р°С‚С„РѕСЂРјС–', val: profilesCount.toString(), color: '#3B82F6', icon: 'рџ‘¤' },
-                  { label: 'РџС–РґРїРёСЃРЅРёРєРё Telegram', val: botSubscribersCount.toString(), color: '#FF5C00', icon: 'рџ“±' },
-                  { label: 'РўСѓСЂРЅС–СЂС–РІ РїСЂРѕРІРµРґРµРЅРѕ', val: completedTournaments.toString(), color: '#8B5CF6', icon: 'рџЏ†' },
-                  { label: 'РњР°С‚С‡С–РІ Р·С–РіСЂР°РЅРѕ', val: finishedMatches.toString(), color: '#10B981', icon: 'вљ”пёЏ' },
-                  { label: 'РљРѕРјР°РЅРґ Р·Р°СЂРµС”СЃС‚СЂРѕРІР°РЅРѕ', val: totalRegisteredTeams.toString(), color: '#F59E0B', icon: 'рџ‘Ґ' },
-                  { label: 'LIVE Р·Р°СЂР°Р·', val: liveMatchesCount.toString(), color: '#EF4444', icon: 'рџ”ґ' }
+                  { label: 'Гравців на платформі', val: profilesCount.toString(), color: '#3B82F6', icon: '👤' },
+                  { label: 'Підписники Telegram', val: botSubscribersCount.toString(), color: '#FF5C00', icon: '📱' },
+                  { label: 'Турнірів проведено', val: completedTournaments.toString(), color: '#8B5CF6', icon: '🏆' },
+                  { label: 'Матчів зіграно', val: finishedMatches.toString(), color: '#10B981', icon: '⚔️' },
+                  { label: 'Команд зареєстровано', val: totalRegisteredTeams.toString(), color: '#F59E0B', icon: '👥' },
+                  { label: 'LIVE зараз', val: liveMatchesCount.toString(), color: '#EF4444', icon: '🔴' }
                 ].map((stat, i) => (
                   <div key={i} className="esports-card" style={{
                     padding: '20px',
@@ -2744,23 +2648,23 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               {/* Tournaments Breakdown Table */}
               <div className="esports-card" style={{ padding: '24px' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '18px' }}>
-                  Р”РµС‚Р°Р»С–Р·Р°С†С–СЏ РїРѕ РўСѓСЂРЅС–СЂР°С… (Р РµР°Р»СЊРЅС– Р”Р°РЅС–)
+                  Деталізація по Турнірах (Реальні Дані)
                 </h3>
                 {tournaments.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#51515E', padding: '40px' }}>
                     <Trophy size={32} style={{ margin: '0 auto 12px', opacity: 0.2 }} />
-                    <p>РўСѓСЂРЅС–СЂС–РІ С‰Рµ РЅРµРјР°С”</p>
+                    <p>Турнірів ще немає</p>
                   </div>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#8F8F9B', textAlign: 'left' }}>
-                        <th style={{ padding: '10px 12px' }}>РќР°Р·РІР°</th>
-                        <th style={{ padding: '10px 12px' }}>РўРёРї</th>
-                        <th style={{ padding: '10px 12px' }}>РЎС‚Р°С‚СѓСЃ</th>
-                        <th style={{ padding: '10px 12px' }}>РљРѕРјР°РЅРґРё</th>
-                        <th style={{ padding: '10px 12px' }}>РњР°С‚С‡С–</th>
-                        <th style={{ padding: '10px 12px' }}>РџСЂРёР·РѕРІРёР№ С„РѕРЅРґ</th>
+                        <th style={{ padding: '10px 12px' }}>Назва</th>
+                        <th style={{ padding: '10px 12px' }}>Тип</th>
+                        <th style={{ padding: '10px 12px' }}>Статус</th>
+                        <th style={{ padding: '10px 12px' }}>Команди</th>
+                        <th style={{ padding: '10px 12px' }}>Матчі</th>
+                        <th style={{ padding: '10px 12px' }}>Призовий фонд</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2804,7 +2708,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 return (
                   <div className="esports-card" style={{ padding: '24px', maxWidth: '380px' }}>
                     <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '20px' }}>
-                      Р РѕР·РїРѕРґС–Р» Р·Р° РЎС‚Р°С‚СѓСЃР°РјРё РўСѓСЂРЅС–СЂС–РІ
+                      Розподіл за Статусами Турнірів
                     </h3>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
                       <svg viewBox="0 0 100 100" style={{ width: '120px', height: '120px', flexShrink: 0 }}>
@@ -2816,15 +2720,15 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       </svg>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8F8F9B' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#FF5C00', display: 'inline-block' }}></span> РћС‡С–РєСѓРІР°РЅРЅСЏ</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8F8F9B' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#FF5C00', display: 'inline-block' }}></span> Очікування</span>
                           <strong style={{ color: '#FF5C00' }}>{upcoming}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8F8F9B' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#10B981', display: 'inline-block' }}></span> РђРєС‚РёРІРЅС–</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8F8F9B' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#10B981', display: 'inline-block' }}></span> Активні</span>
                           <strong style={{ color: '#10B981' }}>{active}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8F8F9B' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#8B5CF6', display: 'inline-block' }}></span> Р—Р°РІРµСЂС€РµРЅС–</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8F8F9B' }}><span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#8B5CF6', display: 'inline-block' }}></span> Завершені</span>
                           <strong style={{ color: '#8B5CF6' }}>{completed}</strong>
                         </div>
                       </div>
@@ -2838,10 +2742,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                  ========================================== */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '24px', marginTop: '12px' }}>
                 
-                {/* рџЏ† Completed Tournaments Archive */}
+                {/* 🏆 Completed Tournaments Archive */}
                 <div className="esports-card" style={{ padding: '24px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '850', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Trophy size={16} color="#8B5CF6" /> РђСЂС…С–РІ Р—Р°РІРµСЂС€РµРЅРёС… РўСѓСЂРЅС–СЂС–РІ
+                    <Trophy size={16} color="#8B5CF6" /> Архів Завершених Турнірів
                   </h3>
                   
                   {(() => {
@@ -2849,7 +2753,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     if (completed.length === 0) {
                       return (
                         <div style={{ padding: '40px 10px', textAlign: 'center', color: '#51515E' }}>
-                          <p style={{ fontSize: '13px', fontWeight: '750' }}>Р—Р°РІРµСЂС€РµРЅРёС… С‚СѓСЂРЅС–СЂС–РІ С‰Рµ РЅРµРјР°С”</p>
+                          <p style={{ fontSize: '13px', fontWeight: '750' }}>Завершених турнірів ще немає</p>
                         </div>
                       );
                     }
@@ -2876,10 +2780,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                 </span>
                               </div>
                               <div style={{ fontSize: '11px', color: '#8F8F9B', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                                <div>рџ“… Р”Р°С‚Р°: <span style={{ color: 'white', fontWeight: '600' }}>{t.date || 'РќРµ РІРєР°Р·Р°РЅРѕ'}</span></div>
-                                <div>рџ‘Ґ Р“СЂР°РІС†С–/РљРѕРјР°РЅРґРё: <span style={{ color: '#10B981', fontWeight: '700' }}>{tTeams.length}</span></div>
-                                <div>рџ—єпёЏ РљР°СЂС‚Р°: <span style={{ color: 'white', fontWeight: '600' }}>{t.map || 'РќРµРІС–РґРѕРјРѕ'}</span></div>
-                                <div>рџ’° РџСЂРёР·: <span style={{ color: '#FF5C00', fontWeight: '750' }}>{t.prizePool}</span></div>
+                                <div>📅 Дата: <span style={{ color: 'white', fontWeight: '600' }}>{t.date || 'Не вказано'}</span></div>
+                                <div>👥 Гравці/Команди: <span style={{ color: '#10B981', fontWeight: '700' }}>{tTeams.length}</span></div>
+                                <div>🗺️ Карта: <span style={{ color: 'white', fontWeight: '600' }}>{t.map || 'Невідомо'}</span></div>
+                                <div>💰 Приз: <span style={{ color: '#FF5C00', fontWeight: '750' }}>{t.prizePool}</span></div>
                               </div>
                             </div>
                           );
@@ -2889,10 +2793,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   })()}
                 </div>
 
-                {/* вљ”пёЏ Finished Matches Archive */}
+                {/* ⚔️ Finished Matches Archive */}
                 <div className="esports-card" style={{ padding: '24px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '850', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Swords size={16} color="#10B981" /> РђСЂС…С–РІ Р—С–РіСЂР°РЅРёС… РњР°С‚С‡С–РІ
+                    <Swords size={16} color="#10B981" /> Архів Зіграних Матчів
                   </h3>
 
                   {(() => {
@@ -2900,7 +2804,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     if (finished.length === 0) {
                       return (
                         <div style={{ padding: '40px 10px', textAlign: 'center', color: '#51515E' }}>
-                          <p style={{ fontSize: '13px', fontWeight: '750' }}>Р—С–РіСЂР°РЅРёС… РјР°С‚С‡С–РІ С‰Рµ РЅРµРјР°С”</p>
+                          <p style={{ fontSize: '13px', fontWeight: '750' }}>Зіграних матчів ще немає</p>
                         </div>
                       );
                     }
@@ -2922,7 +2826,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                               gap: '6px'
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase' }}>
-                                <span>рџЏ† {m.tournamentName}</span>
+                                <span>🏆 {m.tournamentName}</span>
                                 <span>{m.roundName}</span>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
@@ -2935,7 +2839,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   }}>
                                     {m.teamA?.name || 'TBD'}
                                   </span>
-                                  {winA && <span style={{ fontSize: '10px', color: '#10B981' }}>рџ‘‘</span>}
+                                  {winA && <span style={{ fontSize: '10px', color: '#10B981' }}>👑</span>}
                                 </div>
 
                                 {/* Score Display */}
@@ -2954,7 +2858,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                                 {/* Team B */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'flex-end' }}>
-                                  {winB && <span style={{ fontSize: '10px', color: '#10B981' }}>рџ‘‘</span>}
+                                  {winB && <span style={{ fontSize: '10px', color: '#10B981' }}>👑</span>}
                                   <span style={{ 
                                     fontSize: '13px', 
                                     fontWeight: winB ? '900' : '600', 
@@ -2990,7 +2894,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           {activeTab === 'settings' && (
             <div className="esports-card" style={{ padding: '32px', maxWidth: '720px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '900', fontFamily: 'Outfit', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '14px', marginBottom: '24px' }}>
-                РљРѕРЅС„С–РіСѓСЂР°С†С–СЏ РЎРёСЃС‚РµРјРё РЈРїСЂР°РІР»С–РЅРЅСЏ
+                Конфігурація Системи Управління
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -2998,7 +2902,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 {/* Manager Access Code config */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '11px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>
-                    РЎРµРєСЂРµС‚РЅРёР№ РљРѕРґ Р—Р°РїСЂРѕС€РµРЅРЅСЏ РљРµСЂСѓСЋС‡РёС… (Invite Access Code)
+                    Секретний Код Запрошення Керуючих (Invite Access Code)
                   </label>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <input 
@@ -3013,51 +2917,51 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     <button 
                       onClick={() => {
                         if (managerInviteCode.trim()) {
-                          showToast('РљРѕРґ Р·Р°РїСЂРѕС€РµРЅРЅСЏ РѕРЅРѕРІР»РµРЅРѕ СѓСЃРїС–С€РЅРѕ!', 'success');
+                          showToast('Код запрошення оновлено успішно!', 'success');
                           setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Manager Invitation access key modified.`]);
                         }
                       }}
                       className="btn-primary" 
                       style={{ padding: '0 24px', borderRadius: '10px', fontSize: '12px' }}
                     >
-                      Р—Р±РµСЂРµРіС‚Рё Р·РјС–РЅРё
+                      Зберегти зміни
                     </button>
                   </div>
                   <span style={{ fontSize: '11px', color: '#51515E', lineHeight: '1.4', marginTop: '4px' }}>
-                    Р¦РµР№ РїР°СЂРѕР»СЊ РЅРµРѕР±С…С–РґРЅРёР№ РґР»СЏ СЂРµС”СЃС‚СЂР°С†С–С— Р±СѓРґСЊ-СЏРєРѕРіРѕ РЅРѕРІРѕРіРѕ РѕР±Р»С–РєРѕРІРѕРіРѕ Р·Р°РїРёСЃСѓ Р°РґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂР°. Р—Р°С…РёС‰Р°С” РІР°С€Сѓ РїР»Р°С‚С„РѕСЂРјСѓ РІС–Рґ РЅРµСЃР°РЅРєС†С–РѕРЅРѕРІР°РЅРѕРіРѕ РґРѕСЃС‚СѓРїСѓ.
+                    Цей пароль необхідний для реєстрації будь-якого нового облікового запису адміністратора. Захищає вашу платформу від несанкціонованого доступу.
                   </span>
                 </div>
 
                 {/* Maintenance switch */}
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <h4 style={{ fontSize: '13px', fontWeight: '800', fontFamily: 'Outfit', color: 'white' }}>Р РµР¶РёРј РўРµС…РЅС–С‡РЅРёС… Р РѕР±С–С‚ (Maintenance Mode)</h4>
-                    <p style={{ fontSize: '11px', color: '#51515E', marginTop: '4px' }}>РџСЂРёР·СѓРїРёРЅСЏС” РїСЂРёР№РѕРј СЃС‚Р°РІРѕРє С‚Р° СЂРµС”СЃС‚СЂР°С†С–СЋ РіСЂР°РІС†С–РІ Сѓ РґРѕРґР°С‚РєСѓ.</p>
+                    <h4 style={{ fontSize: '13px', fontWeight: '800', fontFamily: 'Outfit', color: 'white' }}>Режим Технічних Робіт (Maintenance Mode)</h4>
+                    <p style={{ fontSize: '11px', color: '#51515E', marginTop: '4px' }}>Призупиняє прийом ставок та реєстрацію гравців у додатку.</p>
                   </div>
                   <button 
                     onClick={() => {
-                      showToast('Р РµР¶РёРј С‚РµС…. СЂРѕР±С–С‚ С‚РёРјС‡Р°СЃРѕРІРѕ РЅРµРґРѕСЃС‚СѓРїРЅРёР№!', 'info');
+                      showToast('Режим тех. робіт тимчасово недоступний!', 'info');
                     }}
                     style={{
                       background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
                       borderRadius: '10px', padding: '10px 16px', color: '#8F8F9B', fontSize: '11px', fontWeight: '700', cursor: 'pointer'
                     }}
                   >
-                    Р’РєР»СЋС‡РёС‚Рё
+                    Включити
                   </button>
                 </div>
 
                 {/* Managers section inside settings */}
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '20px' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: '800', fontFamily: 'Outfit', color: 'white', marginBottom: '6px' }}>РЎРїРёСЃРѕРє РљРµСЂСѓСЋС‡РёС… РџР»Р°С‚С„РѕСЂРјРѕСЋ</h4>
-                  <p style={{ fontSize: '11px', color: '#51515E', marginBottom: '16px' }}>Р’СЃС– Р·Р°СЂРµС”СЃС‚СЂРѕРІР°РЅС– Р°РґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂРё С‚Р° РєРµСЂСѓСЋС‡С– Р· РїСЂР°РІР°РјРё РґРѕСЃС‚СѓРїСѓ.</p>
+                  <h4 style={{ fontSize: '13px', fontWeight: '800', fontFamily: 'Outfit', color: 'white', marginBottom: '6px' }}>Список Керуючих Платформою</h4>
+                  <p style={{ fontSize: '11px', color: '#51515E', marginBottom: '16px' }}>Всі зареєстровані адміністратори та керуючі з правами доступу.</p>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#8F8F9B' }}>
-                        <th style={{ padding: '10px 12px' }}>РљРѕСЂРёСЃС‚СѓРІР°С‡</th>
-                        <th style={{ padding: '10px 12px' }}>Р•Р». РџРѕС€С‚Р°</th>
-                        <th style={{ padding: '10px 12px' }}>Р РѕР»СЊ</th>
-                        <th style={{ padding: '10px 12px' }}>РЎС‚Р°С‚СѓСЃ</th>
+                        <th style={{ padding: '10px 12px' }}>Користувач</th>
+                        <th style={{ padding: '10px 12px' }}>Ел. Пошта</th>
+                        <th style={{ padding: '10px 12px' }}>Роль</th>
+                        <th style={{ padding: '10px 12px' }}>Статус</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3088,7 +2992,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
       </div>
 
-      {/* в”Ђв”Ђв”Ђ EDIT TOURNAMENT MODAL в”Ђв”Ђв”Ђ */}
+      {/* ─── EDIT TOURNAMENT MODAL ─── */}
       {editingTourney && (
         <div style={{
           position: 'fixed',
@@ -3130,12 +3034,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             </button>
 
             <h3 style={{ fontSize: '18px', fontWeight: '900', fontFamily: 'Outfit', color: 'white', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Trophy size={20} color="#FF5C00" /> Р РµРґР°РіСѓРІР°С‚Рё РўСѓСЂРЅС–СЂ: {editingTourney.name}
+              <Trophy size={20} color="#FF5C00" /> Редагувати Турнір: {editingTourney.name}
             </h3>
 
             <form onSubmit={handleEditTourneySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>РќР°Р·РІР° РўСѓСЂРЅС–СЂСѓ</label>
+                <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Назва Турніру</label>
                 <input 
                   type="text" 
                   required
@@ -3150,7 +3054,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Р¤РѕСЂРјР°С‚ Р“СЂРё</label>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Формат Гри</label>
                   <select 
                     value={editTourneyForm.type}
                     onChange={e => setEditTourneyForm({ ...editTourneyForm, type: e.target.value as any })}
@@ -3161,12 +3065,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   >
                     <option value="2X2">2x2 Aim Match</option>
                     <option value="4X4">4x4 Classic</option>
-                    <option value="BCI">Р‘РёС‚РІР° РљР»Р°РЅС–РІ</option>
+                    <option value="BCI">Битва Кланів</option>
                   </select>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Р›РѕРєР°С†С–СЏ / РљР°СЂС‚Р°</label>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Локація / Карта</label>
                   <select 
                     value={editTourneyForm.map}
                     onChange={e => setEditTourneyForm({ ...editTourneyForm, map: e.target.value })}
@@ -3182,7 +3086,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Р”Р°С‚Р°</label>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Дата</label>
                   <input 
                     type="text" 
                     value={editTourneyForm.date}
@@ -3195,7 +3099,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>РњР°РєСЃ. РЈС‡Р°СЃРЅРёРєС–РІ</label>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Макс. Учасників</label>
                   <select 
                     value={editTourneyForm.maxParticipants}
                     onChange={e => setEditTourneyForm({ ...editTourneyForm, maxParticipants: Number(e.target.value) })}
@@ -3204,12 +3108,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit', cursor: 'pointer'
                     }}
                   >
-                    {[4, 8, 16, 32].map(n => <option key={n} value={n}>{n} РєРѕРјР°РЅРґ</option>)}
+                    {[4, 8, 16, 32].map(n => <option key={n} value={n}>{n} команд</option>)}
                   </select>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#FF5C00', textTransform: 'uppercase' }}>РЎС‚Р°С‚СѓСЃ</label>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#FF5C00', textTransform: 'uppercase' }}>Статус</label>
                   <select 
                     value={editTourneyForm.status}
                     onChange={e => setEditTourneyForm({ ...editTourneyForm, status: e.target.value as any })}
@@ -3218,16 +3122,16 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       borderRadius: '10px', padding: '10px 14px', color: '#FF5C00', fontSize: '12px', outline: 'none', fontFamily: 'Outfit', cursor: 'pointer', fontWeight: '700'
                     }}
                   >
-                    <option value="upcoming">Upcoming (РћС‡С–РєСѓС”С‚СЊСЃСЏ)</option>
-                    <option value="active">Active (Р™РґРµ Р·Р°СЂР°Р·)</option>
-                    <option value="completed">Completed (Р—Р°РІРµСЂС€РµРЅРѕ)</option>
+                    <option value="upcoming">Upcoming (Очікується)</option>
+                    <option value="active">Active (Йде зараз)</option>
+                    <option value="completed">Completed (Завершено)</option>
                   </select>
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>РџСЂРёР·РѕРІРёР№ Р¤РѕРЅРґ</label>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Призовий Фонд</label>
                   <input 
                     type="text" 
                     value={editTourneyForm.prizePool}
@@ -3239,7 +3143,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#FFD700', textTransform: 'uppercase' }}>1-Рµ РјС–СЃС†Рµ</label>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#FFD700', textTransform: 'uppercase' }}>1-е місце</label>
                   <input 
                     type="text" 
                     placeholder="50%"
@@ -3252,7 +3156,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#C0C0C0', textTransform: 'uppercase' }}>2-Рµ РјС–СЃС†Рµ</label>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#C0C0C0', textTransform: 'uppercase' }}>2-е місце</label>
                   <input 
                     type="text" 
                     placeholder="30%"
@@ -3265,7 +3169,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#CD7F32', textTransform: 'uppercase' }}>3-С” РјС–СЃС†Рµ</label>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#CD7F32', textTransform: 'uppercase' }}>3-є місце</label>
                   <input 
                     type="text" 
                     placeholder="20%"
@@ -3280,7 +3184,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>РџСЂР°РІРёР»Р° (РїРѕ РѕРґРЅРѕРјСѓ РЅР° СЂСЏРґРѕРє)</label>
+                <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Правила (по одному на рядок)</label>
                 <textarea 
                   rows={4}
                   value={editTourneyForm.rules}
@@ -3294,7 +3198,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
               {/* Photo / Banner Manager */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '16px' }}>
-                <label style={{ fontSize: '10px', fontWeight: '800', color: '#FF5C00', textTransform: 'uppercase' }}>Р—РјС–РЅР° РћР±РєР»Р°РґРёРЅРєРё / Р‘Р°РЅРµСЂР°</label>
+                <label style={{ fontSize: '10px', fontWeight: '800', color: '#FF5C00', textTransform: 'uppercase' }}>Зміна Обкладинки / Банера</label>
                 
                 {/* Presets Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '8px' }}>
@@ -3328,7 +3232,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                 <input 
                   type="text" 
-                  placeholder="РџРѕСЃРёР»Р°РЅРЅСЏ РЅР° Р±Р°РЅРЅРµСЂ С‚СѓСЂРЅС–СЂСѓ"
+                  placeholder="Посилання на баннер турніру"
                   value={editTourneyForm.imageUrl}
                   onChange={e => setEditTourneyForm({ ...editTourneyForm, imageUrl: e.target.value })}
                   style={{
@@ -3356,7 +3260,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       color: '#fff', cursor: 'pointer', fontFamily: 'Outfit', display: 'inline-block'
                     }}
                   >
-                    Р—Р°РІР°РЅС‚Р°Р¶РёС‚Рё РЅРѕРІРµ С„РѕС‚Рѕ
+                    Завантажити нове фото
                   </label>
                   {editTourneyForm.imageUrl && (
                     <button 
@@ -3364,7 +3268,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       onClick={() => setEditTourneyForm({ ...editTourneyForm, imageUrl: '' })}
                       style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '10px', fontWeight: '700' }}
                     >
-                      Р’РёРґР°Р»РёС‚Рё РѕР±РєР»Р°РґРёРЅРєСѓ
+                      Видалити обкладинку
                     </button>
                   )}
                 </div>
@@ -3378,11 +3282,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={(e) => {
                         e.currentTarget.src = '';
-                        showToast('РќРµРІС–СЂРЅРµ РїРѕСЃРёР»Р°РЅРЅСЏ РЅР° Р·РѕР±СЂР°Р¶РµРЅРЅСЏ Р°Р±Рѕ РїРѕРјРёР»РєР° Р·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ', 'error');
+                        showToast('Невірне посилання на зображення або помилка завантаження', 'error');
                       }}
                     />
                     <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'rgba(0,0,0,0.6)', padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '700' }}>
-                      РџР•Р Р•Р“Р›РЇР” Р‘РђРќР•Р Рђ
+                      ПЕРЕГЛЯД БАНЕРА
                     </div>
                   </div>
                 )}
@@ -3391,11 +3295,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               {/* Stream URL */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '16px' }}>
                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#EF4444', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  рџ“Ў РџРѕСЃРёР»Р°РЅРЅСЏ РЅР° LIVE Р•С„С–СЂ (YouTube / Twitch)
+                  📡 Посилання на LIVE Ефір (YouTube / Twitch)
                 </label>
                 <input
                   type="url"
-                  placeholder="https://youtube.com/live/... Р°Р±Рѕ https://twitch.tv/channel"
+                  placeholder="https://youtube.com/live/... або https://twitch.tv/channel"
                   value={editTourneyForm.streamUrl}
                   onChange={e => setEditTourneyForm({ ...editTourneyForm, streamUrl: e.target.value })}
                   style={{
@@ -3405,17 +3309,17 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 />
                 {editTourneyForm.streamUrl && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '700' }}>вњ“ Р•С„С–СЂ РїС–РґРєР»СЋС‡РµРЅРѕ</span>
+                    <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '700' }}>✓ Ефір підключено</span>
                     <button
                       type="button"
                       onClick={() => setEditTourneyForm({ ...editTourneyForm, streamUrl: '' })}
                       style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '10px', fontWeight: '700' }}
                     >
-                      РџСЂРёР±СЂР°С‚Рё
+                      Прибрати
                     </button>
                   </div>
                 )}
-                <span style={{ fontSize: '10px', color: '#51515E' }}>Р“СЂР°РІС†С– РїРѕР±Р°С‡Р°С‚СЊ С†РµР№ РµС„С–СЂ РЅР° СЃС‚РѕСЂС–РЅС†С– РјР°С‚С‡Сѓ РїС–Рґ С‡Р°СЃ Live СЃС‚Р°С‚СѓСЃСѓ</span>
+                <span style={{ fontSize: '10px', color: '#51515E' }}>Гравці побачать цей ефір на сторінці матчу під час Live статусу</span>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
@@ -3424,7 +3328,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   className="btn-primary" 
                   style={{ flex: 1, padding: '14px', borderRadius: '10px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
-                  <Save size={14} /> Р—Р±РµСЂРµРіС‚Рё Р·РјС–РЅРё
+                  <Save size={14} /> Зберегти зміни
                 </button>
                 <button 
                   type="button" 
@@ -3434,7 +3338,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     borderRadius: '10px', padding: '14px 20px', color: '#fff', fontSize: '12px', cursor: 'pointer', fontFamily: 'Outfit'
                   }}
                 >
-                  РЎРєР°СЃСѓРІР°С‚Рё
+                  Скасувати
                 </button>
               </div>
             </form>
