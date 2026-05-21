@@ -191,16 +191,6 @@ export const CoinsManagementView: React.FC = () => {
       : <ChevronDown size={11} style={{ display: 'inline', marginLeft: 3 }} />;
   };
 
-  const card = (content: React.ReactNode, extra?: React.CSSProperties) => (
-    <div style={{
-      background: 'rgba(255,255,255,0.02)',
-      border: '1px solid rgba(255,255,255,0.05)',
-      borderRadius: '16px',
-      padding: '20px',
-      ...extra
-    }}>{content}</div>
-  );
-
   const statItem = (icon: React.ReactNode, label: string, value: string | number, color = '#FF5C00') => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#8F8F9B', fontSize: 10, fontWeight: 800, textTransform: 'uppercase' }}>
