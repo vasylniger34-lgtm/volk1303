@@ -76,7 +76,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
   };
 
   return (
-    <div className="scroll-container" style={{ padding: '16px' }}>
+    <div className="scroll-container" style={{ padding: '16px 16px 110px' }}>
       
       {/* Profile Header Title */}
       <h2 style={{

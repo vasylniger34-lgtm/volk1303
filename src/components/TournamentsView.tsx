@@ -130,7 +130,7 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
     .sort((a, b) => getSortScore(a) - getSortScore(b));
 
   return (
-    <div className="scroll-container" style={{ padding: '16px 20px' }}>
+    <div className="scroll-container" style={{ padding: '16px 20px 110px' }}>
       
       {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '16px' }}>

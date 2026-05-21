@@ -162,7 +162,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const upcomingTourneys = sortedTournaments.filter(t => t.id !== featuredTourney?.id);
 
   return (
-    <div className="scroll-container" style={{ padding: '16px 20px' }}>
+    <div className="scroll-container" style={{ padding: '16px 20px 110px' }}>
       
       {featuredTourney ? (
         <div 

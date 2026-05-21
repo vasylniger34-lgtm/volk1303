@@ -132,7 +132,7 @@ const AppContent: React.FC = () => {
         );
       case 'matches':
         return (
-          <div className="scroll-container" style={{ padding: '16px' }}>
+          <div className="scroll-container" style={{ padding: '16px 16px 110px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '16px', fontFamily: 'Outfit, sans-serif' }}>
               Турнірні Матчі
             </h2>
