@@ -798,7 +798,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { localStorage.setItem('volk_predictions', JSON.stringify(predictions)); }, [predictions]);
 
   // ─── LIVE scores simulator ───
-
+  // DISABLED: User requested to only change scores manually.
+  /*
   useEffect(() => {
     const isManagerSite = typeof window !== 'undefined' && (
       window.location.pathname.startsWith('/admin') ||
@@ -917,6 +918,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => clearInterval(interval);
   }, [matches, useSupabase, user.role]);
+  */
 
   // ─── Auth Methods ───
 
