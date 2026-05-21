@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { User, Award, Shield, RotateCcw, TrendingUp, CheckCircle, BarChart3, Camera, Pencil, Check, X, LogOut } from 'lucide-react';
+import { User, Award, Shield, TrendingUp, CheckCircle, BarChart3, Camera, Pencil, Check, X, LogOut } from 'lucide-react';
 
 interface ProfileViewProps {
   onNavigate: (view: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin') => void;
@@ -17,7 +17,7 @@ const AVATAR_GRADIENTS = [
 ];
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigate }) => {
-  const { user, resetAllData, updateProfile, authLogout } = useApp();
+  const { user, updateProfile, authLogout } = useApp();
 
   // Editing state
   const [isEditingName, setIsEditingName] = useState(false);
@@ -32,9 +32,35 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
 
   const currentGradient = AVATAR_GRADIENTS[user.avatarGradient || 0];
 
-  const cycleAvatar = () => {
-    const next = ((user.avatarGradient || 0) + 1) % AVATAR_GRADIENTS.length;
-    updateProfile({ avatarGradient: next });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        canvas.width = 150;
+        canvas.height = 150;
+
+        const size = Math.min(img.width, img.height);
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 150, 150);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+        updateProfile({ avatarUrl: compressedBase64 });
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const saveName = () => {
@@ -74,12 +100,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
       }}>
         {/* Clickable Avatar */}
         <div 
-          onClick={cycleAvatar}
+          onClick={() => fileInputRef.current?.click()}
           style={{
             width: '56px',
             height: '56px',
             borderRadius: '16px',
-            background: `linear-gradient(135deg, ${currentGradient[0]} 0%, ${currentGradient[1]} 100%)`,
+            background: user.avatarUrl 
+              ? 'transparent' 
+              : `linear-gradient(135deg, ${currentGradient[0]} 0%, ${currentGradient[1]} 100%)`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -87,10 +115,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
             border: '1px solid rgba(255,255,255,0.1)',
             cursor: 'pointer',
             position: 'relative',
-            transition: 'transform 0.2s'
+            transition: 'transform 0.2s',
+            overflow: 'visible'
           }}
         >
-          <User size={28} color="white" />
+          {user.avatarUrl ? (
+            <img 
+              src={user.avatarUrl} 
+              alt="Avatar" 
+              style={{ width: '100%', height: '100%', borderRadius: '16px', objectFit: 'cover' }} 
+            />
+          ) : (
+            <User size={28} color="white" />
+          )}
           <div style={{
             position: 'absolute',
             bottom: '-4px',
@@ -102,11 +139,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
             border: '2px solid #FF5C00',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            zIndex: 10
           }}>
             <Camera size={10} color="#FF5C00" />
           </div>
         </div>
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleAvatarChange} 
+          accept="image/*" 
+          style={{ display: 'none' }} 
+        />
         
         <div style={{ flex: 1 }}>
           {isEditingName ? (
@@ -270,30 +315,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 92, 0, 0.03)'}
         >
           <LogOut size={16} /> ВИЙТИ З АКАУНТУ
-        </button>
-
-        {/* Reset Data */}
-        <button
-          onClick={resetAllData}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            backgroundColor: 'rgba(239, 68, 68, 0.03)',
-            border: '1px solid rgba(239, 68, 68, 0.15)',
-            borderRadius: '12px',
-            padding: '14px',
-            color: '#EF4444',
-            fontSize: '13px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.03)'}
-        >
-          <RotateCcw size={16} /> СКИНУТИ ВСІ ДАНІ
         </button>
       </div>
 

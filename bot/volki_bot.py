@@ -100,7 +100,22 @@ def save_admin_id(chat_id: int):
     save_json(ADMIN_IDS_FILE, list(current))
 
 def is_admin(chat_id: int) -> bool:
-    return chat_id in load_admin_ids()
+    if chat_id in load_admin_ids():
+        return True
+    
+    # Check dynamically in Supabase profiles
+    try:
+        # Check if user has telegram_id equal to chat_id and role equal to 'admin'
+        rows = supabase_request("GET", "profiles", query=f"?telegram_id=eq.{chat_id}&role=eq.admin&select=id")
+        if rows and len(rows) > 0:
+            log.info(f"Dynamic admin detected in Supabase profiles: chat_id={chat_id}")
+            save_admin_id(chat_id)
+            return True
+    except Exception as e:
+        log.warning(f"Error checking dynamic admin in Supabase: {e}")
+        
+    return False
+
 
 # ─── Telegram API Helpers ───
 

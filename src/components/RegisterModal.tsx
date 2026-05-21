@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, ChevronLeft, Plus, Check } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface RegisterModalProps {
   tournamentId: string;
@@ -26,12 +27,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
 
   if (!tourney) return null;
 
-  const handleAddPlayer = () => {
-    if (!newPlayerInput.startsWith('@')) {
+  const checkAndAddPlayer = async (rawInput: string) => {
+    if (!rawInput.startsWith('@')) {
       alert('Нікнейм гравця має починатися з @');
       return;
     }
-    if (players.includes(newPlayerInput)) {
+    if (players.includes(rawInput)) {
       alert('Цей гравець вже є у складі!');
       return;
     }
@@ -39,8 +40,51 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
       alert('Для формату 2х2 максимум 2 гравці!');
       return;
     }
-    setPlayers([...players, newPlayerInput]);
-    setNewPlayerInput('');
+
+    const cleanUsername = rawInput.replace('@', '').trim();
+    const useSupabase = isSupabaseConfigured();
+
+    if (useSupabase) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, username, telegram_username')
+          .or(`username.ieq.${cleanUsername},telegram_username.ieq.${cleanUsername}`);
+
+        if (error) {
+          console.error('[VOLKI] Supabase query error checking user:', error);
+        }
+
+        if (!data || data.length === 0) {
+          // If it's the recommended demo partner, bypass as a fallback so local testing works fine
+          if (cleanUsername === 'volki_partner') {
+            setPlayers([...players, '@volki_partner']);
+            setNewPlayerInput('');
+            return;
+          }
+          alert(`Гравця з нікнеймом ${rawInput} не знайдено на сайті або в боті! Перевірте правильність написання нікнейму.`);
+          return;
+        }
+        
+        const dbUser = data[0];
+        const matchedName = dbUser.username || dbUser.telegram_username || cleanUsername;
+        const formattedName = matchedName.startsWith('@') ? matchedName : `@${matchedName}`;
+        
+        setPlayers([...players, formattedName]);
+        setNewPlayerInput('');
+      } catch (err) {
+        console.error('[VOLKI] Error checking user:', err);
+        setPlayers([...players, rawInput]);
+        setNewPlayerInput('');
+      }
+    } else {
+      setPlayers([...players, rawInput]);
+      setNewPlayerInput('');
+    }
+  };
+
+  const handleAddPlayer = () => {
+    checkAndAddPlayer(newPlayerInput);
   };
 
   const handleRemovePlayer = (idx: number) => {
@@ -288,10 +332,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#51515E' }}>
                   <span>Рекомендовано:</span>
                   <button 
-                    onClick={() => {
-                      setPlayers([...players, '@volki_partner']);
-                      setNewPlayerInput('');
-                    }}
+                    onClick={() => checkAndAddPlayer('@volki_partner')}
                     style={{
                       background: 'rgba(255, 92, 0, 0.05)',
                       border: '1px solid rgba(255, 92, 0, 0.15)',

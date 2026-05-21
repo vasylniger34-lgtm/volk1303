@@ -91,6 +91,7 @@ export interface UserProfile {
   xpNext: number;
   role: 'player' | 'admin' | 'moderator';
   avatarGradient: number;
+  avatarUrl?: string | null;
   stats: UserStats;
 }
 
@@ -126,7 +127,7 @@ interface AppContextType {
   createTournament: (tourney: Omit<Tournament, 'id' | 'participantsCount' | 'status'> & { status?: 'upcoming' | 'active' | 'completed' }) => void;
   resolveBetsForMatch: (matchId: string, winnerId: string, finalScoreA: number, finalScoreB: number) => void;
   generateBracketForTournament: (tournamentId: string) => Promise<void>;
-  updateProfile: (data: { username?: string; avatarGradient?: number }) => void;
+  updateProfile: (data: { username?: string; avatarGradient?: number; avatarUrl?: string | null }) => void;
   deleteTournament: (tournamentId: string) => void;
   updateTournament: (tournamentId: string, data: Partial<Tournament>) => void;
   fillTournamentWithBots: (tournamentId: string) => Promise<void>;
@@ -155,6 +156,7 @@ const DEFAULT_USER: UserProfile = {
   xpNext: 1000,
   role: 'admin', // Local dev mode = admin by default
   avatarGradient: 0,
+  avatarUrl: null,
   stats: { wins: 0, losses: 0, predictionsPlaced: 0, predictionsWon: 0 }
 };
 
@@ -182,6 +184,7 @@ function profileToUser(row: ProfileRow): UserProfile {
     xpNext: row.xp_next,
     role: row.role,
     avatarGradient: 0,
+    avatarUrl: row.avatar_url,
     stats: {
       wins: row.wins,
       losses: row.losses,
@@ -1752,11 +1755,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Update Profile (avatar + username) ───
 
-  const updateProfile = (data: { username?: string; avatarGradient?: number }) => {
+  const updateProfile = (data: { username?: string; avatarGradient?: number; avatarUrl?: string | null }) => {
     setUser(prev => ({
       ...prev,
       ...(data.username !== undefined ? { username: data.username } : {}),
-      ...(data.avatarGradient !== undefined ? { avatarGradient: data.avatarGradient } : {})
+      ...(data.avatarGradient !== undefined ? { avatarGradient: data.avatarGradient } : {}),
+      ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {})
     }));
     if (data.username) {
       showToast('Нікнейм змінено!', 'success');
@@ -1766,6 +1770,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     if (data.avatarGradient !== undefined) {
       showToast('Аватар оновлено!', 'success');
+    }
+    if (data.avatarUrl !== undefined) {
+      showToast('Аватар оновлено!', 'success');
+      if (useSupabase) {
+        supabase.from('profiles').update({ avatar_url: data.avatarUrl }).eq('id', user.id).then();
+      }
     }
   };
 

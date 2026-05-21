@@ -97,11 +97,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
   // Match management state
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [selectedTourneyIdForSimulation, setSelectedTourneyIdForSimulation] = useState<string | null>(null);
   const [editScoreA, setEditScoreA] = useState(0);
   const [editScoreB, setEditScoreB] = useState(0);
   const [editOddsA, setEditOddsA] = useState(1.85);
   const [editOddsB, setEditOddsB] = useState(1.85);
   const [customLog, setCustomLog] = useState('');
+
 
   // Live Terminal Log System state
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
@@ -1288,7 +1290,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
           {[
             { id: 'dashboard', label: 'Огляд Системи', icon: <Activity size={16} /> },
             { id: 'tournaments', label: 'Турніри & Сітки', icon: <Trophy size={16} /> },
-            { id: 'matches', label: 'Архів', icon: <Swords size={16} /> },
+            { id: 'matches', label: 'Проведення турнірів', icon: <Swords size={16} /> },
             { id: 'broadcast', label: 'Telegram Розсилки', icon: <MessageSquare size={16} /> },
             { id: 'analytics', label: 'Аналітика & Дані', icon: <BarChart3 size={16} /> },
             { id: 'settings', label: 'Налаштування', icon: <Settings size={16} /> }
@@ -1299,8 +1301,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                 key={item.id}
                 onClick={() => {
                   setActiveTab(item.id as any);
-                  if (item.id !== 'matches') setSelectedMatchId(null);
+                  if (item.id !== 'matches') {
+                    setSelectedMatchId(null);
+                    setSelectedTourneyIdForSimulation(null);
+                  }
                 }}
+
                 style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '14px 24px', border: 'none', outline: 'none',
@@ -1373,7 +1379,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             <h2 style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '0.5px', fontFamily: 'Outfit', textTransform: 'uppercase', margin: 0 }}>
               {activeTab === 'dashboard' && '📊 Панель Огляду Системи'}
               {activeTab === 'tournaments' && '🏆 Керування Турнірами & Сітками'}
-              {activeTab === 'matches' && '⚔️ Архів Матчів & Управління Рахунками'}
+              {activeTab === 'matches' && '⚔️ Проведення турнірів & Управління Рахунками'}
               {activeTab === 'broadcast' && '📢 Telegram Розсилки для Підписників'}
               {activeTab === 'analytics' && '📈 Аналітика Платформи (Реальні Дані)'}
               {activeTab === 'settings' && '⚙️ Налаштування & Керуючі Сайтом'}
@@ -1979,304 +1985,462 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               TAB: MATCH SIMULATOR
              ============================================================ */}
           {activeTab === 'matches' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '28px' }}>
-              
-              {/* Matches List */}
-              <div className="esports-card" style={{ padding: '24px', height: 'fit-content' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '16px' }}>
-                  Список Турнірних Ігор ({matches.length})
-                </h3>
-
-                {matches.length === 0 ? (
-                  <div style={{ padding: '40px 10px', textAlign: 'center', color: '#51515E' }}>
-                    <Swords size={32} style={{ margin: '0 auto 12px', opacity: 0.2 }} />
-                    <p style={{ fontSize: '13px', fontWeight: '750' }}>Матчі відсутні</p>
-                    <p style={{ fontSize: '11px', marginTop: '4px' }}>Сформуйте сітку у вкладці «Турніри»</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {matches.map(m => {
-                      const isSelected = selectedMatchId === m.id;
+            <div>
+              {selectedTourneyIdForSimulation === null ? (
+                /* Level 1: Tournament Selection */
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: '950', fontFamily: 'Outfit', color: 'white', textTransform: 'uppercase', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Trophy size={18} color="#FF5C00" /> Виберіть активний турнір для проведення ігор
+                  </h3>
+                  
+                  {(() => {
+                    const activeOrUpcoming = tournaments.filter(t => t.status === 'upcoming' || t.status === 'active');
+                    if (activeOrUpcoming.length === 0) {
                       return (
-                        <div 
-                          key={m.id} 
-                          onClick={() => {
-                            setSelectedMatchId(m.id);
-                            setEditScoreA(m.scoreA);
-                            setEditScoreB(m.scoreB);
-                            setEditOddsA(m.oddsA || 1.85);
-                            setEditOddsB(m.oddsB || 1.85);
-                          }}
-                          style={{
-                            background: isSelected ? 'rgba(255, 92, 0, 0.05)' : 'rgba(255,255,255,0.01)',
-                            border: isSelected ? '1px solid rgba(255, 92, 0, 0.3)' : '1px solid rgba(255,255,255,0.04)',
-                            borderRadius: '12px',
-                            padding: '12px 16px',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                              {m.tournamentName} · {m.roundName}
-                            </div>
-                            <div style={{ fontSize: '13px', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span>{m.teamA?.name || 'TBD'}</span>
-                              <span style={{ color: '#FF5C00' }}>vs</span>
-                              <span>{m.teamB?.name || 'TBD'}</span>
-                            </div>
-                          </div>
-                          
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{
-                              fontFamily: 'Outfit', fontWeight: '900', fontSize: '14px',
-                              color: m.status === 'live' ? '#EF4444' : m.status === 'finished' ? '#10B981' : '#8F8F9B'
-                            }}>
-                              {m.scoreA} : {m.scoreB}
-                            </span>
-                            <span style={{
-                              background: m.status === 'live' ? 'rgba(239, 68, 68, 0.1)' : m.status === 'finished' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 92, 0, 0.05)',
-                              color: m.status === 'live' ? '#EF4444' : m.status === 'finished' ? '#10B981' : '#FF5C00',
-                              padding: '2px 6px', borderRadius: '4px', fontSize: '8px', fontWeight: '800'
-                            }}>
-                              {m.status === 'live' ? '🔴 LIVE' : m.status === 'finished' ? 'DONE' : 'WAIT'}
-                            </span>
-                          </div>
+                        <div className="esports-card" style={{ padding: '60px 20px', textAlign: 'center', color: '#51515E' }}>
+                          <Swords size={48} style={{ margin: '0 auto 16px', opacity: 0.2, color: '#FF5C00' }} />
+                          <p style={{ fontSize: '15px', fontWeight: '750', color: '#8F8F9B' }}>Наразі немає активних або запланованих турнірів</p>
+                          <p style={{ fontSize: '11px', marginTop: '6px' }}>Створіть турнір у вкладці «Турніри & Сітки»</p>
                         </div>
                       );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Match Control Dashboard (Simulation Panel) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {activeMatch ? (
-                  <div className="esports-card" style={{ padding: '28px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '16px', marginBottom: '20px' }}>
-                      <div>
-                        <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase' }}>Симулятор Live Гри</span>
-                        <h3 style={{ fontSize: '18px', fontWeight: '900', fontFamily: 'Outfit', marginTop: '4px' }}>
-                          {activeMatch.teamA?.name || 'TBD'} vs {activeMatch.teamB?.name || 'TBD'}
-                        </h3>
-                        <span style={{ fontSize: '11px', color: '#51515E' }}>{activeMatch.tournamentName} ({activeMatch.roundName})</span>
-                      </div>
-                      <button 
-                        onClick={() => setSelectedMatchId(null)}
-                        style={{ background: 'none', border: 'none', color: '#8F8F9B', cursor: 'pointer' }}
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-
-                    {/* Simulation Parameters */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                      
-                      {/* Active Status Actions */}
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        {activeMatch.status === 'scheduled' && (
-                          <button 
-                            onClick={() => startSelectedMatchLive(activeMatch.id)}
-                            className="btn-primary"
-                            style={{ padding: '12px 20px', borderRadius: '10px', fontSize: '12px' }}
-                          >
-                            <Play size={12} style={{ marginRight: '6px' }} /> Запустити LIVE Матч
-                          </button>
-                        )}
-                        {activeMatch.status === 'live' && (
-                          <button 
-                            onClick={() => finishMatchWithScore(activeMatch.id, editScoreA, editScoreB)}
-                            style={{
-                              background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
-                              borderRadius: '10px', padding: '12px 20px', fontSize: '12px', color: '#10B981', fontWeight: '700', cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', gap: '6px'
-                            }}
-                          >
-                            <Check size={12} /> Завершити Матч & Виплатити Ставки
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Interactive Score Board Editor */}
-                      <div style={{
-                        background: '#040406',
-                        border: '1px solid rgba(255,255,255,0.03)',
-                        borderRadius: '16px',
-                        padding: '24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-around'
-                      }}>
-                        {/* Team A */}
-                        <div style={{ textAlign: 'center' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'white', display: 'block', marginBottom: '8px' }}>
-                            {activeMatch.teamA?.name || 'Team A'}
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <button 
-                              onClick={() => setEditScoreA(prev => Math.max(0, prev - 1))}
-                              style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.03)', color: 'white', cursor: 'pointer', fontWeight: '800' }}
-                            >
-                              -
-                            </button>
-                            <span style={{ fontSize: '28px', fontWeight: '950', fontFamily: 'Outfit', minWidth: '32px' }}>{editScoreA}</span>
-                            <button 
-                              onClick={() => setEditScoreA(prev => prev + 1)}
-                              style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,92,0,0.1)', color: '#FF5C00', cursor: 'pointer', fontWeight: '800' }}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-
-                        <span style={{ fontSize: '24px', fontWeight: '900', color: '#51515E' }}>:</span>
-
-                        {/* Team B */}
-                        <div style={{ textAlign: 'center' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'white', display: 'block', marginBottom: '8px' }}>
-                            {activeMatch.teamB?.name || 'Team B'}
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <button 
-                              onClick={() => setEditScoreB(prev => Math.max(0, prev - 1))}
-                              style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.03)', color: 'white', cursor: 'pointer', fontWeight: '800' }}
-                            >
-                              -
-                            </button>
-                            <span style={{ fontSize: '28px', fontWeight: '950', fontFamily: 'Outfit', minWidth: '32px' }}>{editScoreB}</span>
-                            <button 
-                              onClick={() => setEditScoreB(prev => prev + 1)}
-                              style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,92,0,0.1)', color: '#FF5C00', cursor: 'pointer', fontWeight: '800' }}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Fast Score Updater Button */}
-                      {activeMatch.status === 'live' && (
-                        <button 
-                          onClick={() => {
-                            setMatchScore(activeMatch.id, editScoreA, editScoreB, 'live', null);
-                            showToast('Рахунок матчу оновлено!', 'info');
-                          }}
-                          style={{
-                            background: 'rgba(255, 92, 0, 0.15)', border: '1px solid rgba(255, 92, 0, 0.3)',
-                            borderRadius: '10px', padding: '12px', fontSize: '12px', color: '#FF5C00', fontWeight: '750', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                          }}
-                        >
-                          <Save size={14} /> Оновити рахунок на платформі
-                        </button>
-                      )}
-
-                      {/* Match Odds (Coefficients) Editor */}
-                      <div style={{
-                        background: '#040406',
-                        border: '1px solid rgba(255,255,255,0.03)',
-                        borderRadius: '16px',
-                        padding: '20px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}>
-                        <span style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>
-                          Коефіцієнти матчу (ставки на монетки)
-                        </span>
-                        
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                          {/* Odds A */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '10px', color: '#8F8F9B' }}>Коеф. на {activeMatch.teamA?.name || 'Team A'}</label>
-                            <input 
-                              type="number" 
-                              step="0.01" 
-                              min="1.01"
-                              value={editOddsA}
-                              onChange={e => setEditOddsA(Math.max(1.01, parseFloat(e.target.value) || 0))}
-                              style={{
-                                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                    }
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                        {activeOrUpcoming.map(t => {
+                          const tTeams = teams[t.id] || [];
+                          const tMatches = matches.filter(m => m.tournamentId === t.id);
+                          const liveMatches = tMatches.filter(m => m.status === 'live').length;
+                          const finishedMatches = tMatches.filter(m => m.status === 'finished').length;
+                          
+                          return (
+                            <div 
+                              key={t.id} 
+                              className="esports-card" 
+                              style={{ 
+                                padding: '24px', 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                justifyContent: 'space-between', 
+                                border: liveMatches > 0 ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(255,255,255,0.04)',
+                                boxShadow: liveMatches > 0 ? '0 0 20px rgba(239, 68, 68, 0.05)' : 'none',
+                                transition: 'transform 0.2s, border-color 0.2s'
                               }}
-                            />
-                          </div>
-
-                          {/* Odds B */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <label style={{ fontSize: '10px', color: '#8F8F9B' }}>Коеф. на {activeMatch.teamB?.name || 'Team B'}</label>
-                            <input 
-                              type="number" 
-                              step="0.01" 
-                              min="1.01"
-                              value={editOddsB}
-                              onChange={e => setEditOddsB(Math.max(1.01, parseFloat(e.target.value) || 0))}
-                              style={{
-                                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <button 
-                          onClick={() => {
-                            updateMatchOdds(activeMatch.id, editOddsA, editOddsB);
-                            setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Updated match odds: ${editOddsA} vs ${editOddsB}`]);
-                          }}
-                          style={{
-                            background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)',
-                            borderRadius: '10px', padding: '10px', fontSize: '11px', color: '#3B82F6', fontWeight: '750', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '4px'
-                          }}
-                        >
-                          <Save size={12} /> Зберегти коефіцієнти
-                        </button>
+                            >
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                  <span style={{
+                                    background: t.status === 'active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 92, 0, 0.1)',
+                                    color: t.status === 'active' ? '#10B981' : '#FF5C00',
+                                    padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '800', textTransform: 'uppercase'
+                                  }}>
+                                    {t.status === 'active' ? 'АКТИВНИЙ' : 'ОЧІКУВАННЯ'}
+                                  </span>
+                                  {liveMatches > 0 && (
+                                    <span style={{ 
+                                      background: 'rgba(239, 68, 68, 0.1)', 
+                                      color: '#EF4444', 
+                                      padding: '2px 8px', 
+                                      borderRadius: '4px', 
+                                      fontSize: '9px', 
+                                      fontWeight: '800', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: '4px' 
+                                    }}>
+                                      <span style={{ 
+                                        width: '6px', 
+                                        height: '6px', 
+                                        borderRadius: '50%', 
+                                        backgroundColor: '#EF4444', 
+                                        display: 'inline-block'
+                                      }}></span>
+                                      {liveMatches} LIVE
+                                    </span>
+                                  )}
+                                </div>
+                                <h4 style={{ fontSize: '18px', fontWeight: '950', fontFamily: 'Outfit', color: 'white', margin: '0 0 10px 0' }}>
+                                  {t.name}
+                                </h4>
+                                <div style={{ fontSize: '12px', color: '#8F8F9B', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                                  <div>📅 Дата: <span style={{ color: 'white', fontWeight: '600' }}>{t.date || 'Не вказано'}</span></div>
+                                  <div>🗺️ Карта: <span style={{ color: 'white', fontWeight: '600' }}>{t.map || 'Невідомо'}</span></div>
+                                  <div>👥 Команди: <span style={{ color: '#10B981', fontWeight: '700' }}>{tTeams.length} / {t.maxParticipants}</span></div>
+                                  <div>📊 Матчі: <span style={{ color: '#3B82F6', fontWeight: '750' }}>{finishedMatches} зіграно / {tMatches.length} всього</span></div>
+                                </div>
+                              </div>
+                              
+                              <button
+                                onClick={() => {
+                                  setSelectedTourneyIdForSimulation(t.id);
+                                  setSelectedMatchId(null);
+                                }}
+                                className="btn-primary"
+                                style={{ 
+                                  width: '100%', 
+                                  padding: '12px', 
+                                  borderRadius: '10px', 
+                                  fontSize: '12px', 
+                                  fontWeight: '800', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  gap: '8px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Swords size={14} /> Керувати матчами
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
-
-                      {/* Live commentary logger simulation injection */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '20px' }}>
-                        <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>
-                          Впровадити Коментар LIVE ЛОГУ
-                        </label>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <input 
-                            type="text" 
-                            placeholder="Гравець 1 робить неймовірний даблкіл на точці А..."
-                            value={customLog}
-                            onChange={e => setCustomLog(e.target.value)}
-                            style={{
-                              flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-                              borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                    );
+                  })()}
+                </div>
+              ) : (
+                /* Level 2 & 3: Tournaments Matches View & Match simulation control */
+                <div>
+                  {(() => {
+                    const activeTourney = tournaments.find(t => t.id === selectedTourneyIdForSimulation);
+                    const tourneyMatches = matches.filter(m => m.tournamentId === selectedTourneyIdForSimulation);
+                    
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* Level Navigation Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <button
+                            onClick={() => {
+                              setSelectedTourneyIdForSimulation(null);
+                              setSelectedMatchId(null);
                             }}
-                          />
-                          <button 
-                            onClick={() => injectMatchLog(activeMatch.id)}
                             style={{
-                              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
-                              borderRadius: '10px', padding: '10px 14px', color: '#ccc', cursor: 'pointer',
-                              display: 'flex', alignItems: 'center'
+                              background: 'rgba(255,255,255,0.02)',
+                              border: '1px solid rgba(255,255,255,0.06)',
+                              borderRadius: '8px',
+                              padding: '8px 16px',
+                              color: '#8F8F9B',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontFamily: 'Outfit'
                             }}
                           >
-                            <Send size={14} />
+                            ← До списку турнірів
                           </button>
+                          
+                          <h3 style={{ fontSize: '15px', fontWeight: '950', fontFamily: 'Outfit', color: 'white', textTransform: 'uppercase', margin: 0 }}>
+                            🏆 {activeTourney?.name} — Управління іграми
+                          </h3>
+                        </div>
+
+                        {/* Simulation & Listing Container */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '28px' }}>
+                          
+                          {/* Matches List */}
+                          <div className="esports-card" style={{ padding: '24px', height: 'fit-content' }}>
+                            <h3 style={{ fontSize: '13px', fontWeight: '850', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', marginBottom: '16px' }}>
+                              Список ігор турніру ({tourneyMatches.length})
+                            </h3>
+
+                            {tourneyMatches.length === 0 ? (
+                              <div style={{ padding: '40px 10px', textAlign: 'center', color: '#51515E' }}>
+                                <Swords size={32} style={{ margin: '0 auto 12px', opacity: 0.2 }} />
+                                <p style={{ fontSize: '13px', fontWeight: '750' }}>Матчі для цього турніру ще не згенеровані</p>
+                                <p style={{ fontSize: '11px', marginTop: '4px' }}>Сформуйте сітку у вкладці «Турніри & Сітки»</p>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {tourneyMatches.map(m => {
+                                  const isSelected = selectedMatchId === m.id;
+                                  return (
+                                    <div 
+                                      key={m.id} 
+                                      onClick={() => {
+                                        setSelectedMatchId(m.id);
+                                        setEditScoreA(m.scoreA);
+                                        setEditScoreB(m.scoreB);
+                                        setEditOddsA(m.oddsA || 1.85);
+                                        setEditOddsB(m.oddsB || 1.85);
+                                      }}
+                                      style={{
+                                        background: isSelected ? 'rgba(255, 92, 0, 0.05)' : 'rgba(255,255,255,0.01)',
+                                        border: isSelected ? '1px solid rgba(255, 92, 0, 0.3)' : '1px solid rgba(255,255,255,0.04)',
+                                        borderRadius: '12px',
+                                        padding: '12px 16px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between'
+                                      }}
+                                    >
+                                      <div>
+                                        <div style={{ fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                          {m.roundName}
+                                        </div>
+                                        <div style={{ fontSize: '13px', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <span>{m.teamA?.name || 'TBD'}</span>
+                                          <span style={{ color: '#FF5C00' }}>vs</span>
+                                          <span>{m.teamB?.name || 'TBD'}</span>
+                                        </div>
+                                      </div>
+                                      
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{
+                                          fontFamily: 'Outfit', fontWeight: '900', fontSize: '14px',
+                                          color: m.status === 'live' ? '#EF4444' : m.status === 'finished' ? '#10B981' : '#8F8F9B'
+                                        }}>
+                                          {m.scoreA} : {m.scoreB}
+                                        </span>
+                                        <span style={{
+                                          background: m.status === 'live' ? 'rgba(239, 68, 68, 0.1)' : m.status === 'finished' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 92, 0, 0.05)',
+                                          color: m.status === 'live' ? '#EF4444' : m.status === 'finished' ? '#10B981' : '#FF5C00',
+                                          padding: '2px 6px', borderRadius: '4px', fontSize: '8px', fontWeight: '800'
+                                        }}>
+                                          {m.status === 'live' ? '🔴 LIVE' : m.status === 'finished' ? 'DONE' : 'WAIT'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Match Control Dashboard (Simulation Panel) */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            {activeMatch && activeMatch.tournamentId === selectedTourneyIdForSimulation ? (
+                              <div className="esports-card" style={{ padding: '28px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '16px', marginBottom: '20px' }}>
+                                  <div>
+                                    <span style={{ fontSize: '10px', color: '#8F8F9B', textTransform: 'uppercase' }}>Симулятор Live Гри</span>
+                                    <h3 style={{ fontSize: '18px', fontWeight: '900', fontFamily: 'Outfit', marginTop: '4px' }}>
+                                      {activeMatch.teamA?.name || 'TBD'} vs {activeMatch.teamB?.name || 'TBD'}
+                                    </h3>
+                                    <span style={{ fontSize: '11px', color: '#51515E' }}>{activeMatch.tournamentName} ({activeMatch.roundName})</span>
+                                  </div>
+                                  <button 
+                                    onClick={() => setSelectedMatchId(null)}
+                                    style={{ background: 'none', border: 'none', color: '#8F8F9B', cursor: 'pointer' }}
+                                  >
+                                    <X size={18} />
+                                  </button>
+                                </div>
+
+                                {/* Simulation Parameters */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                  
+                                  {/* Active Status Actions */}
+                                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                    {activeMatch.status === 'scheduled' && (
+                                      <button 
+                                        onClick={() => startSelectedMatchLive(activeMatch.id)}
+                                        className="btn-primary"
+                                        style={{ padding: '12px 20px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer' }}
+                                      >
+                                        <Play size={12} style={{ marginRight: '6px' }} /> Запустити LIVE Матч
+                                      </button>
+                                    )}
+                                    {activeMatch.status === 'live' && (
+                                      <button 
+                                        onClick={() => finishMatchWithScore(activeMatch.id, editScoreA, editScoreB)}
+                                        style={{
+                                          background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                                          borderRadius: '10px', padding: '12px 20px', fontSize: '12px', color: '#10B981', fontWeight: '700', cursor: 'pointer',
+                                          display: 'flex', alignItems: 'center', gap: '6px'
+                                        }}
+                                      >
+                                        <Check size={12} /> Завершити Матч & Виплатити Ставки
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* Interactive Score Board Editor */}
+                                  <div style={{
+                                    background: '#040406',
+                                    border: '1px solid rgba(255,255,255,0.03)',
+                                    borderRadius: '16px',
+                                    padding: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-around'
+                                  }}>
+                                    {/* Team A */}
+                                    <div style={{ textAlign: 'center' }}>
+                                      <span style={{ fontSize: '13px', fontWeight: '700', color: 'white', display: 'block', marginBottom: '8px' }}>
+                                        {activeMatch.teamA?.name || 'Team A'}
+                                      </span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <button 
+                                          onClick={() => setEditScoreA(prev => Math.max(0, prev - 1))}
+                                          style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.03)', color: 'white', cursor: 'pointer', fontWeight: '800' }}
+                                        >
+                                          -
+                                        </button>
+                                        <span style={{ fontSize: '28px', fontWeight: '950', fontFamily: 'Outfit', minWidth: '32px' }}>{editScoreA}</span>
+                                        <button 
+                                          onClick={() => setEditScoreA(prev => prev + 1)}
+                                          style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,92,0,0.1)', color: '#FF5C00', cursor: 'pointer', fontWeight: '800' }}
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <span style={{ fontSize: '24px', fontWeight: '900', color: '#51515E' }}>:</span>
+
+                                    {/* Team B */}
+                                    <div style={{ textAlign: 'center' }}>
+                                      <span style={{ fontSize: '13px', fontWeight: '700', color: 'white', display: 'block', marginBottom: '8px' }}>
+                                        {activeMatch.teamB?.name || 'Team B'}
+                                      </span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <button 
+                                          onClick={() => setEditScoreB(prev => Math.max(0, prev - 1))}
+                                          style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.03)', color: 'white', cursor: 'pointer', fontWeight: '800' }}
+                                        >
+                                          -
+                                        </button>
+                                        <span style={{ fontSize: '28px', fontWeight: '950', fontFamily: 'Outfit', minWidth: '32px' }}>{editScoreB}</span>
+                                        <button 
+                                          onClick={() => setEditScoreB(prev => prev + 1)}
+                                          style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,92,0,0.1)', color: '#FF5C00', cursor: 'pointer', fontWeight: '800' }}
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Fast Score Updater Button */}
+                                  {activeMatch.status === 'live' && (
+                                    <button 
+                                      onClick={() => {
+                                        setMatchScore(activeMatch.id, editScoreA, editScoreB, 'live', null);
+                                        showToast('Рахунок матчу оновлено!', 'info');
+                                      }}
+                                      style={{
+                                        background: 'rgba(255, 92, 0, 0.15)', border: '1px solid rgba(255, 92, 0, 0.3)',
+                                        borderRadius: '10px', padding: '12px', fontSize: '12px', color: '#FF5C00', fontWeight: '750', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                      }}
+                                    >
+                                      <Save size={14} /> Оновити рахунок на платформі
+                                    </button>
+                                  )}
+
+                                  {/* Match Odds (Coefficients) Editor */}
+                                  <div style={{
+                                    background: '#040406',
+                                    border: '1px solid rgba(255,255,255,0.03)',
+                                    borderRadius: '16px',
+                                    padding: '20px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px'
+                                  }}>
+                                    <span style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>
+                                      Коефіцієнти матчу (ставки на монетки)
+                                    </span>
+                                    
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                                      {/* Odds A */}
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <label style={{ fontSize: '10px', color: '#8F8F9B' }}>Коеф. на {activeMatch.teamA?.name || 'Team A'}</label>
+                                        <input 
+                                          type="number" 
+                                          step="0.01" 
+                                          min="1.01"
+                                          value={editOddsA}
+                                          onChange={e => setEditOddsA(Math.max(1.01, parseFloat(e.target.value) || 0))}
+                                          style={{
+                                            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                                            borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                                          }}
+                                        />
+                                      </div>
+
+                                      {/* Odds B */}
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <label style={{ fontSize: '10px', color: '#8F8F9B' }}>Коеф. на {activeMatch.teamB?.name || 'Team B'}</label>
+                                        <input 
+                                          type="number" 
+                                          step="0.01" 
+                                          min="1.01"
+                                          value={editOddsB}
+                                          onChange={e => setEditOddsB(Math.max(1.01, parseFloat(e.target.value) || 0))}
+                                          style={{
+                                            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                                            borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <button 
+                                      onClick={() => {
+                                        updateMatchOdds(activeMatch.id, editOddsA, editOddsB);
+                                        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Updated match odds: ${editOddsA} vs ${editOddsB}`]);
+                                      }}
+                                      style={{
+                                        background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)',
+                                        borderRadius: '10px', padding: '10px', fontSize: '11px', color: '#3B82F6', fontWeight: '750', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '4px'
+                                      }}
+                                    >
+                                      <Save size={12} /> Зберегти коефіцієнти
+                                    </button>
+                                  </div>
+
+                                  {/* Live commentary logger simulation injection */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '20px' }}>
+                                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>
+                                      Впровадити Коментар LIVE ЛОГУ
+                                    </label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                      <input 
+                                        type="text" 
+                                        placeholder="Гравець 1 робить неймовірний даблкіл на точці А..."
+                                        value={customLog}
+                                        onChange={e => setCustomLog(e.target.value)}
+                                        style={{
+                                          flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+                                          borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit'
+                                        }}
+                                      />
+                                      <button 
+                                        onClick={() => injectMatchLog(activeMatch.id)}
+                                        style={{
+                                          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                                          borderRadius: '10px', padding: '10px 14px', color: '#ccc', cursor: 'pointer',
+                                          display: 'flex', alignItems: 'center'
+                                        }}
+                                      >
+                                        <Send size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="esports-card" style={{ padding: '60px', textAlign: 'center', color: '#51515E' }}>
+                                <Swords size={48} style={{ margin: '0 auto 16px', opacity: 0.15 }} />
+                                <p style={{ fontSize: '15px', fontWeight: '700', color: '#8F8F9B' }}>Жодної гри не вибрано</p>
+                                <p style={{ fontSize: '11px', marginTop: '4px' }}>Клацніть на матч із лівого списку, щоб отримати доступ до симулятора</p>
+                              </div>
+                            )}
+                          </div>
+
                         </div>
                       </div>
-
-                    </div>
-                  </div>
-                ) : (
-                  <div className="esports-card" style={{ padding: '60px', textAlign: 'center', color: '#51515E' }}>
-                    <Swords size={48} style={{ margin: '0 auto 16px', opacity: 0.15 }} />
-                    <p style={{ fontSize: '15px', fontWeight: '700', color: '#8F8F9B' }}>Жодної гри не вибрано</p>
-                    <p style={{ fontSize: '11px', marginTop: '4px' }}>Клацніть на матч із лівого списку, щоб отримати доступ до симулятора</p>
-                  </div>
-                )}
-              </div>
-
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
 
@@ -2292,6 +2456,61 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start' }}>
               {/* Broadcast Composer */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* 📢 Telegram Bot Deep Link & Broadcast Guide Banner */}
+                <div className="esports-card" style={{
+                  padding: '20px 24px',
+                  background: 'linear-gradient(135deg, rgba(255, 92, 0, 0.08) 0%, rgba(16, 16, 25, 0.4) 100%)',
+                  border: '1px solid rgba(255, 92, 0, 0.25)',
+                  boxShadow: '0 4px 20px rgba(255, 92, 0, 0.03)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '20px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 92, 0, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '20px',
+                      flexShrink: 0
+                    }}>
+                      📢
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '13px', fontWeight: '900', fontFamily: 'Outfit', color: 'white', margin: '0 0 4px 0' }}>
+                        Мобільна розсилка через Telegram-бот
+                      </h4>
+                      <p style={{ fontSize: '11px', color: '#8F8F9B', margin: 0, lineHeight: '1.4' }}>
+                        Ви можете робити розсилки прямо зі свого телефону! Перейдіть у наш бот і скористайтеся командою <code style={{ color: '#FF5C00', background: 'rgba(255,92,0,0.1)', padding: '2px 6px', borderRadius: '4px' }}>/broadcast</code>.
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href="https://t.me/volki1303_bot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-primary"
+                    style={{
+                      padding: '10px 18px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span>Відкрити бот</span> ➔
+                  </a>
+                </div>
+
                 <div className="esports-card" style={{ padding: '28px' }}>
                   <h3 style={{ fontSize: '15px', fontWeight: '900', fontFamily: 'Outfit', color: '#fff', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <MessageSquare size={18} color="#FF5C00" /> Нова Розсилка
@@ -2576,6 +2795,147 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   </div>
                 );
               })()}
+
+              {/* ==========================================
+                  ARCHIVES SECTION
+                 ========================================== */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '24px', marginTop: '12px' }}>
+                
+                {/* 🏆 Completed Tournaments Archive */}
+                <div className="esports-card" style={{ padding: '24px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '850', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Trophy size={16} color="#8B5CF6" /> Архів Завершених Турнірів
+                  </h3>
+                  
+                  {(() => {
+                    const completed = tournaments.filter(t => t.status === 'completed');
+                    if (completed.length === 0) {
+                      return (
+                        <div style={{ padding: '40px 10px', textAlign: 'center', color: '#51515E' }}>
+                          <p style={{ fontSize: '13px', fontWeight: '750' }}>Завершених турнірів ще немає</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
+                        {completed.map(t => {
+                          const tTeams = teams[t.id] || [];
+                          return (
+                            <div key={t.id} style={{
+                              background: 'rgba(255,255,255,0.01)',
+                              border: '1px solid rgba(255,255,255,0.04)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h4 style={{ fontSize: '14px', fontWeight: '800', fontFamily: 'Outfit', color: 'white', margin: 0 }}>
+                                  {t.name}
+                                </h4>
+                                <span style={{ fontSize: '10px', color: '#8B5CF6', fontWeight: '800', textTransform: 'uppercase' }}>
+                                  {t.type}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#8F8F9B', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                <div>📅 Дата: <span style={{ color: 'white', fontWeight: '600' }}>{t.date || 'Не вказано'}</span></div>
+                                <div>👥 Гравці/Команди: <span style={{ color: '#10B981', fontWeight: '700' }}>{tTeams.length}</span></div>
+                                <div>🗺️ Карта: <span style={{ color: 'white', fontWeight: '600' }}>{t.map || 'Невідомо'}</span></div>
+                                <div>💰 Приз: <span style={{ color: '#FF5C00', fontWeight: '750' }}>{t.prizePool}</span></div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* ⚔️ Finished Matches Archive */}
+                <div className="esports-card" style={{ padding: '24px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '850', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#ccc', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Swords size={16} color="#10B981" /> Архів Зіграних Матчів
+                  </h3>
+
+                  {(() => {
+                    const finished = matches.filter(m => m.status === 'finished');
+                    if (finished.length === 0) {
+                      return (
+                        <div style={{ padding: '40px 10px', textAlign: 'center', color: '#51515E' }}>
+                          <p style={{ fontSize: '13px', fontWeight: '750' }}>Зіграних матчів ще немає</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
+                        {finished.map(m => {
+                          const scoreA = m.scoreA;
+                          const scoreB = m.scoreB;
+                          const winA = scoreA > scoreB;
+                          const winB = scoreB > scoreA;
+                          return (
+                            <div key={m.id} style={{
+                              background: 'rgba(255,255,255,0.01)',
+                              border: '1px solid rgba(255,255,255,0.04)',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase' }}>
+                                <span>🏆 {m.tournamentName}</span>
+                                <span>{m.roundName}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+                                {/* Team A */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                                  <span style={{ 
+                                    fontSize: '13px', 
+                                    fontWeight: winA ? '900' : '600', 
+                                    color: winA ? '#10B981' : '#ccc' 
+                                  }}>
+                                    {m.teamA?.name || 'TBD'}
+                                  </span>
+                                  {winA && <span style={{ fontSize: '10px', color: '#10B981' }}>👑</span>}
+                                </div>
+
+                                {/* Score Display */}
+                                <span style={{ 
+                                  fontFamily: 'Outfit', 
+                                  fontWeight: '900', 
+                                  fontSize: '14px', 
+                                  color: 'white',
+                                  padding: '4px 10px',
+                                  background: 'rgba(255,255,255,0.02)',
+                                  borderRadius: '6px',
+                                  margin: '0 12px'
+                                }}>
+                                  {scoreA} : {scoreB}
+                                </span>
+
+                                {/* Team B */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'flex-end' }}>
+                                  {winB && <span style={{ fontSize: '10px', color: '#10B981' }}>👑</span>}
+                                  <span style={{ 
+                                    fontSize: '13px', 
+                                    fontWeight: winB ? '900' : '600', 
+                                    color: winB ? '#10B981' : '#ccc' 
+                                  }}>
+                                    {m.teamB?.name || 'TBD'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+              </div>
 
             </div>
           )}
