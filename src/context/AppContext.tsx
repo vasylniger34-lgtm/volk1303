@@ -1328,24 +1328,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const setMatchScore = (matchId: string, scoreA: number, scoreB: number, status: 'live' | 'finished', winnerId?: string | null) => {
+    // Capture match data BEFORE the state update to avoid stale closure
+    const matchSnapshot = matchesRef.current.find(m => m.id === matchId);
+    if (!matchSnapshot) return;
+
+    const finalWinnerId = status === 'finished'
+      ? (winnerId || (scoreA > scoreB ? matchSnapshot.teamA?.id : matchSnapshot.teamB?.id) || null)
+      : null;
+
+    if (useSupabase) {
+      supabase.from('matches').update({
+        score_a: scoreA,
+        score_b: scoreB,
+        status,
+        winner_id: finalWinnerId,
+        live_logs: [...matchSnapshot.liveLogs, `Score updated to ${scoreA}:${scoreB}`]
+      }).eq('id', matchId).then();
+    }
+
     setMatches(prev => prev.map(m => {
       if (m.id === matchId) {
-        const finalWinnerId = status === 'finished' ? (winnerId || (scoreA > scoreB ? m.teamA?.id : m.teamB?.id) || null) : null;
-
-        if (status === 'finished' && finalWinnerId) {
-          setTimeout(() => resolveBetsForMatch(matchId, finalWinnerId, scoreA, scoreB), 200);
-        }
-
-        if (useSupabase) {
-          supabase.from('matches').update({
-            score_a: scoreA,
-            score_b: scoreB,
-            status,
-            winner_id: finalWinnerId,
-            live_logs: [...m.liveLogs, `Score updated to ${scoreA}:${scoreB}`]
-          }).eq('id', matchId).then();
-        }
-
         return {
           ...m, scoreA, scoreB, status,
           winnerId: finalWinnerId,
@@ -1354,7 +1356,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return m;
     }));
+
+    // Call resolveBets AFTER setMatches, outside the callback, with data passed directly
+    if (status === 'finished' && finalWinnerId) {
+      setTimeout(() => resolveBetsForMatch(matchId, finalWinnerId, scoreA, scoreB), 300);
+    }
   };
+
 
   // ─── Add Map Score (fix current map result, reset live score to 0:0) ───
 
@@ -1485,7 +1493,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .eq('match_id', matchId)
         .eq('status', 'pending')
         .then(({ data: preds, error }) => {
-          if (error || !preds) return;
+          if (error || !preds || preds.length === 0) {
+            console.warn('[VOLKI] No pending predictions for match', matchId, error);
+            return;
+          }
+
+          console.log(`[VOLKI] Resolving ${preds.length} bet(s) for match ${matchId}, winner: "${winningTeamName}"`);
 
           preds.forEach(async (pred) => {
             let won = false;
@@ -1499,55 +1512,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const status = won ? 'won' : 'lost';
             const payout = won ? Math.round(pred.wager * pred.odds) : 0;
 
-            // Update prediction status
+            console.log(`[VOLKI]   Bet: "${pred.predicted_value}" → ${status}, payout: ${payout}`);
+
+            // Mark prediction as resolved
             await supabase.from('predictions').update({ status, payout }).eq('id', pred.id);
 
-            // Update user profile statistics and coins
-            const { data: profile } = await supabase.from('profiles').select('*').eq('id', pred.user_id).single();
-            if (profile) {
-              const newBalance = profile.balance + payout;
-              const newWins = won ? profile.wins + 1 : profile.wins;
-              const newLosses = won ? profile.losses : profile.losses + 1;
-              const newPredsWon = won ? profile.predictions_won + 1 : profile.predictions_won;
-              const xpGain = won ? 150 : 50;
-              let newXp = profile.xp + xpGain;
-              let newLevel = profile.level;
-              let newXpNext = profile.xp_next;
+            // Fetch fresh profile for balance/XP update
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('balance, wins, losses, predictions_won, xp, xp_next, level')
+              .eq('id', pred.user_id)
+              .single();
 
-              if (newXp >= newXpNext) {
-                newXp = newXp - newXpNext;
-                newLevel += 1;
-                newXpNext = Math.round(newXpNext * 1.5);
-              }
+            if (!profile) return;
 
-              await supabase.from('profiles').update({
-                balance: newBalance,
-                wins: newWins,
-                losses: newLosses,
-                predictions_won: newPredsWon,
+            const xpGain = won ? 150 : 30;
+            let newXp = (profile.xp || 0) + xpGain;
+            let newLevel = profile.level || 1;
+            let newXpNext = profile.xp_next || 1000;
+
+            if (newXp >= newXpNext) {
+              newXp -= newXpNext;
+              newLevel += 1;
+              newXpNext = Math.round(newXpNext * 1.5);
+            }
+
+            const updatePayload: Record<string, number> = {
+              xp: newXp,
+              level: newLevel,
+              xp_next: newXpNext,
+              losses: won ? (profile.losses || 0) : (profile.losses || 0) + 1,
+              wins: won ? (profile.wins || 0) + 1 : (profile.wins || 0),
+              predictions_won: won ? (profile.predictions_won || 0) + 1 : (profile.predictions_won || 0),
+            };
+
+            if (won) {
+              // Add winnings to balance (wager was already deducted at bet time)
+              updatePayload.balance = (profile.balance || 0) + payout;
+            }
+
+            await supabase.from('profiles').update(updatePayload).eq('id', pred.user_id);
+
+            // Update local UI state for current user
+            if (pred.user_id === userRef.current.id) {
+              setUser(prev => ({
+                ...prev,
+                balance: won ? (profile.balance || 0) + payout : prev.balance,
                 xp: newXp,
                 level: newLevel,
-                xp_next: newXpNext
-              }).eq('id', pred.user_id);
-
-              // Update state if it's the current user
-              if (pred.user_id === userRef.current.id) {
-                setUser(prev => ({
-                  ...prev,
-                  balance: newBalance,
-                  xp: newXp,
-                  level: newLevel,
-                  xpNext: newXpNext,
-                  stats: {
-                    ...prev.stats,
-                    wins: newWins,
-                    losses: newLosses,
-                    predictionsWon: newPredsWon
-                  }
-                }));
-                if (won) {
-                  showToast(`Виграш! +${payout} 🪙!`, 'success');
+                xpNext: newXpNext,
+                stats: {
+                  ...prev.stats,
+                  wins: won ? (profile.wins || 0) + 1 : prev.stats.wins,
+                  losses: won ? prev.stats.losses : (profile.losses || 0) + 1,
+                  predictionsWon: won ? (profile.predictions_won || 0) + 1 : prev.stats.predictionsWon
                 }
+              }));
+              if (won) {
+                showToast(`🏆 Виграш! +${payout} 🪙 за ставку на ${pred.predicted_value}!`, 'success');
+              } else {
+                showToast(`Ставку програно 😔 (${pred.predicted_value})`, 'info');
               }
             }
           });
