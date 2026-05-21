@@ -197,6 +197,26 @@ function profileToUser(row: ProfileRow): UserProfile {
   };
 }
 
+function dbPredictionToApp(row: any): Prediction {
+  return {
+    id: row.id,
+    matchId: row.match_id || null,
+    tournamentId: row.tournament_id,
+    tournamentName: row.tournament_name || 'Турнір',
+    teamA: row.team_a || 'Команда A',
+    teamB: row.team_b || 'Команда B',
+    predictionType: row.prediction_type as 'winner' | 'total_rounds' | 'tournament_winner',
+    predictedValue: row.predicted_value,
+    odds: Number(row.odds),
+    wager: Number(row.wager),
+    status: row.status as 'pending' | 'won' | 'lost',
+    payout: Number(row.payout || 0),
+    date: row.created_at
+      ? new Date(row.created_at).toLocaleDateString('uk-UA', { hour: '2-digit', minute: '2-digit' })
+      : new Date().toLocaleDateString('uk-UA', { hour: '2-digit', minute: '2-digit' })
+  };
+}
+
 // ─── Provider ───
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -511,7 +531,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           })));
         } else {
           setMatches([]);
-          setPredictions([]);
+        }
+      }
+
+      // Load predictions for current user
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.user?.id) {
+        const { data: predictionsData } = await supabase
+          .from('predictions')
+          .select('*')
+          .eq('user_id', currentSession.user.id)
+          .order('created_at', { ascending: false });
+
+        if (predictionsData) {
+          setPredictions(predictionsData.map(dbPredictionToApp));
         }
       }
     } catch (err) {
@@ -785,6 +818,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setUser(profileToUser(newRow as ProfileRow));
         }
       })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'predictions',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        const { eventType, new: newRow, old: oldRow } = payload;
+        if (eventType === 'INSERT' && newRow) {
+          const mapped = dbPredictionToApp(newRow);
+          setPredictions(prev => prev.some(p => p.id === mapped.id) ? prev : [mapped, ...prev]);
+        } else if (eventType === 'UPDATE' && newRow) {
+          const mapped = dbPredictionToApp(newRow);
+          setPredictions(prev => prev.map(p => p.id === mapped.id ? mapped : p));
+        } else if (eventType === 'DELETE' && oldRow) {
+          setPredictions(prev => prev.filter(p => p.id !== oldRow.id));
+        }
+      })
       .subscribe();
 
     return () => {
@@ -877,7 +927,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   .eq('id', session.user.id)
                   .select()
                   .single();
-                
+
                 if (!updateError && updatedProfile) {
                   activeProfile = updatedProfile;
                 } else {
@@ -885,6 +935,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 }
               }
               setUser(profileToUser(activeProfile as ProfileRow));
+
+              // Fetch this user's predictions from Supabase
+              const { data: predictionsData } = await supabase
+                .from('predictions')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .order('created_at', { ascending: false });
+
+              if (predictionsData) {
+                setPredictions(predictionsData.map(dbPredictionToApp));
+              }
             }
           }
         }
@@ -915,6 +976,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(false);
     localStorage.removeItem('volk_session');
     setUser(DEFAULT_USER);
+    setPredictions([]);
     showToast('Ви вийшли з акаунту', 'info');
   };
 
