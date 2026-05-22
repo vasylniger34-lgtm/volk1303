@@ -1,4 +1,4 @@
-# deploy_bot.ps1 �" Deploy VOLKI Telegram Bot to Ubuntu server
+﻿# deploy_bot.ps1 вЂ" Deploy VOLKI Telegram Bot to Ubuntu server
 # Usage: .\bot\deploy_bot.ps1
 
 $ErrorActionPreference = "Stop"
@@ -10,7 +10,7 @@ $RemoteDir = "/opt/bots/volki1303"
 $BotFile = "$PSScriptRoot\volki_bot.py"
 $ServiceFile = "$PSScriptRoot\volki-bot.service"
 
-Write-Host "`n🐺 VOLKI 13:03 �" Bot Deployment" -ForegroundColor Cyan
+Write-Host "`nрџђє VOLKI 13:03 вЂ" Bot Deployment" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor DarkGray
 
 # Import Posh-SSH
@@ -59,7 +59,7 @@ Write-Host $status.Output -ForegroundColor Green
 # Cleanup
 Remove-SSHSession -SessionId $session.SessionId | Out-Null
 
-Write-Host "`n✅ Bot deployed successfully!" -ForegroundColor Green
+Write-Host "`nвњ… Bot deployed successfully!" -ForegroundColor Green
 Write-Host "   Server: $ServerIP" -ForegroundColor DarkGray
 Write-Host "   Service: volki-bot.service" -ForegroundColor DarkGray
 Write-Host "   Commands:" -ForegroundColor DarkGray
