@@ -1154,6 +1154,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTimeout(() => generateBracketForTournament(tournamentId), 1000);
     }
 
+    if (teamData.invites && teamData.invites.length > 0 && createdTeamId) {
+      return createdTeamId;
+    }
+
     return true;
   };
 
@@ -2238,3 +2242,4 @@ export const useApp = () => {
   }
   return context;
 };
+

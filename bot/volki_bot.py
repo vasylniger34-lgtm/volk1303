@@ -540,10 +540,11 @@ def handle_callback_query(update: dict):
     
     # Always answer the callback query to remove loading indicator
     tg_request("answerCallbackQuery", {"callback_query_id": cq["id"]})
-    
-    if not is_admin(chat_id):
-        send_msg(chat_id, "⛔ У вас немає прав для цієї дії.")
-        return
+    # Only restrict broadcast actions to admins
+    if data.startswith("broadcast_") or data.startswith("tmpl_") or data in BROADCAST_TEMPLATES:
+        if not is_admin(chat_id):
+            send_msg(chat_id, "⛔ У вас немає прав для цієї дії.")
+            return
     
     if data == "broadcast_cancel":
         pending_broadcasts.pop(chat_id, None)
