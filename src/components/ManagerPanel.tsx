@@ -2641,32 +2641,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start' }}>
               {/* Broadcast Composer */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div className="esports-card" style={{
-                  padding: '20px 24px',
-                  background: 'linear-gradient(135deg, rgba(255, 92, 0, 0.08) 0%, rgba(16, 16, 25, 0.4) 100%)',
-                  border: '1px solid rgba(255, 92, 0, 0.25)',
-                  boxShadow: '0 4px 20px rgba(255, 92, 0, 0.03)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '20px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{
-                      width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(255, 92, 0, 0.1)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0
-                    }}>📢</div>
-                    <div>
-                      <h4 style={{ fontSize: '13px', fontWeight: '900', fontFamily: 'Outfit', color: 'white', margin: '0 0 4px 0' }}>Мобільна розсилка через Telegram-бот</h4>
-                      <p style={{ fontSize: '11px', color: '#8F8F9B', margin: 0, lineHeight: '1.4' }}>
-                        Ви можете робити розсилки прямо зі свого телефону! Перейдіть у наш бот і скористайтеся командою <code style={{ color: '#FF5C00', background: 'rgba(255,92,0,0.1)', padding: '2px 6px', borderRadius: '4px' }}>/broadcast</code>.
-                      </p>
-                    </div>
-                  </div>
-                  <a href="https://t.me/volki1303_bot" target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ padding: '10px 18px', borderRadius: '10px', fontSize: '11px', fontWeight: '800', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-                    <span>Відкрити бот</span> ➔
-                  </a>
-                </div>
+
 
                 <div className="esports-card" style={{ padding: '28px' }}>
                   <h3 style={{ fontSize: '15px', fontWeight: '900', fontFamily: 'Outfit', color: '#fff', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
