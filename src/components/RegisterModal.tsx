@@ -34,30 +34,42 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     const searchId = parseInt(newPlayerInput.replace(/\D/g, ''), 10);
+    
     if (!searchId || isNaN(searchId)) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
     
     setIsSearching(true);
     const timeoutId = setTimeout(async () => {
-      const useSupabase = isSupabaseConfigured();
-      if (useSupabase) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, username, telegram_username, reg_num')
-          .eq('reg_num', searchId);
-        
-        if (error) console.error('[VOLKI] Search error:', error);
-        setSearchResults(data || []);
-      } else {
-        setSearchResults([{ id: String(searchId), username: `@player_${searchId}`, reg_num: searchId }]);
+      try {
+        const useSupabase = isSupabaseConfigured();
+        if (useSupabase) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, username, telegram_username, reg_num')
+            .eq('reg_num', searchId);
+          
+          if (error) console.error('[VOLKI] Search error:', error);
+          if (isMounted) setSearchResults(data || []);
+        } else {
+          if (isMounted) setSearchResults([{ id: String(searchId), username: `@player_${searchId}`, reg_num: searchId }]);
+        }
+      } catch (err) {
+        console.error('[VOLKI] Search exception:', err);
+        if (isMounted) setSearchResults([]);
+      } finally {
+        if (isMounted) setIsSearching(false);
       }
-      setIsSearching(false);
     }, 500);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [newPlayerInput]);
 
   const handleAddPlayer = (dbUser: any) => {
