@@ -96,7 +96,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
   };
 
   const handleRemovePlayer = (idx: number) => {
-    if (players[idx] === captain) {
+    if (players[idx].username === captain) {
       alert('Капітан не може бути вилучений зі складу!');
       return;
     }
@@ -350,7 +350,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
             </div>
 
             {/* Add player form */}
-            {teamPlayers.length < 2 && (
+            {players.length < 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <input

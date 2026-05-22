@@ -1108,7 +1108,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logo_bg: newTeam.logoBg,
         join_type: newTeam.joinType,
         password: teamData.password || null
-      }).select('id').single().then(({ data, error }) => {
+      }).select('id').single().then(({ data }) => {
         if (data && teamData.invites && teamData.invites.length > 0) {
           const inviteInserts = teamData.invites.map(inviteeId => ({
             team_id: data.id,
@@ -2201,6 +2201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast,
       hideToast,
       registerTeam,
+      joinTeam,
       placePrediction,
       setMatchLive,
       setMatchScore,
