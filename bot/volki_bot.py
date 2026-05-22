@@ -180,7 +180,7 @@ def supabase_request(method: str, table: str, payload: dict = None, query: str =
 # ─── Subscriber Storage (Supabase Cloud) ───
 
 def add_subscriber_to_db(chat_id: int, first_name: str, username: str):
-    """Upsert a subscriber into Supabase bot_subscribers table"""
+    """Upsert a subscriber into Supabase bot_subscribers table and register in profiles via RPC"""
     data = {
         "chat_id": chat_id,
         "first_name": first_name,
@@ -195,19 +195,38 @@ def add_subscriber_to_db(chat_id: int, first_name: str, username: str):
         "Prefer": "resolution=merge-duplicates,return=representation"
     }
     ctx = ssl.create_default_context()
+    
+    # 1. Upsert bot_subscribers table
     try:
         body = json.dumps(data).encode("utf-8")
         req = urllib.request.Request(url, data=body, headers=headers, method="POST")
         with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
             resp.read()
         log.info(f"Subscriber upserted to DB: {first_name} (chat_id={chat_id})")
-        return True
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace")
         log.warning(f"Could not upsert subscriber to DB: {e.code} — {err_body}")
-        return False
     except Exception as e:
         log.warning(f"Could not upsert subscriber to DB: {e}")
+
+    # 2. Register/Sync in auth.users and public.profiles via RPC
+    rpc_url = f"{SUPABASE_URL}/rest/v1/rpc/register_telegram_user"
+    rpc_payload = {
+        "tg_id": str(chat_id),
+        "tg_username": username or f"user_{chat_id}",
+        "tg_first_name": first_name or "Гравець"
+    }
+    try:
+        body = json.dumps(rpc_payload).encode("utf-8")
+        req = urllib.request.Request(rpc_url, data=body, headers=headers, method="POST")
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+            resp.read()
+        log.info(f"User profile registered/synced via RPC: {username} ({chat_id})")
+        return True
+    except Exception as e:
+        log.warning(f"Could not register user profile via RPC: {e}")
+        if hasattr(e, 'read'):
+            log.warning(f"Response: {e.read().decode('utf-8')}")
         return False
 
 def mark_subscriber_inactive(chat_id: int):

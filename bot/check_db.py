@@ -22,4 +22,6 @@ def check_table(table):
         print(f"Error checking {table}: {e}")
 
 check_table("profiles")
+check_table("bot_subscribers")
+check_table("user_coins")
 check_table("tournaments")

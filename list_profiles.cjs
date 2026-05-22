@@ -7,16 +7,17 @@ const supabase = createClient(DEFAULT_URL, DEFAULT_KEY);
 
 async function run() {
   try {
-    const { data, error } = await supabase
+    const { data: profiles, error: pError } = await supabase
       .from('profiles')
       .select('*');
 
-    if (error) {
-      console.error('Error fetching profiles:', error);
+    if (pError) {
+      console.error('Error fetching profiles:', pError);
       return;
     }
 
-    console.log('All profiles found in database:', data);
+    console.log('--- PROFILES ---');
+    console.log(profiles.map(p => ({ id: p.id, username: p.username, reg_num: p.reg_num, balance: p.balance })));
   } catch (err) {
     console.error('Fatal error:', err);
   }

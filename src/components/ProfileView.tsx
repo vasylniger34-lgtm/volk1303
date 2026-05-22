@@ -199,28 +199,45 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onNavigate: _onNavigat
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'white', fontFamily: 'Outfit, sans-serif' }}>
-                {user.username}#{user.regNum}
-              </h3>
-              <button onClick={() => setIsEditingName(true)} style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '2px',
-                opacity: 0.5,
-                transition: 'opacity 0.2s'
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-              onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
-              >
-                <Pencil size={12} color="#FF5C00" />
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '950', color: 'white', fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.3px' }}>
+                  {user.username}
+                </h3>
+                <button onClick={() => setIsEditingName(true)} style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  opacity: 0.5,
+                  transition: 'opacity 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
+                >
+                  <Pencil size={12} color="#FF5C00" />
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: '900',
+                  color: '#FF5C00',
+                  background: 'rgba(255, 92, 0, 0.1)',
+                  border: '1px solid rgba(255, 92, 0, 0.25)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontFamily: 'Outfit, sans-serif',
+                  letterSpacing: '0.5px'
+                }}>
+                  #{user.regNum || 1001}
+                </span>
+                <span style={{ fontSize: '11px', color: '#8F8F9B', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Award size={12} color="#FF5C00" /> PRO PLAYER
+                </span>
+              </div>
             </div>
           )}
-          <span style={{ fontSize: '11px', color: '#FF5C00', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Award size={12} /> PRO PLAYER RANK
-          </span>
         </div>
 
         <div style={{

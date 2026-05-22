@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Bell } from 'lucide-react';
 
 interface HeaderProps {
-  onNavigate: (view: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager' | 'streams') => void;
+  onNavigate: (view: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager') => void;
   currentView: string;
 }
 

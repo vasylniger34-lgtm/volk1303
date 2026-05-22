@@ -1,12 +1,29 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { ChevronLeft, Star, Swords, Trophy, FileText, CheckCircle2, Coins, Lock } from 'lucide-react';
+import { ChevronLeft, Star, Swords, Trophy, FileText, CheckCircle2, Coins, Lock, Tv2, ExternalLink, Maximize2, X } from 'lucide-react';
 
 interface TournamentDetailViewProps {
   tournamentId: string;
   onBack: () => void;
   onSelectMatch: (id: string) => void;
   onOpenRegister: (id: string) => void;
+}
+
+// Converts any YouTube / Twitch URL to an embeddable iframe src
+function getEmbedUrl(url: string): string | null {
+  if (!url) return null;
+
+  // YouTube: youtu.be/ID or youtube.com/watch?v=ID or youtube.com/live/ID
+  const ytShort = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  const ytFull  = url.match(/youtube\.com\/(?:watch\?v=|live\/)([a-zA-Z0-9_-]{11})/);
+  const ytId = (ytShort || ytFull)?.[1];
+  if (ytId) return `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0`;
+
+  // Twitch channel: twitch.tv/CHANNEL
+  const twCh = url.match(/twitch\.tv\/([a-zA-Z0-9_]+)/);
+  if (twCh) return `https://player.twitch.tv/?channel=${twCh[1]}&parent=${window.location.hostname}&autoplay=true`;
+
+  return null; // unsupported platform – we'll show a fallback link
 }
 
 export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
@@ -17,13 +34,18 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
 }) => {
   const { tournaments, teams, matches, user, predictions, placePrediction } = useApp();
   const tourney = tournaments.find(t => t.id === tournamentId);
-  const [activeTab, setActiveTab] = useState<'INFO' | 'BRACKET' | 'PARTICIPANTS' | 'BETS' | 'RULES'>('INFO');
+  const [activeTab, setActiveTab] = useState<'INFO' | 'BRACKET' | 'PARTICIPANTS' | 'BETS' | 'RULES' | 'STREAM'>('INFO');
+  const [fullscreenUrl, setFullscreenUrl] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [selectedTeamForBet, setSelectedTeamForBet] = useState<any | null>(null);
   const [selectedTeamOdds, setSelectedTeamOdds] = useState<number>(0);
   const [wagerAmount, setWagerAmount] = useState<number>(100);
 
   if (!tourney) return <div style={{ padding: '20px', color: 'white' }}>Турнір не знайдено</div>;
+
+  const rawStream = tourney.streamUrl || '';
+  const streamUrls = rawStream ? rawStream.split(/[\s,]+/).map(url => url.trim()).filter(Boolean) : [];
+  const embedUrls = streamUrls.map(url => ({ url, embed: getEmbedUrl(url) }));
 
   const tourneyTeams = teams[tournamentId] || [];
   const tourneyMatches = matches.filter(m => m.tournamentId === tournamentId);
@@ -187,7 +209,8 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
           { id: 'BRACKET', label: 'Сітка' },
           { id: 'PARTICIPANTS', label: 'Учасники' },
           { id: 'BETS', label: 'Ставки 🏆' },
-          { id: 'RULES', label: 'Правила' }
+          { id: 'RULES', label: 'Правила' },
+          ...(rawStream ? [{ id: 'STREAM', label: '📡 Ефір' }] : [])
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1025,6 +1048,78 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                 <li key={idx} style={{ paddingLeft: '4px' }}>{rule}</li>
               ))}
             </ol>
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: Stream */}
+      {activeTab === 'STREAM' && (
+        <div style={{ padding: '0 20px 24px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {embedUrls.map(({ url, embed }, idx) => (
+            <div key={idx} className="esports-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: '800', color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Tv2 size={14} color="#FF5C00" /> Трансляція #{idx + 1}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {embed && (
+                    <button
+                      onClick={() => setFullscreenUrl(embed)}
+                      style={{ background: 'none', border: 'none', color: '#8F8F9B', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '800' }}
+                    >
+                      На весь екран <Maximize2 size={12} />
+                    </button>
+                  )}
+                  <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#FF5C00', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontWeight: '800' }}>
+                    Відкрити <ExternalLink size={12} />
+                  </a>
+                </div>
+              </div>
+              {embed ? (
+                <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <iframe
+                    src={embed}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                    allowFullScreen
+                    allow="autoplay; encrypted-media"
+                  />
+                </div>
+              ) : (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#8F8F9B', fontSize: '12px', border: '1px dotted rgba(255,255,255,0.1)', borderRadius: '10px' }}>
+                  Плеєр не підтримується для цього посилання. Будь ласка, використовуйте посилання вище.
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Fullscreen stream overlay */}
+      {fullscreenUrl && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'black',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', background: '#0D0D14', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <span style={{ fontSize: '12px', fontWeight: '800', color: 'white' }}>Повноекранний режим</span>
+            <button 
+              onClick={() => setFullscreenUrl(null)}
+              style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <iframe
+              src={fullscreenUrl}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              allowFullScreen
+              allow="autoplay; encrypted-media"
+            />
           </div>
         </div>
       )}

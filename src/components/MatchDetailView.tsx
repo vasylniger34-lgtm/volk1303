@@ -227,7 +227,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
       <div className="tabs-header" style={{ padding: '0 16px', margin: '12px 0' }}>
         {[
           { id: 'OVERVIEW', label: 'Огляд' },
-          { id: 'STREAM',   label: rawStream ? '📡 Ефір' : 'Ефір' },
+          ...(rawStream ? [{ id: 'STREAM', label: '📡 Ефір' }] : []),
           { id: 'BETS',     label: 'Ставки' },
         ].map(tab => (
           <button

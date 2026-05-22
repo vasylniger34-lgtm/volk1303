@@ -137,6 +137,43 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const getDeterministicUUID = (tgId: string): string => {
+  const clean = tgId.replace(/\D/g, '').padStart(32, '0');
+  return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-${clean.slice(12, 16)}-${clean.slice(16, 20)}-${clean.slice(20, 32)}`;
+};
+
+const sanitizeUser = (u: any): UserProfile => {
+  if (!u) return {
+    id: 'local_user',
+    username: 'volki_player',
+    balance: 0,
+    level: 1,
+    xp: 0,
+    xpNext: 1000,
+    role: 'admin',
+    avatarGradient: 0,
+    avatarUrl: null,
+    stats: { wins: 0, losses: 0, predictionsPlaced: 0, predictionsWon: 0 },
+    regNum: 1001
+  };
+  
+  const clean = { ...u };
+  if (clean.id && clean.id !== 'local_user' && !clean.id.includes('-')) {
+    clean.id = getDeterministicUUID(clean.id);
+  }
+  
+  if (typeof clean.regNum !== 'number') {
+    clean.regNum = clean.reg_num || 1001;
+  }
+  
+  if (!clean.stats) {
+    clean.stats = { wins: 0, losses: 0, predictionsPlaced: 0, predictionsWon: 0 };
+  }
+  
+  return clean as UserProfile;
+};
+
+
 function generateUUID() {
   if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
     return window.crypto.randomUUID();
@@ -234,7 +271,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<UserProfile>(() => {
     try {
       const saved = localStorage.getItem('volk_user');
-      return saved ? JSON.parse(saved) : DEFAULT_USER;
+      if (saved) {
+        return sanitizeUser(JSON.parse(saved));
+      }
+      return DEFAULT_USER;
     } catch (e) {
       console.warn('[VOLKI] Failed to parse volk_user from localStorage:', e);
       return DEFAULT_USER;
@@ -321,6 +361,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           window.location.search.includes('manager=true') ||
           window.location.search.includes('admin=true')
         );
+
+        // Silent auto-login for Telegram WebApp users if they have a Telegram ID available
+        let tgId: string | null = null;
+        let tgUsername: string | null = null;
+        let tgFirstName: string | null = null;
+
+        if (typeof window !== 'undefined') {
+          const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+          if (tgUser?.id) {
+            tgId = String(tgUser.id);
+            tgUsername = tgUser.username || tgUser.first_name;
+            tgFirstName = tgUser.first_name;
+            // Cache in localStorage to ensure it is kept across sub-pages/reloads
+            localStorage.setItem('volk_tg_id', tgId);
+            localStorage.setItem('volk_tg_username', tgUsername);
+            localStorage.setItem('volk_tg_first_name', tgFirstName);
+          } else {
+            // Retrieve from cache if WebApp object is lost/unavailable on page refresh
+            tgId = localStorage.getItem('volk_tg_id');
+            tgUsername = localStorage.getItem('volk_tg_username');
+            tgFirstName = localStorage.getItem('volk_tg_first_name');
+          }
+        }
+
+        if (!session?.user && tgId && !isManagerSite) {
+          console.log('[VOLKI] Silent auto-authenticating Telegram user in background:', tgId);
+          const email = `${tgId}@telegram.volki.app`;
+          const password = `volki_tg_${tgId}_secure`;
+
+          // Register first via RPC to make sure user exists
+          try {
+            await supabase.rpc('register_telegram_user', {
+              tg_id: tgId,
+              tg_username: tgUsername || `user_${tgId}`,
+              tg_first_name: tgFirstName || 'Гравець'
+            });
+          } catch (rpcErr) {
+            console.warn('[VOLKI] Silent pre-login RPC registration exception:', rpcErr);
+          }
+
+          // Sign in
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (!signInError && signInData?.session) {
+            session = signInData.session;
+            console.log('[VOLKI] Silent login successful for Telegram user:', tgId);
+          } else {
+            console.error('[VOLKI] Silent login failed for Telegram user:', signInError);
+          }
+        }
 
         // Auto-login for manager panel in background to guarantee a valid admin session
         if (!session?.user && isManagerSite) {
@@ -564,10 +657,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 2. Refresh current user's profile (balance, XP, level, wins, losses)
       if (isAuthenticated && user.id && user.id !== 'local_user') {
         try {
+          const targetId = user.id.includes('-') ? user.id : getDeterministicUUID(user.id);
           const { data: profile, error } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', user.id)
+            .eq('id', targetId)
             .single();
 
           if (profile && !error) {
@@ -864,37 +958,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsLoading(true);
     let supabaseSuccess = false;
 
+    // Cache Telegram data to support silent login on reload
+    localStorage.setItem('volk_tg_id', telegramData.id);
+    localStorage.setItem('volk_tg_username', telegramData.username);
+    localStorage.setItem('volk_tg_first_name', telegramData.first_name);
+
     try {
       if (useSupabase) {
         const email = `${telegramData.id}@telegram.volki.app`;
         const password = `volki_tg_${telegramData.id}_secure`;
 
-        // Try sign in first
+        // 1. Force registration via RPC first. This creates the user securely in auth.users,
+        // populates the identities mapping, and sets GoTrue compatible tokens to avoid 500 schema error.
+        try {
+          const { data: registerResult, error: rpcError } = await supabase.rpc('register_telegram_user', {
+            tg_id: telegramData.id,
+            tg_username: telegramData.username || `user_${telegramData.id}`,
+            tg_first_name: telegramData.first_name || 'Гравець'
+          });
+          
+          if (rpcError) {
+            console.warn('[VOLKI] Pre-login RPC registration returned error:', rpcError);
+          } else {
+            console.log('[VOLKI] Pre-login RPC registration successful:', registerResult);
+          }
+        } catch (rpcErr) {
+          console.warn('[VOLKI] Pre-login RPC registration exception:', rpcErr);
+        }
+
+        // 2. Sign in with password (now guaranteed to succeed since user is securely registered with identities)
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
-        if (signInError) {
-          // Try sign up
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                username: telegramData.username,
-                telegram_id: telegramData.id,
-                telegram_username: telegramData.username
-              }
-            }
-          });
-
-          if (!signUpError && signUpData?.user) {
-            // Try sign in again after signup
-            const { error: retryError } = await supabase.auth.signInWithPassword({ email, password });
-            if (!retryError) {
-              supabaseSuccess = true;
-            }
-          }
-        } else {
+        if (!signInError) {
           supabaseSuccess = true;
+        } else {
+          console.error('[VOLKI] Sign-in failed even after RPC registration:', signInError);
         }
 
         if (supabaseSuccess) {
@@ -976,6 +1074,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setIsAuthenticated(false);
     localStorage.removeItem('volk_session');
+    localStorage.removeItem('volk_tg_id');
+    localStorage.removeItem('volk_tg_username');
+    localStorage.removeItem('volk_tg_first_name');
+    localStorage.removeItem('volk_user');
     setUser(DEFAULT_USER);
     setPredictions([]);
     showToast('Ви вийшли з акаунту', 'info');

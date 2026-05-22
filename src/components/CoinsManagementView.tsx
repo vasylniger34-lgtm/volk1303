@@ -76,7 +76,17 @@ export const CoinsManagementView: React.FC = () => {
         .order(sortBy === 'username' ? 'username' : sortBy === 'balance' ? 'balance' : sortBy === 'wins' ? 'wins' : 'level', { ascending: sortAsc });
 
       if (searchQuery.trim()) {
-        query = query.ilike('username', `%${searchQuery}%`);
+        const searchInput = searchQuery.trim();
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const regNumStr = searchInput.startsWith('#') ? searchInput.slice(1) : searchInput;
+
+        if (uuidRegex.test(searchInput)) {
+          query = query.eq('id', searchInput);
+        } else if (/^\d+$/.test(regNumStr)) {
+          query = query.eq('reg_num', parseInt(regNumStr, 10));
+        } else {
+          query = query.ilike('username', `%${searchInput}%`);
+        }
       } else {
         query = query.limit(60);
       }
@@ -99,26 +109,37 @@ export const CoinsManagementView: React.FC = () => {
     fetchStats();
   }, [fetchStats]);
 
-  // Quick action: find user by nick and add/remove coins
+  // Quick action: find user by nick, ID or reg_num and add/remove coins
   const handleQuickAction = async (action: 'add' | 'subtract') => {
-    const nick = quickNick.trim();
+    const searchInput = quickNick.trim();
     const num = Number(quickAmount);
-    if (!nick || !num || isNaN(num) || num <= 0) {
-      setQuickResult({ ok: false, msg: 'Введіть нік і суму' });
+    if (!searchInput || !num || isNaN(num) || num <= 0) {
+      setQuickResult({ ok: false, msg: 'Введіть нік/ID/номер і суму' });
       return;
     }
     setActionLoading(true);
     setQuickResult(null);
     try {
-      const { data: found, error: findErr } = await supabase
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const regNumStr = searchInput.startsWith('#') ? searchInput.slice(1) : searchInput;
+
+      let findQuery = supabase
         .from('profiles')
         .select('id, username, balance')
-        .ilike('username', nick)
-        .limit(1)
-        .single();
+        .limit(1);
+
+      if (uuidRegex.test(searchInput)) {
+        findQuery = findQuery.eq('id', searchInput);
+      } else if (/^\d+$/.test(regNumStr)) {
+        findQuery = findQuery.eq('reg_num', parseInt(regNumStr, 10));
+      } else {
+        findQuery = findQuery.ilike('username', searchInput);
+      }
+
+      const { data: found, error: findErr } = await findQuery.single();
 
       if (findErr || !found) {
-        setQuickResult({ ok: false, msg: `Гравця "${nick}" не знайдено` });
+        setQuickResult({ ok: false, msg: `Гравця "${searchInput}" не знайдено` });
         return;
       }
 
@@ -148,24 +169,35 @@ export const CoinsManagementView: React.FC = () => {
   };
 
   const handleSetBalance = async () => {
-    const nick = quickNick.trim();
+    const searchInput = quickNick.trim();
     const num = Number(quickAmount);
-    if (!nick || isNaN(num) || num < 0) {
-      setQuickResult({ ok: false, msg: 'Введіть нік і суму' });
+    if (!searchInput || isNaN(num) || num < 0) {
+      setQuickResult({ ok: false, msg: 'Введіть нік/ID/номер і суму' });
       return;
     }
     setActionLoading(true);
     setQuickResult(null);
     try {
-      const { data: found, error: findErr } = await supabase
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const regNumStr = searchInput.startsWith('#') ? searchInput.slice(1) : searchInput;
+
+      let findQuery = supabase
         .from('profiles')
         .select('id, username')
-        .ilike('username', nick)
-        .limit(1)
-        .single();
+        .limit(1);
+
+      if (uuidRegex.test(searchInput)) {
+        findQuery = findQuery.eq('id', searchInput);
+      } else if (/^\d+$/.test(regNumStr)) {
+        findQuery = findQuery.eq('reg_num', parseInt(regNumStr, 10));
+      } else {
+        findQuery = findQuery.ilike('username', searchInput);
+      }
+
+      const { data: found, error: findErr } = await findQuery.single();
 
       if (findErr || !found) {
-        setQuickResult({ ok: false, msg: `Гравця "${nick}" не знайдено` });
+        setQuickResult({ ok: false, msg: `Гравця "${searchInput}" не знайдено` });
         return;
       }
 
@@ -174,6 +206,8 @@ export const CoinsManagementView: React.FC = () => {
       setQuickAmount('');
       fetchUsers();
       fetchStats();
+    } catch (err) {
+      setQuickResult({ ok: false, msg: 'Помилка оновлення' });
     } finally {
       setActionLoading(false);
     }
@@ -249,7 +283,7 @@ export const CoinsManagementView: React.FC = () => {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             type="text"
-            placeholder="Нікнейм гравця..."
+            placeholder="Нікнейм, ID або #номер..."
             value={quickNick}
             onChange={e => { setQuickNick(e.target.value); setQuickResult(null); }}
             style={{
@@ -327,7 +361,7 @@ export const CoinsManagementView: React.FC = () => {
             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8F8F9B', pointerEvents: 'none' }} />
             <input
               type="text"
-              placeholder="Пошук за ніком..."
+              placeholder="Пошук за ніком, ID або #номером..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
