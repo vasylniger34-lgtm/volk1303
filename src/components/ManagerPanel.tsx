@@ -815,6 +815,43 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
   const activeMatch = matches.find(m => m.id === selectedMatchId);
 
+  // Auto-win and Dynamic Odds Handler
+  const handleScoreChange = (team: 'A' | 'B', delta: number) => {
+    if (!activeMatch) return;
+    let newA = editScoreA;
+    let newB = editScoreB;
+    if (team === 'A') newA = Math.max(0, newA + delta);
+    if (team === 'B') newB = Math.max(0, newB + delta);
+    
+    setEditScoreA(newA);
+    setEditScoreB(newB);
+
+    const diff = newA - newB;
+    let newOddsA = 1.85;
+    let newOddsB = 1.85;
+
+    if (diff > 0) {
+      newOddsA = Math.max(1.05, Number((1.85 - diff * 0.08).toFixed(2)));
+      newOddsB = Math.min(10.0, Number((1.85 + diff * 0.2).toFixed(2)));
+    } else if (diff < 0) {
+      newOddsB = Math.max(1.05, Number((1.85 - Math.abs(diff) * 0.08).toFixed(2)));
+      newOddsA = Math.min(10.0, Number((1.85 + Math.abs(diff) * 0.2).toFixed(2)));
+    }
+    
+    setEditOddsA(newOddsA);
+    setEditOddsB(newOddsB);
+
+    // Save changes to server immediately to keep it snappy
+    setMatchScore(activeMatch.id, newA, newB, 'live', null);
+    updateMatchOdds(activeMatch.id, newOddsA, newOddsB);
+
+    // Auto-finish at 13
+    if (newA >= 13 || newB >= 13) {
+      finishMatchWithScore(activeMatch.id, newA, newB);
+      showToast(`Матч автоматично завершено: 13 раундів!`, 'success');
+    }
+  };
+
   // Stat Counters
   const liveMatchesCount = matches.filter(m => m.status === 'live').length;
   const upcomingMatchesCount = matches.filter(m => m.status === 'scheduled').length;
@@ -1610,6 +1647,24 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   <Play size={10} /> Запустити
                                 </button>
                               )}
+                              {t.status === 'active' && (
+                                <button 
+                                  onClick={() => {
+                                    if (confirm(`Завершити турнір "${t.name}" та відправити в архів?`)) {
+                                      updateTournament(t.id, { status: 'completed' });
+                                      setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Completed tournament: "${t.name}"`]);
+                                      showToast('Турнір успішно завершено та архівовано!', 'success');
+                                    }
+                                  }}
+                                  style={{
+                                    background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.2)',
+                                    borderRadius: '8px', padding: '6px 12px', fontSize: '11px', color: '#8B5CF6', fontWeight: '700',
+                                    fontFamily: 'Outfit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                  }}
+                                >
+                                  <CheckCircle2 size={10} /> Завершити
+                                </button>
+                              )}
                               {tTeams.length < t.maxParticipants && (
                                 <button 
                                   onClick={async () => {
@@ -2301,14 +2356,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                       </span>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <button 
-                                          onClick={() => setEditScoreA(prev => Math.max(0, prev - 1))}
+                                          onClick={() => handleScoreChange('A', -1)}
                                           style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.03)', color: 'white', cursor: 'pointer', fontWeight: '800' }}
                                         >
                                           -
                                         </button>
                                         <span style={{ fontSize: '28px', fontWeight: '950', fontFamily: 'Outfit', minWidth: '32px' }}>{editScoreA}</span>
                                         <button 
-                                          onClick={() => setEditScoreA(prev => prev + 1)}
+                                          onClick={() => handleScoreChange('A', 1)}
                                           style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,92,0,0.1)', color: '#FF5C00', cursor: 'pointer', fontWeight: '800' }}
                                         >
                                           +
@@ -2325,14 +2380,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                       </span>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <button 
-                                          onClick={() => setEditScoreB(prev => Math.max(0, prev - 1))}
+                                          onClick={() => handleScoreChange('B', -1)}
                                           style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.03)', color: 'white', cursor: 'pointer', fontWeight: '800' }}
                                         >
                                           -
                                         </button>
                                         <span style={{ fontSize: '28px', fontWeight: '950', fontFamily: 'Outfit', minWidth: '32px' }}>{editScoreB}</span>
                                         <button 
-                                          onClick={() => setEditScoreB(prev => prev + 1)}
+                                          onClick={() => handleScoreChange('B', 1)}
                                           style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: 'rgba(255,92,0,0.1)', color: '#FF5C00', cursor: 'pointer', fontWeight: '800' }}
                                         >
                                           +

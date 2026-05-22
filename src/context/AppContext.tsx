@@ -868,32 +868,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const email = `${telegramData.id}@telegram.volki.app`;
         const password = `volki_tg_${telegramData.id}_secure`;
 
-        // Try sign in first
+        // 1. Force registration via RPC first. This creates the user securely in auth.users,
+        // populates the identities mapping, and sets GoTrue compatible tokens to avoid 500 schema error.
+        try {
+          const { data: registerResult, error: rpcError } = await supabase.rpc('register_telegram_user', {
+            tg_id: telegramData.id,
+            tg_username: telegramData.username || `user_${telegramData.id}`,
+            tg_first_name: telegramData.first_name || 'Гравець'
+          });
+          
+          if (rpcError) {
+            console.warn('[VOLKI] Pre-login RPC registration returned error:', rpcError);
+          } else {
+            console.log('[VOLKI] Pre-login RPC registration successful:', registerResult);
+          }
+        } catch (rpcErr) {
+          console.warn('[VOLKI] Pre-login RPC registration exception:', rpcErr);
+        }
+
+        // 2. Sign in with password (now guaranteed to succeed since user is securely registered with identities)
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
-        if (signInError) {
-          // Try sign up
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                username: telegramData.username,
-                telegram_id: telegramData.id,
-                telegram_username: telegramData.username
-              }
-            }
-          });
-
-          if (!signUpError && signUpData?.user) {
-            // Try sign in again after signup
-            const { error: retryError } = await supabase.auth.signInWithPassword({ email, password });
-            if (!retryError) {
-              supabaseSuccess = true;
-            }
-          }
-        } else {
+        if (!signInError) {
           supabaseSuccess = true;
+        } else {
+          console.error('[VOLKI] Sign-in failed even after RPC registration:', signInError);
         }
 
         if (supabaseSuccess) {

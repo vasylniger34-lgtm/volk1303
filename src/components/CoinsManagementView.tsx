@@ -19,12 +19,13 @@ export const CoinsManagementView: React.FC = () => {
     try {
       let query = supabase
         .from('profiles')
-        .select('id, username, user_coins(registration_number, coins)')
-        .order('username', { ascending: true })
-        .limit(50);
+        .select('id, username, reg_num, balance')
+        .order('username', { ascending: true });
 
       if (searchQuery.trim()) {
         query = query.ilike('username', `%${searchQuery}%`);
+      } else {
+        query = query.limit(50);
       }
 
       const { data, error } = await query;
@@ -59,15 +60,15 @@ export const CoinsManagementView: React.FC = () => {
       // Refresh the specific user's balance locally
       setUsers(users.map(u => {
         if (u.id === selectedUser.id) {
-          const currentCoins = u.user_coins?.[0]?.coins || 0;
-          let newCoins = currentCoins;
-          if (action === 'add') newCoins += numAmount;
-          if (action === 'subtract') newCoins -= numAmount;
-          if (action === 'set') newCoins = numAmount;
+          const currentBalance = u.balance || 0;
+          let newBalance = currentBalance;
+          if (action === 'add') newBalance += numAmount;
+          if (action === 'subtract') newBalance -= numAmount;
+          if (action === 'set') newBalance = numAmount;
           
           return {
             ...u,
-            user_coins: [{ ...u.user_coins?.[0], coins: newCoins }]
+            balance: newBalance
           };
         }
         return u;
@@ -81,6 +82,10 @@ export const CoinsManagementView: React.FC = () => {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const getHashtag = (user: any) => {
+    return user.reg_num || 'N/A';
   };
 
   return (
@@ -109,18 +114,18 @@ export const CoinsManagementView: React.FC = () => {
           <div key={user.id} style={{
             background: '#1a1a1a', padding: '15px', borderRadius: '8px',
             border: selectedUser?.id === user.id ? '1px solid #FF5C00' : '1px solid #333',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
           }} onClick={() => setSelectedUser(user)}>
             <div>
               <h3 style={{ margin: '0 0 5px 0' }}>
-                {user.username}#{user.user_coins?.[0]?.registration_number || 'N/A'}
+                {user.username}#{getHashtag(user)}
               </h3>
               <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>
-                Reg #: {user.user_coins?.[0]?.registration_number || 'N/A'}
+                Reg #: {getHashtag(user)}
               </p>
             </div>
             <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#FF5C00' }}>
-              {user.user_coins?.[0]?.coins || 0}
+              {user.balance || 0}
             </div>
           </div>
         ))}
@@ -128,7 +133,7 @@ export const CoinsManagementView: React.FC = () => {
 
       {selectedUser && (
         <div style={{ marginTop: '20px', background: '#222', padding: '20px', borderRadius: '8px' }}>
-          <h3>Manage Coins for {selectedUser.username}#{selectedUser.user_coins?.[0]?.registration_number || 'N/A'}</h3>
+          <h3>Manage Coins for {selectedUser.username}#{getHashtag(selectedUser)}</h3>
           <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
             <input
               type="number"

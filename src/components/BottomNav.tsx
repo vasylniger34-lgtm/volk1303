@@ -1,16 +1,15 @@
 import React from 'react';
-import { Home, Trophy, Swords, Landmark, User, Tv } from 'lucide-react';
+import { Home, Trophy, Swords, Landmark, User } from 'lucide-react';
 
 interface BottomNavProps {
-  currentView: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'streams';
-  onNavigate: (view: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'streams') => void;
+  currentView: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin';
+  onNavigate: (view: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin') => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ currentView, onNavigate }) => {
   const navItems = [
     { id: 'home', label: 'Головна', icon: Home },
     { id: 'tournaments', label: 'Турніри', icon: Trophy },
-    { id: 'streams', label: 'Стріми', icon: Tv },
     { id: 'matches', label: 'Матчі', icon: Swords },
     { id: 'bets', label: 'Ставки', icon: Landmark },
     { id: 'profile', label: 'Профіль', icon: User }

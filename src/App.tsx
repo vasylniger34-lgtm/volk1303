@@ -13,12 +13,11 @@ import { ProfileView } from './components/ProfileView';
 import { AdminPanel } from './components/AdminPanel';
 import { ManagerPanel } from './components/ManagerPanel';
 import { AuthModal } from './components/AuthModal';
-import { StreamsView } from './components/StreamsView';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   // Navigation states
-  const [view, setView] = useState<'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager' | 'streams'>('home');
+  const [view, setView] = useState<'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager'>('home');
   
   // Selection states
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
@@ -28,7 +27,7 @@ const AppContent: React.FC = () => {
   const { toast, hideToast, isAuthenticated, isLoading, authLogin } = useApp();
 
   // Navigation controller helper
-  const navigateTo = (targetView: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager' | 'streams') => {
+  const navigateTo = (targetView: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin' | 'manager') => {
     setView(targetView);
     setSelectedTournamentId(null);
     setSelectedMatchId(null);
@@ -130,12 +129,6 @@ const AppContent: React.FC = () => {
         return (
           <TournamentsView 
             onSelectTournament={(id) => setSelectedTournamentId(id)}
-          />
-        );
-      case 'streams':
-        return (
-          <StreamsView 
-            onSelectMatch={(id) => setSelectedMatchId(id)}
           />
         );
       case 'matches':
