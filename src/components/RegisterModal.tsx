@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, ChevronLeft, Plus, Check } from 'lucide-react';
+import { X, ChevronLeft, Check } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface RegisterModalProps {
@@ -30,69 +30,47 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
 
   if (!tourney) return null;
 
-  const checkAndAddPlayer = async (rawInput: string) => {
-    if (!rawInput.trim()) {
-      alert('Введіть ID гравця (наприклад 1005)');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    const searchId = parseInt(newPlayerInput.replace(/\D/g, ''), 10);
+    if (!searchId || isNaN(searchId)) {
+      setSearchResults([]);
       return;
     }
     
-    // Convert to number for reg_num check
-    const searchId = parseInt(rawInput.replace('#', '').trim(), 10);
-    if (isNaN(searchId)) {
-      alert('ID гравця має бути числом (наприклад 1005)');
-      return;
-    }
-
-    if (players.some(p => p.username === rawInput || (p.id !== 'local' && p.id === String(searchId)))) {
-      alert('Цей гравець вже є у списку запрошень!');
-      return;
-    }
-    
-    if (players.length >= 2) {
-      alert('Для формату 2х2 максимум 2 гравці!');
-      return;
-    }
-
-    const useSupabase = isSupabaseConfigured();
-
-    if (useSupabase) {
-      try {
+    setIsSearching(true);
+    const timeoutId = setTimeout(async () => {
+      const useSupabase = isSupabaseConfigured();
+      if (useSupabase) {
         const { data, error } = await supabase
           .from('profiles')
           .select('id, username, telegram_username, reg_num')
           .eq('reg_num', searchId);
-
-        if (error) {
-          console.error('[VOLKI] Supabase query error checking user:', error);
-        }
-
-        if (!data || data.length === 0) {
-          alert(`Гравця з ID ${searchId} не знайдено! Перевірте правильність написання.`);
-          return;
-        }
         
-        if (data[0].id === user?.id) {
-          alert('Ви не можете запросити самі себе!');
-          return;
-        }
-        
-        const dbUser = data[0];
-        const matchedName = dbUser.username || dbUser.telegram_username || String(dbUser.reg_num);
-        const formattedName = matchedName.startsWith('@') ? matchedName : `@${matchedName}`;
-        
-        setPlayers([...players, { id: dbUser.id, username: formattedName }]);
-        setNewPlayerInput('');
-      } catch (err) {
-        console.error('[VOLKI] Error checking user:', err);
+        if (error) console.error('[VOLKI] Search error:', error);
+        setSearchResults(data || []);
+      } else {
+        setSearchResults([{ id: String(searchId), username: `@player_${searchId}`, reg_num: searchId }]);
       }
-    } else {
-      setPlayers([...players, { id: String(searchId), username: `@player_${searchId}` }]);
-      setNewPlayerInput('');
-    }
-  };
+      setIsSearching(false);
+    }, 500);
 
-  const handleAddPlayer = () => {
-    checkAndAddPlayer(newPlayerInput);
+    return () => clearTimeout(timeoutId);
+  }, [newPlayerInput]);
+
+  const handleAddPlayer = (dbUser: any) => {
+    if (dbUser.id === user?.id) {
+      alert('Ви не можете запросити самі себе!');
+      return;
+    }
+    const matchedName = dbUser.username || dbUser.telegram_username || String(dbUser.reg_num);
+    const formattedName = matchedName.startsWith('@') ? matchedName : `@${matchedName}`;
+    
+    setPlayers([...players, { id: dbUser.id, username: formattedName }]);
+    setNewPlayerInput('');
+    setSearchResults([]);
   };
 
   const handleRemovePlayer = (idx: number) => {
@@ -115,6 +93,15 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
       }
       setStep(2);
     } else if (step === 2) {
+      if (players.length === 1 && joinType === 'invite_only') {
+        const confirmChange = window.confirm(
+          'Ви не додали жодного гравця у команду по запрошенням.\n\nБажаєте автоматично змінити тип команди на "Закриту" та згенерувати пароль, щоб друг міг приєднатися пізніше?\n\n(ОК - згенерувати пароль, Скасувати - залишити як є)'
+        );
+        if (confirmChange) {
+          setJoinType('closed');
+          setPassword(Math.random().toString(36).substring(2, 8).toUpperCase());
+        }
+      }
       setStep(3);
     } else if (step === 3) {
       const success = registerTeam(tournamentId, {
@@ -352,7 +339,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
             {/* Add player form */}
             {players.length < 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
                   <input
                     type="text"
                     className="form-input"
@@ -360,22 +347,52 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
                     value={newPlayerInput}
                     onChange={(e) => setNewPlayerInput(e.target.value)}
                   />
-                  <button
-                    onClick={handleAddPlayer}
-                    style={{
-                      backgroundColor: 'rgba(255, 92, 0, 0.05)',
-                      border: '1px solid rgba(255, 92, 0, 0.15)',
+                  {/* Results Dropdown */}
+                  {newPlayerInput.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: '4px',
+                      background: '#15151A',
+                      border: '1px solid rgba(255,255,255,0.1)',
                       borderRadius: '12px',
-                      color: '#FF5C00',
-                      width: '46px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Plus size={20} />
-                  </button>
+                      padding: '8px',
+                      zIndex: 10,
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
+                    }}>
+                      {isSearching ? (
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#8F8F9B', fontSize: '11px', fontFamily: 'Outfit' }}>Пошук...</div>
+                      ) : searchResults.length > 0 ? (
+                        searchResults.map(res => {
+                           const matchedName = res.username || res.telegram_username || String(res.reg_num);
+                           const formattedName = matchedName.startsWith('@') ? matchedName : `@${matchedName}`;
+                           return (
+                             <div 
+                               key={res.id} 
+                               onClick={() => handleAddPlayer(res)}
+                               style={{
+                                 display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', 
+                                 cursor: 'pointer', borderRadius: '8px', background: 'rgba(255,255,255,0.03)',
+                                 transition: 'all 0.2s', marginBottom: '4px'
+                               }}
+                             >
+                               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(255,92,0,0.2), rgba(255,92,0,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', border: '1px solid rgba(255,92,0,0.2)' }}>
+                                 🐺
+                               </div>
+                               <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                 <span style={{ fontSize: '13px', fontWeight: '800', color: 'white', fontFamily: 'Outfit' }}>{formattedName}</span>
+                                 <span style={{ fontSize: '11px', color: '#8F8F9B' }}>#{res.reg_num}</span>
+                               </div>
+                             </div>
+                           );
+                        })
+                      ) : (
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#EF4444', fontSize: '11px', fontFamily: 'Outfit' }}>Гравця не знайдено</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
