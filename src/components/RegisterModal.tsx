@@ -16,7 +16,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
   const userHandle = user?.username ? (user.username.startsWith('@') ? user.username : `@${user.username}`) : '@volki_player';
 
   // Wizard steps
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [createdTeamId, setCreatedTeamId] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState(180);
 
   // Form states
   const [teamName, setTeamName] = useState(user?.username ? `${user.username.replace('@', '').toUpperCase()} Team` : 'VOLK Team');
@@ -27,6 +29,63 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
   const captain = userHandle;
   const [players, setPlayers] = useState<{ id: string; username: string }[]>([{ id: user?.id || 'local', username: userHandle }]);
   const [newPlayerInput, setNewPlayerInput] = useState('');
+
+  // Step 4 Polling Logic
+  useEffect(() => {
+    if (step !== 4 || !createdTeamId) return;
+
+    const timerInterval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    const checkInterval = setInterval(async () => {
+      if (!isSupabaseConfigured()) return;
+      const { data, error } = await supabase
+        .from('team_invites')
+        .select('status')
+        .eq('team_id', createdTeamId)
+        .limit(1)
+        .single();
+      
+      if (!error && data) {
+        if (data.status === 'accepted') {
+          clearInterval(checkInterval);
+          clearInterval(timerInterval);
+          onSuccess();
+        } else if (data.status === 'declined' || data.status === 'expired') {
+          clearInterval(checkInterval);
+          clearInterval(timerInterval);
+          alert(data.status === 'declined' ? 'Гравець відхилив запрошення.' : 'Час очікування вичерпано.');
+          await supabase.from('teams').delete().eq('id', createdTeamId);
+          setStep(2);
+          setCreatedTeamId(null);
+          setTimeLeft(180);
+        }
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(timerInterval);
+      clearInterval(checkInterval);
+    };
+  }, [step, createdTeamId, onSuccess]);
+
+  useEffect(() => {
+    if (step === 4 && timeLeft === 0 && createdTeamId) {
+      alert('Час на прийняття запрошення вичерпано.');
+      supabase.from('teams').delete().eq('id', createdTeamId).then(() => {
+        setStep(2);
+        setCreatedTeamId(null);
+        setTimeLeft(180);
+      });
+    }
+  }, [timeLeft, step, createdTeamId]);
 
   if (!tourney) return null;
 
@@ -115,7 +174,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
     setPlayers(players.filter((_, i) => i !== idx));
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1) {
       if (!teamName.trim()) {
         alert('Введіть назву команди!');
@@ -138,7 +197,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
       }
       setStep(3);
     } else if (step === 3) {
-      const success = registerTeam(tournamentId, {
+      const success = await registerTeam(tournamentId, {
         name: teamName,
         tag: teamTag.toUpperCase(),
         captain,
@@ -147,7 +206,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
         password,
         invites: players.filter(p => p.username !== captain).map(p => p.id)
       } as any);
-      if (success) {
+      if (typeof success === 'string') {
+        setCreatedTeamId(success);
+        setStep(4);
+      } else if (success) {
         onSuccess();
       }
     }
@@ -499,6 +561,44 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
           </div>
         )}
 
+        {/* STEP 4: Waiting for Invite */}
+        {step === 4 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
+            <h4 style={{ fontSize: '14px', color: 'white', fontWeight: '700', textAlign: 'center' }}>
+              Очікування підтвердження
+            </h4>
+            
+            <div style={{ 
+              width: '80px', 
+              height: '80px', 
+              borderRadius: '50%', 
+              border: '4px solid rgba(255, 92, 0, 0.2)',
+              borderTopColor: '#FF5C00',
+              animation: 'spin 1s linear infinite',
+              margin: '20px auto'
+            }} />
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
+            
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '13px', color: '#8F8F9B', marginBottom: '8px' }}>
+                Запрошення відправлено в Telegram бота.
+              </p>
+              <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#FF5C00', fontFamily: 'Outfit' }}>
+                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </p>
+            </div>
+            
+            <p style={{ fontSize: '11px', color: '#51515E', textAlign: 'center' }}>
+              Якщо гравець не підтвердить участь, реєстрацію буде скасовано.
+            </p>
+          </div>
+        )}
+
       </div>
 
       {/* Button footer */}
@@ -509,9 +609,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
         <button 
           className="btn-primary"
           onClick={handleNext}
-          style={{ width: '100%', padding: '14px' }}
+          disabled={step === 4}
+          style={{ width: '100%', padding: '14px', opacity: step === 4 ? 0.5 : 1 }}
         >
-          {step === 3 ? 'ЗАРЕЄСТРУВАТИСЬ' : 'ДАЛІ'}
+          {step === 4 ? 'ОЧІКУВАННЯ...' : step === 3 ? 'ЗАРЕЄСТРУВАТИСЬ' : 'ДАЛІ'}
         </button>
       </div>
       

@@ -634,16 +634,22 @@ def handle_callback_query(update: dict):
     if data.startswith("invite_accept_"):
         invite_id = data.replace("invite_accept_", "")
         
-        # Fetch invite details to get inviter's telegram_id and team name
-        invite_data = supabase_request("GET", f"team_invites?id=eq.{invite_id}&select=*,inviter:profiles!team_invites_inviter_id_fkey(telegram_id),teams(name)")
+        # Fetch invite details to get inviter's telegram_id and team id
+        invite_data = supabase_request("GET", f"team_invites?id=eq.{invite_id}&select=*,inviter:profiles!team_invites_inviter_id_fkey(telegram_id)")
         
         res = supabase_request("POST", "rpc/accept_team_invite", payload={"p_invite_id": invite_id})
         if res and isinstance(res, dict) and res.get("ok"):
             team_name = ""
             inviter_tg_id = None
             if invite_data and len(invite_data) > 0:
-                team_name = invite_data[0].get("teams", {}).get("name", "")
-                inviter_tg_id = invite_data[0].get("inviter", {}).get("telegram_id")
+                inv_rec = invite_data[0]
+                team_id = inv_rec.get("team_id")
+                inviter_tg_id = inv_rec.get("inviter", {}).get("telegram_id")
+                
+                # Fetch team name
+                team_data = supabase_request("GET", f"teams?id=eq.{team_id}&select=name")
+                if team_data and len(team_data) > 0:
+                    team_name = team_data[0].get("name", "")
                 
             tg_request("editMessageText", {
                 "chat_id": chat_id,
@@ -932,7 +938,7 @@ def monitor_new_invites():
     while True:
         try:
             # Fetch pending invites that haven't been notified yet
-            url = f"{SUPABASE_URL}/rest/v1/team_invites?status=eq.pending&bot_notified=eq.false&select=*,teams(name),tournaments(name),profiles!team_invites_invitee_id_fkey(telegram_id)"
+            url = f"{SUPABASE_URL}/rest/v1/team_invites?status=eq.pending&bot_notified=eq.false&select=*,profiles!team_invites_invitee_id_fkey(telegram_id)"
             headers = {
                 "apikey": SUPABASE_KEY,
                 "Authorization": f"Bearer {SUPABASE_KEY}"

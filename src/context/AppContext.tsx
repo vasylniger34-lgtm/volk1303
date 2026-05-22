@@ -119,7 +119,7 @@ interface AppContextType {
   toast: ToastMessage;
   showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
   hideToast: () => void;
-  registerTeam: (tournamentId: string, teamData: Omit<Team, 'id' | 'logoText' | 'logoBg'> & { password?: string, invites?: string[] }) => boolean;
+  registerTeam: (tournamentId: string, teamData: Omit<Team, 'id' | 'logoText' | 'logoBg'> & { password?: string, invites?: string[] }) => Promise<string | boolean>;
   placePrediction: (prediction: Omit<Prediction, 'id' | 'status' | 'payout' | 'date'>) => boolean;
   setMatchLive: (matchId: string) => void;
   setMatchScore: (matchId: string, scoreA: number, scoreB: number, status: 'live' | 'finished', winnerId?: string | null) => void;
@@ -1081,7 +1081,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Register Team ───
 
-  const registerTeam = (tournamentId: string, teamData: Omit<Team, 'id' | 'logoText' | 'logoBg'> & { password?: string, invites?: string[] }): boolean => {
+  const registerTeam = async (tournamentId: string, teamData: Omit<Team, 'id' | 'logoText' | 'logoBg'> & { password?: string, invites?: string[] }): Promise<string | boolean> => {
     const tourney = tournaments.find(t => t.id === tournamentId);
     if (!tourney) return false;
     if (tourney.participantsCount >= tourney.maxParticipants) {
@@ -1097,8 +1097,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       joinType: teamData.joinType || 'invite_only'
     };
 
+    let createdTeamId = '';
+
     if (useSupabase) {
-      supabase.from('teams').insert({
+      const { data, error } = await supabase.from('teams').insert({
         tournament_id: tournamentId,
         name: newTeam.name,
         tag: newTeam.tag,
@@ -1108,29 +1110,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logo_bg: newTeam.logoBg,
         join_type: newTeam.joinType,
         password: teamData.password || null
-      }).select('id').single().then(({ data }) => {
-        if (data && teamData.invites && teamData.invites.length > 0) {
-          const inviteInserts = teamData.invites.map(inviteeId => ({
-            team_id: data.id,
-            tournament_id: tournamentId,
-            inviter_id: user.id,
-            invitee_id: inviteeId,
-            status: 'pending'
-          }));
-          supabase.from('team_invites').insert(inviteInserts).then();
-        }
-      });
+      }).select('id').single();
+
+      if (error || !data) {
+        showToast('Помилка при створенні команди', 'error');
+        return false;
+      }
+
+      createdTeamId = data.id;
+
+      if (teamData.invites && teamData.invites.length > 0) {
+        const inviteInserts = teamData.invites.map(inviteeId => ({
+          team_id: data.id,
+          tournament_id: tournamentId,
+          inviter_id: user?.id,
+          invitee_id: inviteeId,
+          status: 'pending'
+        }));
+        await supabase.from('team_invites').insert(inviteInserts);
+      }
 
       const nextStatus = tourney.participantsCount + 1 === tourney.maxParticipants ? 'active' : tourney.status;
-      supabase.from('tournaments')
+      await supabase.from('tournaments')
         .update({ 
           participants_count: tourney.participantsCount + 1,
           status: nextStatus
         })
-        .eq('id', tournamentId).then();
+        .eq('id', tournamentId);
     }
 
-    setTeams(prev => ({ ...prev, [tournamentId]: [...(prev[tournamentId] || []), newTeam] }));
+    setTeams(prev => ({ ...prev, [tournamentId]: [...(prev[tournamentId] || []), { ...newTeam, id: createdTeamId || newTeam.id }] }));
     setTournaments(prev => prev.map(t => {
       if (t.id === tournamentId) {
         const newCount = t.participantsCount + 1;
