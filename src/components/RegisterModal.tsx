@@ -32,6 +32,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
 
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -40,10 +41,18 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
     if (!searchId || isNaN(searchId)) {
       setSearchResults([]);
       setIsSearching(false);
+      setSearchError(null);
       return;
     }
     
     setIsSearching(true);
+    setSearchError(null);
+    
+    const controller = new AbortController();
+    const abortTimeout = setTimeout(() => {
+      controller.abort();
+    }, 5000); // 5 second hard timeout for search
+
     const timeoutId = setTimeout(async () => {
       try {
         const useSupabase = isSupabaseConfigured();
@@ -51,24 +60,37 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
           const { data, error } = await supabase
             .from('profiles')
             .select('id, username, telegram_username, reg_num')
-            .eq('reg_num', searchId);
+            .eq('reg_num', searchId)
+            .abortSignal(controller.signal);
           
-          if (error) console.error('[VOLKI] Search error:', error);
+          if (error) {
+            console.error('[VOLKI] Search error:', error);
+            if (isMounted) setSearchError('Помилка бази даних. Спробуйте пізніше.');
+          }
           if (isMounted) setSearchResults(data || []);
         } else {
           if (isMounted) setSearchResults([{ id: String(searchId), username: `@player_${searchId}`, reg_num: searchId }]);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('[VOLKI] Search exception:', err);
-        if (isMounted) setSearchResults([]);
+        if (isMounted) {
+          if (err.name === 'AbortError') {
+            setSearchError('Перевищено час очікування. Перевірте інтернет.');
+          } else {
+            setSearchError('Помилка з\'єднання.');
+          }
+          setSearchResults([]);
+        }
       } finally {
-        setIsSearching(false);
+        if (isMounted) setIsSearching(false);
       }
     }, 500);
 
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
+      clearTimeout(abortTimeout);
+      controller.abort();
     };
   }, [newPlayerInput]);
 
@@ -375,30 +397,49 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
                       boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
                     }}>
                       {isSearching ? (
-                        <div style={{ padding: '12px', textAlign: 'center', color: '#8F8F9B', fontSize: '11px', fontFamily: 'Outfit' }}>Пошук...</div>
+                        <div style={{ textAlign: 'center', color: '#888', padding: '10px' }}>Пошук...</div>
+                      ) : searchError ? (
+                        <div style={{ textAlign: 'center', color: '#ef4444', padding: '10px' }}>{searchError}</div>
                       ) : searchResults.length > 0 ? (
                         searchResults.map(res => {
-                           const matchedName = res.username || res.telegram_username || String(res.reg_num);
-                           const formattedName = matchedName.startsWith('@') ? matchedName : `@${matchedName}`;
-                           return (
-                             <div 
-                               key={res.id} 
-                               onClick={() => handleAddPlayer(res)}
-                               style={{
-                                 display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', 
-                                 cursor: 'pointer', borderRadius: '8px', background: 'rgba(255,255,255,0.03)',
-                                 transition: 'all 0.2s', marginBottom: '4px'
-                               }}
-                             >
-                               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(255,92,0,0.2), rgba(255,92,0,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', border: '1px solid rgba(255,92,0,0.2)' }}>
-                                 🐺
-                               </div>
-                               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                 <span style={{ fontSize: '13px', fontWeight: '800', color: 'white', fontFamily: 'Outfit' }}>{formattedName}</span>
-                                 <span style={{ fontSize: '11px', color: '#8F8F9B' }}>#{res.reg_num}</span>
-                               </div>
-                             </div>
-                           );
+                          const matchedName = res.username || res.telegram_username || String(res.reg_num);
+                          const displayName = matchedName.startsWith('@') ? matchedName : `@${matchedName}`;
+                          return (
+                            <div 
+                              key={res.id}
+                              onClick={() => handleAddPlayer(res)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '12px',
+                                background: 'rgba(255,255,255,0.02)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                transition: 'background 0.2s'
+                              }}
+                              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                            >
+                              <div style={{
+                                width: '32px', height: '32px',
+                                borderRadius: '50%',
+                                background: 'linear-gradient(45deg, #FF4500, #FF8C00)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: 'white', fontWeight: 'bold', fontSize: '14px',
+                                marginRight: '12px'
+                              }}>
+                                {displayName.substring(1, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>
+                                  {displayName}
+                                </div>
+                                <div style={{ color: '#FF4500', fontSize: '12px', marginTop: '2px' }}>
+                                  #{res.reg_num}
+                                </div>
+                              </div>
+                            </div>
+                          );
                         })
                       ) : (
                         <div style={{ padding: '12px', textAlign: 'center', color: '#EF4444', fontSize: '11px', fontFamily: 'Outfit' }}>Гравця не знайдено</div>
