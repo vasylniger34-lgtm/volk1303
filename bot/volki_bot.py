@@ -633,20 +633,39 @@ def handle_callback_query(update: dict):
     # ─── Invite Handlers ───
     if data.startswith("invite_accept_"):
         invite_id = data.replace("invite_accept_", "")
+        
+        # Fetch invite details to get inviter's telegram_id and team name
+        invite_data = supabase_request("GET", f"team_invites?id=eq.{invite_id}&select=*,inviter:profiles!team_invites_inviter_id_fkey(telegram_id),teams(name)")
+        
         res = supabase_request("POST", "rpc/accept_team_invite", payload={"p_invite_id": invite_id})
         if res and isinstance(res, dict) and res.get("ok"):
+            team_name = ""
+            inviter_tg_id = None
+            if invite_data and len(invite_data) > 0:
+                team_name = invite_data[0].get("teams", {}).get("name", "")
+                inviter_tg_id = invite_data[0].get("inviter", {}).get("telegram_id")
+                
             tg_request("editMessageText", {
                 "chat_id": chat_id,
                 "message_id": message_id,
-                "text": f"✅ Ви успішно приєдналися до команди <b>{res.get('team_name', '')}</b>!",
+                "text": f"✅ Ви успішно приєдналися до команди <b>{team_name}</b>!\nТепер ви є у списку зареєстрованих.",
                 "parse_mode": "HTML"
             })
+            
+            # Notify inviter
+            if inviter_tg_id:
+                tg_request("sendMessage", {
+                    "chat_id": inviter_tg_id,
+                    "text": f"🎉 Ваш друг прийняв запрошення у команду <b>{team_name}</b>!\n\nКоманда повністю сформована і зареєстрована на турнір.",
+                    "parse_mode": "HTML"
+                })
         else:
-            tg_request("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "Помилка! Можливо, запрошення вже недійсне.", "show_alert": True})
+            err_msg = res.get("error", "Запрошення недійсне або вже оброблене.") if res else "Запрошення недійсне."
+            tg_request("answerCallbackQuery", {"callback_query_id": cq["id"], "text": err_msg, "show_alert": True})
             tg_request("editMessageText", {
                 "chat_id": chat_id,
                 "message_id": message_id,
-                "text": "❌ Запрошення недійсне або вже оброблене.",
+                "text": f"❌ {err_msg}",
                 "parse_mode": "HTML"
             })
         return
