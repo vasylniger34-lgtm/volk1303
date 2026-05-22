@@ -107,11 +107,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
     setIsSearching(true);
     setSearchError(null);
     
-    const controller = new AbortController();
-    const abortTimeout = setTimeout(() => {
-      controller.abort();
-    }, 5000); // 5 second hard timeout for search
-
     const timeoutId = setTimeout(async () => {
       try {
         const useSupabase = isSupabaseConfigured();
@@ -119,25 +114,21 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
           const { data, error } = await supabase
             .from('profiles')
             .select('id, username, telegram_username, reg_num')
-            .eq('reg_num', searchId)
-            .abortSignal(controller.signal);
+            .eq('reg_num', searchId);
           
           if (error) {
             console.error('[VOLKI] Search error:', error);
             if (isMounted) setSearchError('Помилка бази даних. Спробуйте пізніше.');
+          } else {
+            if (isMounted) setSearchResults(data || []);
           }
-          if (isMounted) setSearchResults(data || []);
         } else {
           if (isMounted) setSearchResults([{ id: String(searchId), username: `@player_${searchId}`, reg_num: searchId }]);
         }
       } catch (err: any) {
         console.error('[VOLKI] Search exception:', err);
         if (isMounted) {
-          if (err.name === 'AbortError') {
-            setSearchError('Перевищено час очікування. Перевірте інтернет.');
-          } else {
-            setSearchError('Помилка з\'єднання.');
-          }
+          setSearchError('Помилка з\'єднання.');
           setSearchResults([]);
         }
       } finally {
@@ -148,8 +139,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
-      clearTimeout(abortTimeout);
-      controller.abort();
     };
   }, [newPlayerInput]);
 
