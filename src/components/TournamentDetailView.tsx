@@ -261,7 +261,8 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
               gap: '12px',
               justifyContent: 'center'
             }}>
-              {/* 2nd Place */}
+              {/* 2nd Place - only if prize exists */}
+              {tourney.prizePlaces.second && (
               <div 
                 className="esports-card"
                 style={{
@@ -285,6 +286,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                   {tourney.prizePlaces.second.replace(' 🪙', '')}
                 </span>
               </div>
+              )}
 
               {/* 1st Place - Center highlighted */}
               <div 
@@ -323,7 +325,8 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                 </span>
               </div>
 
-              {/* 3rd Place */}
+              {/* 3rd Place - only if prize exists */}
+              {tourney.prizePlaces.third && (
               <div 
                 className="esports-card"
                 style={{
@@ -347,6 +350,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                   {tourney.prizePlaces.third.replace(' 🪙', '')}
                 </span>
               </div>
+              )}
             </div>
           </div>
 

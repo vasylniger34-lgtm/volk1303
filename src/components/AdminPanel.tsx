@@ -10,7 +10,7 @@ import {
 
 const ADMIN_PASSWORD = '11111111';
 
-const MAPS = ['de_dust2', 'de_mirage', 'de_inferno', 'de_nuke', 'de_ancient', 'de_anubis', 'de_vertigo', 'de_overpass'];
+const MAPS = ['de_dust2', 'de_mirage', 'de_inferno', 'de_nuke', 'de_ancient', 'de_anubis', 'de_train', 'de_cache'];
 
 interface AdminPanelProps {
   onExitAdmin?: () => void;
