@@ -21,7 +21,7 @@ export interface Team {
 export interface Tournament {
   id: string;
   name: string;
-  type: '2X2' | '4X4' | 'BCI';
+  type: '2X2' | '3X3' | '4X4' | '5X5' | 'BCI';
   date: string;
   prizePool: string;
   prizePlaces: {
@@ -535,7 +535,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setTournaments(tourneysData.map(t => ({
             id: t.id,
             name: t.name,
-            type: t.type as '2X2' | '4X4' | 'BCI',
+            type: t.type as '2X2' | '3X3' | '4X4' | '5X5' | 'BCI',
             date: t.date,
             prizePool: t.prize_pool,
             prizePlaces: {
@@ -774,7 +774,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const mapped: Tournament = {
             id: newRow.id,
             name: newRow.name,
-            type: newRow.type as '2X2' | '4X4' | 'BCI',
+            type: newRow.type as '2X2' | '3X3' | '4X4' | '5X5' | 'BCI',
             date: newRow.date,
             prizePool: newRow.prize_pool,
             prizePlaces: {
@@ -801,7 +801,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               return {
                 ...t,
                 name: newRow.name,
-                type: newRow.type as '2X2' | '4X4' | 'BCI',
+                type: newRow.type as '2X2' | '3X3' | '4X4' | '5X5' | 'BCI',
                 date: newRow.date,
                 prizePool: newRow.prize_pool,
                 prizePlaces: {
@@ -932,9 +932,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Simulated live score ticking is disabled per user request to enforce manual administrator referee control.
   }, []);
 
+  // ─── Toast ───
+
+  const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setToast({ show: true, message, type });
+  }, []);
+
+  const hideToast = useCallback(() => {
+    setToast(prev => ({ ...prev, show: false }));
+  }, []);
+
   // ─── Auth Methods ───
 
-  const authLogin = async (telegramData: { id: string; username: string; first_name: string }) => {
+  const authLogin = useCallback(async (telegramData: { id: string; username: string; first_name: string }) => {
     setIsLoading(true);
     let supabaseSuccess = false;
 
@@ -1041,9 +1051,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('volk_session', 'true');
     showToast(`Вітаємо, @${telegramData.username}! 🎮`, 'success');
     setIsLoading(false);
-  };
+  }, [useSupabase, showToast]);
 
-  const authLogout = async () => {
+  const authLogout = useCallback(async () => {
     if (useSupabase) {
       await supabase.auth.signOut();
     }
@@ -1056,17 +1066,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUser(DEFAULT_USER);
     setPredictions([]);
     showToast('Ви вийшли з акаунту', 'info');
-  };
-
-  // ─── Toast ───
-
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setToast({ show: true, message, type });
-  };
-
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, show: false }));
-  };
+  }, [useSupabase, showToast]);
 
   const addFunds = (amount: number) => {
     if (useSupabase) {
@@ -1104,8 +1104,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logo_bg: newTeam.logoBg
       }).then();
 
+      const nextStatus = tourney.participantsCount + 1 === tourney.maxParticipants ? 'active' : tourney.status;
       supabase.from('tournaments')
-        .update({ participants_count: tourney.participantsCount + 1 })
+        .update({ 
+          participants_count: tourney.participantsCount + 1,
+          status: nextStatus
+        })
         .eq('id', tournamentId).then();
     }
 

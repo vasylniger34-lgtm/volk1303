@@ -27,7 +27,7 @@ export interface ProfileRow {
 export interface TournamentRow {
   id: string;
   name: string;
-  type: '2X2' | '4X4' | 'BCI';
+  type: '2X2' | '3X3' | '4X4' | '5X5' | 'BCI';
   date: string;
   prize_pool: string;
   prize_first: string | null;

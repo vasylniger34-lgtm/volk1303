@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { Trophy, Swords, TrendingUp, User, ChevronRight, Zap } from 'lucide-react';
+import { getFormatBadgeStyle } from './TournamentsView';
 
 interface HomeViewProps {
   onNavigate: (view: 'home' | 'tournaments' | 'matches' | 'bets' | 'profile' | 'admin') => void;
@@ -135,14 +136,20 @@ export const HomeView: React.FC<HomeViewProps> = ({
     return resultDate.getTime();
   };
 
+  const isTournamentCompleted = (t: any): boolean => {
+    if (t.status === 'completed') return true;
+    const tourneyMatches = matches.filter(m => m.tournamentId === t.id);
+    return tourneyMatches.length > 0 && tourneyMatches.every(m => m.status === 'finished');
+  };
+
   const getSortScore = (t: any): number => {
     const timestamp = parseTourneyDate(t.date);
     
     // Prioritize active (live) tournaments first
-    if (t.status === 'active') return -1000000000000 + timestamp;
+    if (t.status === 'active' && !isTournamentCompleted(t)) return -1000000000000 + timestamp;
     
     // Then upcoming tournaments sorted chronologically ascending (closest first)
-    if (t.status === 'upcoming') return timestamp;
+    if (t.status === 'upcoming' && !isTournamentCompleted(t)) return timestamp;
     
     // Completed tournaments go to the bottom sorted chronologically descending
     return 1000000000000 - timestamp;
@@ -151,8 +158,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const sortedTournaments = [...tournaments].sort((a, b) => getSortScore(a) - getSortScore(b));
 
   // Find featured tournament: prioritize any active (live) tournament, then the closest upcoming one
-  const featuredTourney = sortedTournaments.find(t => t.status === 'active') || 
-                          sortedTournaments.find(t => t.status === 'upcoming');
+  const featuredTourney = sortedTournaments.find(t => t.status === 'active' && !isTournamentCompleted(t)) || 
+                          sortedTournaments.find(t => t.status === 'upcoming' && !isTournamentCompleted(t));
   
   // Find live match
   const liveMatch = matches.find(m => m.status === 'live');
@@ -160,7 +167,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   // Get other tournaments (excluding the featured one and excluding completed ones)
   const upcomingTourneys = sortedTournaments.filter(t => 
     t.id !== featuredTourney?.id && 
-    t.status !== 'completed'
+    !isTournamentCompleted(t)
   );
 
   return (
@@ -241,7 +248,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <span style={{ fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase', display: 'block', fontWeight: '700', letterSpacing: '0.5px' }}>
                   Формат
                 </span>
-                <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--primary-orange)', fontFamily: 'Outfit, sans-serif' }}>
+                <span style={{ fontSize: '16px', fontWeight: '800', color: getFormatBadgeStyle(featuredTourney.type).color, fontFamily: 'Outfit, sans-serif' }}>
                   {featuredTourney.type}
                 </span>
               </div>
@@ -544,14 +551,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   width: '38px',
                   height: '38px',
                   borderRadius: '10px',
-                  backgroundColor: tourney.type === '4X4' ? 'rgba(255, 92, 0, 0.08)' : 'rgba(139, 92, 246, 0.08)',
-                  border: `1px solid ${tourney.type === '4X4' ? 'rgba(255, 92, 0, 0.15)' : 'rgba(139, 92, 246, 0.15)'}`,
+                  backgroundColor: getFormatBadgeStyle(tourney.type).bg,
+                  border: `1px solid ${getFormatBadgeStyle(tourney.type).border}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '11px',
                   fontWeight: '900',
-                  color: tourney.type === '4X4' ? 'var(--primary-orange)' : 'var(--accent-purple)',
+                  color: getFormatBadgeStyle(tourney.type).color,
                   fontFamily: 'Outfit, sans-serif'
                 }}>
                   {tourney.type}

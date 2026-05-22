@@ -35,7 +35,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
 
   // Create form
   const [form, setForm] = useState({
-    name: '', type: '2X2' as '2X2' | '4X4', prize: '10 000',
+    name: '', type: '2X2' as '2X2' | '3X3' | '4X4' | '5X5' | 'BCI', prize: '10 000',
     map: 'de_dust2', date: '', maxParticipants: 16,
     rules: ''
   });
@@ -548,9 +548,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
                   <div>
                     <label style={s.label}>Формат</label>
                     <select style={{ ...s.input, cursor: 'pointer' }} value={form.type}
-                      onChange={e => setForm({ ...form, type: e.target.value as '2X2' | '4X4' })}>
+                      onChange={e => setForm({ ...form, type: e.target.value as any })}>
                       <option value="2X2">2x2</option>
+                      <option value="3X3">3x3</option>
                       <option value="4X4">4x4</option>
+                      <option value="5X5">5x5</option>
                     </select>
                   </div>
                   <div>
@@ -569,7 +571,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
                     <label style={s.label}>Макс. учасників</label>
                     <select style={{ ...s.input, cursor: 'pointer' }} value={form.maxParticipants}
                       onChange={e => setForm({ ...form, maxParticipants: Number(e.target.value) })}>
-                      {[4, 8, 16, 32].map(n => <option key={n} value={n}>{n} команд</option>)}
+                      {[2, 4, 8, 16, 32].map(n => (
+                        <option key={n} value={n}>
+                          {n} {n === 2 || n === 4 ? 'команди' : 'команд'}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>

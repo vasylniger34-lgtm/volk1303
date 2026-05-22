@@ -116,7 +116,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   // Tournament creation form state
   const [tourneyForm, setTourneyForm] = useState({
     name: '',
-    type: '2X2' as '2X2' | '4X4' | 'BCI',
+    type: '2X2' as '2X2' | '3X3' | '4X4' | '5X5' | 'BCI',
     prize: '25 000',
     prizeFirst: '',
     prizeSecond: '',
@@ -135,7 +135,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   const [editTourneyForm, setEditTourneyForm] = useState({
     id: '',
     name: '',
-    type: '2X2' as '2X2' | '4X4' | 'BCI',
+    type: '2X2' as '2X2' | '3X3' | '4X4' | '5X5' | 'BCI',
     prizePool: '',
     prizeFirst: '',
     prizeSecond: '',
@@ -1810,8 +1810,9 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                         }}
                       >
                         <option value="2X2">2x2 Aim Match</option>
+                        <option value="3X3">3x3 Match</option>
                         <option value="4X4">4x4 Classic</option>
-                        <option value="BCI">Битва Кланів</option>
+                        <option value="5X5">5x5 Classic</option>
                       </select>
                     </div>
 
@@ -1857,7 +1858,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit', cursor: 'pointer'
                         }}
                       >
-                        {[4, 8, 16, 32].map(n => <option key={n} value={n}>{n} команд</option>)}
+                        {[2, 4, 8, 16, 32].map(n => (
+                          <option key={n} value={n}>
+                            {n} {n === 2 || n === 4 ? 'команди' : 'команд'}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -3183,8 +3188,9 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     }}
                   >
                     <option value="2X2">2x2 Aim Match</option>
+                    <option value="3X3">3x3 Match</option>
                     <option value="4X4">4x4 Classic</option>
-                    <option value="BCI">Битва Кланів</option>
+                    <option value="5X5">5x5 Classic</option>
                   </select>
                 </div>
 
@@ -3227,7 +3233,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '12px', outline: 'none', fontFamily: 'Outfit', cursor: 'pointer'
                     }}
                   >
-                    {[4, 8, 16, 32].map(n => <option key={n} value={n}>{n} команд</option>)}
+                    {[2, 4, 8, 16, 32].map(n => (
+                      <option key={n} value={n}>
+                        {n} {n === 2 || n === 4 ? 'команди' : 'команд'}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE TABLE IF NOT EXISTS tournaments (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('2X2', '4X4', 'BCI')),
+  type TEXT NOT NULL CHECK (type IN ('2X2', '3X3', '4X4', '5X5', 'BCI')),
   date TEXT NOT NULL,
   prize_pool TEXT NOT NULL,
   prize_first TEXT,

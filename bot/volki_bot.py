@@ -348,8 +348,12 @@ def format_tournament(t: dict) -> str:
     type_emoji = "⚔️"
     if tourney_type == "2X2":
         type_emoji = "👥 2x2"
+    elif tourney_type == "3X3":
+        type_emoji = "🎯 3x3"
     elif tourney_type == "4X4":
         type_emoji = "🐺 4x4"
+    elif tourney_type == "5X5":
+        type_emoji = "👑 5x5"
     elif tourney_type == "BCI":
         type_emoji = "🏆 BCI"
 
@@ -507,7 +511,7 @@ def send_welcome(chat_id: int, first_name: str = "Гравець"):
         f"🐺 <b>Вітаємо, {first_name}!</b>\n\n"
         f"Ласкаво просимо до <b>VOLKI 13:03</b> — "
         f"елітної турнірної платформи для кіберспорту CS2.\n\n"
-        f"🎮 Турніри 2x2 та 4x4\n"
+        f"🎮 Турніри 2x2, 3x3, 4x4 та 5x5\n"
         f"🏆 Величезні призові пули\n"
         f"📊 LIVE ставки на матчі віртуальними монетами\n"
         f"⚡ Рівні гравців, статистика та XP рейтинг\n\n"

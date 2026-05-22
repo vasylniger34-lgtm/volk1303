@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Trophy, Swords, ArrowLeft, ChevronRight, Calendar } from 'lucide-react';
+import { getFormatBadgeStyle } from './TournamentsView';
 
 interface MatchesViewProps {
   onSelectMatch: (matchId: string) => void;
@@ -95,11 +96,9 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ onSelectMatch, onSelec
               style={{
                 fontSize: '10px',
                 fontWeight: '900',
-                color: selectedTourney.type === '2X2' ? 'var(--accent-purple)' : 'var(--primary-orange)',
-                backgroundColor: selectedTourney.type === '2X2' ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255, 92, 0, 0.08)',
-                border: `1px solid ${
-                  selectedTourney.type === '2X2' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255, 92, 0, 0.15)'
-                }`,
+                color: getFormatBadgeStyle(selectedTourney.type).color,
+                backgroundColor: getFormatBadgeStyle(selectedTourney.type).bg,
+                border: `1px solid ${getFormatBadgeStyle(selectedTourney.type).border}`,
                 padding: '3px 10px',
                 borderRadius: '6px',
                 fontFamily: 'Outfit, sans-serif',
@@ -571,11 +570,9 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ onSelectMatch, onSelec
                     style={{
                       fontSize: '10px',
                       fontWeight: '900',
-                      color: tourney.type === '2X2' ? 'var(--accent-purple)' : 'var(--primary-orange)',
-                      backgroundColor: tourney.type === '2X2' ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255, 92, 0, 0.08)',
-                      border: `1px solid ${
-                        tourney.type === '2X2' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255, 92, 0, 0.15)'
-                      }`,
+                      color: getFormatBadgeStyle(tourney.type).color,
+                      backgroundColor: getFormatBadgeStyle(tourney.type).bg,
+                      border: `1px solid ${getFormatBadgeStyle(tourney.type).border}`,
                       padding: '3px 10px',
                       borderRadius: '6px',
                       fontFamily: 'Outfit, sans-serif',

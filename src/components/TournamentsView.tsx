@@ -6,10 +6,45 @@ interface TournamentsViewProps {
   onSelectTournament: (id: string) => void;
 }
 
+export const getFormatBadgeStyle = (type: string) => {
+  switch (type) {
+    case '2X2':
+      return {
+        color: 'var(--accent-purple)',
+        bg: 'rgba(139, 92, 246, 0.08)',
+        border: 'rgba(139, 92, 246, 0.15)'
+      };
+    case '3X3':
+      return {
+        color: 'var(--accent-green)',
+        bg: 'rgba(16, 185, 129, 0.08)',
+        border: 'rgba(16, 185, 129, 0.15)'
+      };
+    case '4X4':
+      return {
+        color: 'var(--primary-orange)',
+        bg: 'rgba(255, 92, 0, 0.08)',
+        border: 'rgba(255, 92, 0, 0.15)'
+      };
+    case '5X5':
+      return {
+        color: '#06B6D4',
+        bg: 'rgba(6, 182, 212, 0.08)',
+        border: 'rgba(6, 182, 212, 0.15)'
+      };
+    default:
+      return {
+        color: 'var(--text-secondary)',
+        bg: 'rgba(144, 144, 156, 0.08)',
+        border: 'rgba(144, 144, 156, 0.15)'
+      };
+  }
+};
+
 export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTournament }) => {
-  const { tournaments, deleteTournament, user } = useApp();
+  const { tournaments, deleteTournament, user, matches } = useApp();
   const isAdmin = user.role === 'admin';
-  const [activeTab, setActiveTab] = useState<'BCI' | '2X2' | '4X4'>('BCI');
+  const [activeTab, setActiveTab] = useState<'ALL' | '2X2' | '3X3' | '4X4' | '5X5'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   const parseTourneyDate = (dateStr: string): number => {
@@ -108,10 +143,16 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
     return resultDate.getTime();
   };
 
+  const isTournamentCompleted = (t: any): boolean => {
+    if (t.status === 'completed') return true;
+    const tourneyMatches = matches.filter(m => m.tournamentId === t.id);
+    return tourneyMatches.length > 0 && tourneyMatches.every(m => m.status === 'finished');
+  };
+
   const getSortScore = (t: any): number => {
     const timestamp = parseTourneyDate(t.date);
-    if (t.status === 'active') return -1000000000000 + timestamp;
-    if (t.status === 'upcoming') return timestamp;
+    if (t.status === 'active' && !isTournamentCompleted(t)) return -1000000000000 + timestamp;
+    if (t.status === 'upcoming' && !isTournamentCompleted(t)) return timestamp;
     return 1000000000000 - timestamp;
   };
 
@@ -119,7 +160,7 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
   const filteredTourneys = tournaments
     .filter(t => {
       // Type tab filter
-      const matchesTab = activeTab === 'BCI' || t.type === activeTab;
+      const matchesTab = activeTab === 'ALL' || t.type === activeTab;
       
       // Search query filter
       const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -156,14 +197,14 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
 
       {/* Tabs */}
       <div className="tabs-header" style={{ marginBottom: '22px' }}>
-        {(['BCI', '2X2', '4X4'] as const).map((tab) => (
+        {(['ALL', '2X2', '3X3', '4X4', '5X5'] as const).map((tab) => (
           <button
             key={tab}
             className={`tab-btn ${activeTab === tab ? 'tab-btn-active' : ''}`}
             onClick={() => setActiveTab(tab)}
             style={{ fontSize: '12px', fontWeight: '800' }}
           >
-            {tab === 'BCI' ? 'ВСІ' : tab}
+            {tab === 'ALL' ? 'ВСІ' : tab}
           </button>
         ))}
       </div>
@@ -173,6 +214,7 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
         {filteredTourneys.length > 0 ? (
           filteredTourneys.map((tourney) => {
             const isFull = tourney.participantsCount >= tourney.maxParticipants;
+            const badgeStyle = getFormatBadgeStyle(tourney.type);
             
             return (
               <div
@@ -193,9 +235,9 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
                   <span style={{
                     fontSize: '10px',
                     fontWeight: '900',
-                    color: tourney.type === '2X2' ? 'var(--accent-purple)' : 'var(--primary-orange)',
-                    backgroundColor: tourney.type === '2X2' ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255, 92, 0, 0.08)',
-                    border: `1px solid ${tourney.type === '2X2' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255, 92, 0, 0.15)'}`,
+                    color: badgeStyle.color,
+                    backgroundColor: badgeStyle.bg,
+                    border: `1px solid ${badgeStyle.border}`,
                     padding: '3px 10px',
                     borderRadius: '6px',
                     fontFamily: 'Outfit, sans-serif'

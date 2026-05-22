@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { ChevronLeft, Star, Swords, Trophy, FileText, CheckCircle2, Coins, Lock, Tv2, ExternalLink, Maximize2, X } from 'lucide-react';
+import { getFormatBadgeStyle } from './TournamentsView';
 
 interface TournamentDetailViewProps {
   tournamentId: string;
@@ -135,9 +136,9 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px' }}>
           <span style={{
             fontSize: '10px',
-            color: tourney.type === '2X2' ? 'var(--accent-purple)' : 'var(--primary-orange)',
-            backgroundColor: tourney.type === '2X2' ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255, 92, 0, 0.08)',
-            border: `1px solid ${tourney.type === '2X2' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255, 92, 0, 0.15)'}`,
+            color: getFormatBadgeStyle(tourney.type).color,
+            backgroundColor: getFormatBadgeStyle(tourney.type).bg,
+            border: `1px solid ${getFormatBadgeStyle(tourney.type).border}`,
             padding: '3px 10px',
             borderRadius: '6px',
             fontFamily: 'Outfit, sans-serif',
