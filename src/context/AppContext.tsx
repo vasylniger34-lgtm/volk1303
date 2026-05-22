@@ -349,6 +349,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    // Safety timeout: stop infinite loading spinner if initialization hangs
+    const timeoutTimer = setTimeout(() => {
+      console.warn('[VOLKI] Auth initialization timed out! Unlocking UI loading gate.');
+      setIsLoading(false);
+    }, 6000);
+
     const initAuth = async () => {
       try {
         // Always load public data (tournaments, matches) regardless of auth
@@ -478,6 +484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (err) {
         console.error('[VOLKI] Auth init error:', err);
       } finally {
+        clearTimeout(timeoutTimer);
         setIsLoading(false);
       }
     };
@@ -505,7 +512,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeoutTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // ─── Supabase Data Loader ───
