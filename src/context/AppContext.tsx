@@ -150,7 +150,7 @@ const sanitizeUser = (u: any): UserProfile => {
     level: 1,
     xp: 0,
     xpNext: 1000,
-    role: 'admin',
+    role: 'player',
     avatarGradient: 0,
     avatarUrl: null,
     stats: { wins: 0, losses: 0, predictionsPlaced: 0, predictionsWon: 0 },
@@ -193,7 +193,7 @@ const DEFAULT_USER: UserProfile = {
   level: 1,
   xp: 0,
   xpNext: 1000,
-  role: 'admin', // Local dev mode = admin by default
+  role: 'player', // Local dev mode = player by default
   avatarGradient: 0,
   avatarUrl: null,
   stats: { wins: 0, losses: 0, predictionsPlaced: 0, predictionsWon: 0 },
@@ -462,22 +462,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .single();
 
           if (profile) {
-            let activeProfile = profile;
-            if (profile.role !== 'admin') {
-              const { data: updatedProfile, error: updateError } = await supabase
-                .from('profiles')
-                .update({ role: 'admin' })
-                .eq('id', session.user.id)
-                .select()
-                .single();
-              
-              if (!updateError && updatedProfile) {
-                activeProfile = updatedProfile;
-              } else {
-                activeProfile = { ...profile, role: 'admin' };
-              }
-            }
-            setUser(profileToUser(activeProfile as ProfileRow));
+            setUser(profileToUser(profile as ProfileRow));
           }
           setIsAuthenticated(true);
           localStorage.setItem('volk_session', 'true');
@@ -509,22 +494,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .single();
 
         if (profile) {
-          let activeProfile = profile;
-          if (profile.role !== 'admin') {
-            const { data: updatedProfile, error: updateError } = await supabase
-              .from('profiles')
-              .update({ role: 'admin' })
-              .eq('id', session.user.id)
-              .select()
-              .single();
-            
-            if (!updateError && updatedProfile) {
-              activeProfile = updatedProfile;
-            } else {
-              activeProfile = { ...profile, role: 'admin' };
-            }
-          }
-          setUser(profileToUser(activeProfile as ProfileRow));
+          setUser(profileToUser(profile as ProfileRow));
         }
         setIsAuthenticated(true);
         localStorage.setItem('volk_session', 'true');
@@ -1008,17 +978,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               let activeProfile = profile;
               
               const needsUsernameSync = profile.username !== telegramData.username || profile.telegram_username !== telegramData.username;
-              const needsRoleSync = profile.role !== 'admin';
               
-              if (needsUsernameSync || needsRoleSync) {
-                const updates: any = {};
-                if (needsUsernameSync) {
-                  updates.username = telegramData.username;
-                  updates.telegram_username = telegramData.username;
-                }
-                if (needsRoleSync) {
-                  updates.role = 'admin';
-                }
+              if (needsUsernameSync) {
+                const updates = {
+                  username: telegramData.username,
+                  telegram_username: telegramData.username
+                };
                 
                 const { data: updatedProfile, error: updateError } = await supabase
                   .from('profiles')

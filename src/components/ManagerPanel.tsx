@@ -1647,6 +1647,24 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   <Play size={10} /> Запустити
                                 </button>
                               )}
+                              {t.status === 'active' && (
+                                <button 
+                                  onClick={() => {
+                                    if (confirm(`Завершити турнір "${t.name}" та відправити в архів?`)) {
+                                      updateTournament(t.id, { status: 'completed' });
+                                      setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Completed tournament: "${t.name}"`]);
+                                      showToast('Турнір успішно завершено та архівовано!', 'success');
+                                    }
+                                  }}
+                                  style={{
+                                    background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.2)',
+                                    borderRadius: '8px', padding: '6px 12px', fontSize: '11px', color: '#8B5CF6', fontWeight: '700',
+                                    fontFamily: 'Outfit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                  }}
+                                >
+                                  <CheckCircle2 size={10} /> Завершити
+                                </button>
+                              )}
                               {tTeams.length < t.maxParticipants && (
                                 <button 
                                   onClick={async () => {
