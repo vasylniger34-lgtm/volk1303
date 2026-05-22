@@ -62,7 +62,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
         console.error('[VOLKI] Search exception:', err);
         if (isMounted) setSearchResults([]);
       } finally {
-        if (isMounted) setIsSearching(false);
+        setIsSearching(false);
       }
     }, 500);
 
