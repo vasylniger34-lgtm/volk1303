@@ -16,6 +16,7 @@ export interface Team {
   players: Player[];
   logoText: string;
   logoBg: string;
+  joinType?: string;
 }
 
 export interface Tournament {
@@ -118,7 +119,7 @@ interface AppContextType {
   toast: ToastMessage;
   showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
   hideToast: () => void;
-  registerTeam: (tournamentId: string, teamData: Omit<Team, 'id' | 'logoText' | 'logoBg'>) => boolean;
+  registerTeam: (tournamentId: string, teamData: Omit<Team, 'id' | 'logoText' | 'logoBg'> & { password?: string, invites?: string[] }) => boolean;
   placePrediction: (prediction: Omit<Prediction, 'id' | 'status' | 'payout' | 'date'>) => boolean;
   setMatchLive: (matchId: string) => void;
   setMatchScore: (matchId: string, scoreA: number, scoreB: number, status: 'live' | 'finished', winnerId?: string | null) => void;
@@ -133,6 +134,7 @@ interface AppContextType {
   deleteTournament: (tournamentId: string) => void;
   updateTournament: (tournamentId: string, data: Partial<Tournament>) => void;
   fillTournamentWithBots: (tournamentId: string) => Promise<void>;
+  joinTeam: (teamId: string, password?: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -210,7 +212,8 @@ function dbTeamToApp(row: TeamRow): Team {
     captain: row.captain,
     players: (row.players || []) as Player[],
     logoText: row.logo_text || row.tag.substring(0, 2).toUpperCase(),
-    logoBg: row.logo_bg || '#1E293B'
+    logoBg: row.logo_bg || '#1E293B',
+    joinType: (row as any).join_type || 'invite_only'
   };
 }
 
@@ -1078,7 +1081,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Register Team ───
 
-  const registerTeam = (tournamentId: string, teamData: Omit<Team, 'id' | 'logoText' | 'logoBg'>): boolean => {
+  const registerTeam = (tournamentId: string, teamData: Omit<Team, 'id' | 'logoText' | 'logoBg'> & { password?: string, invites?: string[] }): boolean => {
     const tourney = tournaments.find(t => t.id === tournamentId);
     if (!tourney) return false;
     if (tourney.participantsCount >= tourney.maxParticipants) {
@@ -1090,7 +1093,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...teamData,
       id: `team_${Date.now()}`,
       logoText: teamData.tag.substring(0, 3).toUpperCase(),
-      logoBg: ['#FF5C00', '#8B5CF6', '#10B981', '#3B82F6', '#EF4444', '#EC4899'][Math.floor(Math.random() * 6)]
+      logoBg: ['#FF5C00', '#8B5CF6', '#10B981', '#3B82F6', '#EF4444', '#EC4899'][Math.floor(Math.random() * 6)],
+      joinType: teamData.joinType || 'invite_only'
     };
 
     if (useSupabase) {
@@ -1101,8 +1105,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         captain: newTeam.captain,
         players: newTeam.players as unknown as { username: string }[],
         logo_text: newTeam.logoText,
-        logo_bg: newTeam.logoBg
-      }).then();
+        logo_bg: newTeam.logoBg,
+        join_type: newTeam.joinType,
+        password: teamData.password || null
+      }).select('id').single().then(({ data, error }) => {
+        if (data && teamData.invites && teamData.invites.length > 0) {
+          const inviteInserts = teamData.invites.map(inviteeId => ({
+            team_id: data.id,
+            tournament_id: tournamentId,
+            inviter_id: user.id,
+            invitee_id: inviteeId,
+            status: 'pending'
+          }));
+          supabase.from('team_invites').insert(inviteInserts).then();
+        }
+      });
 
       const nextStatus = tourney.participantsCount + 1 === tourney.maxParticipants ? 'active' : tourney.status;
       supabase.from('tournaments')
@@ -1129,6 +1146,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     return true;
+  };
+
+  // ─── Join Team ───
+  const joinTeam = async (teamId: string, password?: string): Promise<boolean> => {
+    if (!useSupabase) {
+      showToast('Тільки для онлайн режиму!', 'error');
+      return false;
+    }
+    
+    try {
+      const { data, error } = await supabase.rpc('join_team', {
+        p_team_id: teamId,
+        p_user_id: user.id,
+        p_password: password || null
+      });
+
+      if (error) throw error;
+      if (!data?.ok) {
+        showToast(data?.error || 'Помилка приєднання', 'error');
+        return false;
+      }
+
+      showToast('Ви успішно приєднались до команди!', 'success');
+      return true;
+    } catch (e) {
+      console.error('Error joining team:', e);
+      showToast('Сталася помилка. Перевірте пароль.', 'error');
+      return false;
+    }
   };
 
   // ─── Generate Bracket ───

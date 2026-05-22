@@ -33,7 +33,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   onSelectMatch,
   onOpenRegister
 }) => {
-  const { tournaments, teams, matches, user, predictions, placePrediction } = useApp();
+  const { tournaments, teams, matches, user, predictions, placePrediction, joinTeam } = useApp();
   const tourney = tournaments.find(t => t.id === tournamentId);
   const [activeTab, setActiveTab] = useState<'INFO' | 'BRACKET' | 'PARTICIPANTS' | 'BETS' | 'RULES' | 'STREAM'>('INFO');
   const [fullscreenUrl, setFullscreenUrl] = useState<string | null>(null);
@@ -70,6 +70,18 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   // Check if user is registered by inspecting captain names in the team list
   const userHandle = user?.username ? (user.username.startsWith('@') ? user.username : `@${user.username}`) : '@volki_player';
   const isUserRegistered = tourneyTeams.some(t => t.captain === userHandle || t.players?.some(p => p.username === userHandle));
+
+  const handleJoinClick = async (team: any) => {
+    if (team.joinType === 'closed') {
+      const pwd = window.prompt('Ця команда закрита. Введіть пароль:');
+      if (!pwd) return;
+      await joinTeam(team.id, pwd);
+    } else if (team.joinType === 'open') {
+      if (window.confirm(`Приєднатися до команди ${team.name}?`)) {
+        await joinTeam(team.id);
+      }
+    }
+  };
 
   return (
     <div className="scroll-container" style={{ position: 'relative', paddingBottom: '120px' }}>
@@ -671,6 +683,24 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                     }}>
                       MY
                     </span>
+                  )}
+                  {!isMyTeam && !isUserRegistered && (team.joinType === 'open' || team.joinType === 'closed') && (team.players?.length < 2) && (
+                    <button
+                      onClick={() => handleJoinClick(team)}
+                      style={{
+                        marginTop: '8px',
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: '6px',
+                        color: 'var(--accent-green)',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        padding: '4px 8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {team.joinType === 'closed' ? 'ВСТУПИТИ 🔒' : 'ВСТУПИТИ'}
+                    </button>
                   )}
                 </div>
               );

@@ -630,6 +630,38 @@ def handle_callback_query(update: dict):
         threading.Thread(target=run_broadcast, daemon=True).start()
         return
 
+    # ─── Invite Handlers ───
+    if data.startswith("invite_accept_"):
+        invite_id = data.replace("invite_accept_", "")
+        res = supabase_request("POST", "rpc/accept_team_invite", payload={"p_invite_id": invite_id})
+        if res and isinstance(res, dict) and res.get("ok"):
+            tg_request("editMessageText", {
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": f"✅ Ви успішно приєдналися до команди <b>{res.get('team_name', '')}</b>!",
+                "parse_mode": "HTML"
+            })
+        else:
+            tg_request("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "Помилка! Можливо, запрошення вже недійсне.", "show_alert": True})
+            tg_request("editMessageText", {
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": "❌ Запрошення недійсне або вже оброблене.",
+                "parse_mode": "HTML"
+            })
+        return
+
+    if data.startswith("invite_decline_"):
+        invite_id = data.replace("invite_decline_", "")
+        supabase_request("POST", "rpc/decline_team_invite", payload={"p_invite_id": invite_id})
+        tg_request("editMessageText", {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": "❌ Ви відхилили запрошення.",
+            "parse_mode": "HTML"
+        })
+        return
+
 def handle_update(update: dict):
     """Process incoming Telegram update"""
     # Handle callback queries (inline button clicks)
@@ -874,6 +906,65 @@ def monitor_new_tournaments():
             
         time.sleep(15)  # Poll database every 15 seconds
 
+def monitor_new_invites():
+    """Background loop that polls Supabase for pending team invites and sends DM to invitees"""
+    log.info("Background Supabase Team Invites Monitor thread started!")
+    
+    while True:
+        try:
+            # Fetch pending invites that haven't been notified yet
+            url = f"{SUPABASE_URL}/rest/v1/team_invites?status=eq.pending&bot_notified=eq.false&select=*,teams(name),tournaments(name),profiles!team_invites_invitee_id_fkey(telegram_id)"
+            headers = {
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}"
+            }
+            req = urllib.request.Request(url, headers=headers)
+            ctx = ssl.create_default_context()
+            with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
+                invites = json.loads(resp.read().decode("utf-8"))
+            
+            for inv in invites:
+                invite_id = inv.get("id")
+                tg_id = inv.get("profiles", {}).get("telegram_id")
+                team_name = inv.get("teams", {}).get("name", "Команда")
+                tournament_name = inv.get("tournaments", {}).get("name", "Турнір")
+                
+                if tg_id:
+                    try:
+                        chat_id = int(tg_id)
+                        text = (
+                            f"🎟️ <b>Нове запрошення!</b>\n\n"
+                            f"Вас запросили вступити в команду <b>{team_name}</b> на турнір <b>{tournament_name}</b>.\n\n"
+                            f"Що бажаєте зробити?"
+                        )
+                        kb = {
+                            "inline_keyboard": [
+                                [{"text": "✅ Прийняти", "callback_data": f"invite_accept_{invite_id}"}],
+                                [{"text": "❌ Відхилити", "callback_data": f"invite_decline_{invite_id}"}]
+                            ]
+                        }
+                        res = tg_request("sendMessage", {
+                            "chat_id": chat_id,
+                            "text": text,
+                            "parse_mode": "HTML",
+                            "reply_markup": kb
+                        })
+                        
+                        if res and res.get("ok"):
+                            log.info(f"Invite notification sent to {chat_id} for team {team_name}")
+                            # Mark as notified
+                            supabase_request("PATCH", "team_invites", payload={"bot_notified": True}, query=f"?id=eq.{invite_id}")
+                    except Exception as ex:
+                        log.error(f"Error sending invite notification to {tg_id}: {ex}")
+                else:
+                    # No telegram ID found for this user, mark as notified to skip next time
+                    supabase_request("PATCH", "team_invites", payload={"bot_notified": True}, query=f"?id=eq.{invite_id}")
+                    
+        except Exception as e:
+            log.error(f"Error in invite monitor loop: {e}")
+            
+        time.sleep(10)  # Poll invites every 10 seconds
+
 # ─── Polling Mode ───
 
 def run_polling():
@@ -899,6 +990,10 @@ def run_polling():
     # Start the background sync monitor thread
     monitor_thread = threading.Thread(target=monitor_new_tournaments, daemon=True)
     monitor_thread.start()
+    
+    # Start the invites monitor thread
+    invites_thread = threading.Thread(target=monitor_new_invites, daemon=True)
+    invites_thread.start()
     
     log.info("🐺 VOLKI bot is fully running! Listening for messages...")
     

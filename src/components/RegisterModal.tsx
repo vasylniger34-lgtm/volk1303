@@ -21,64 +21,72 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
   // Form states
   const [teamName, setTeamName] = useState(user?.username ? `${user.username.replace('@', '').toUpperCase()} Team` : 'VOLK Team');
   const [teamTag, setTeamTag] = useState(user?.username ? user.username.replace('@', '').substring(0, 3).toUpperCase() : 'VLK');
+  const [joinType, setJoinType] = useState<'open' | 'closed' | 'invite_only'>('invite_only');
+  const [password, setPassword] = useState('');
+  
   const captain = userHandle;
-  const [players, setPlayers] = useState<string[]>([userHandle]);
+  const [players, setPlayers] = useState<{ id: string; username: string }[]>([{ id: user?.id || 'local', username: userHandle }]);
   const [newPlayerInput, setNewPlayerInput] = useState('');
 
   if (!tourney) return null;
 
   const checkAndAddPlayer = async (rawInput: string) => {
-    if (!rawInput.startsWith('@')) {
-      alert('Нікнейм гравця має починатися з @');
+    if (!rawInput.trim()) {
+      alert('Введіть ID гравця (наприклад 1005)');
       return;
     }
-    if (players.includes(rawInput)) {
-      alert('Цей гравець вже є у складі!');
+    
+    // Convert to number for reg_num check
+    const searchId = parseInt(rawInput.replace('#', '').trim(), 10);
+    if (isNaN(searchId)) {
+      alert('ID гравця має бути числом (наприклад 1005)');
       return;
     }
+
+    if (players.some(p => p.username === rawInput || (p.id !== 'local' && p.id === String(searchId)))) {
+      alert('Цей гравець вже є у списку запрошень!');
+      return;
+    }
+    
     if (players.length >= 2) {
       alert('Для формату 2х2 максимум 2 гравці!');
       return;
     }
 
-    const cleanUsername = rawInput.replace('@', '').trim();
     const useSupabase = isSupabaseConfigured();
 
     if (useSupabase) {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, username, telegram_username')
-          .or(`username.ieq.${cleanUsername},telegram_username.ieq.${cleanUsername}`);
+          .select('id, username, telegram_username, reg_num')
+          .eq('reg_num', searchId);
 
         if (error) {
           console.error('[VOLKI] Supabase query error checking user:', error);
         }
 
         if (!data || data.length === 0) {
-          // If it's the recommended demo partner, bypass as a fallback so local testing works fine
-          if (cleanUsername === 'volki_partner') {
-            setPlayers([...players, '@volki_partner']);
-            setNewPlayerInput('');
-            return;
-          }
-          alert(`Гравця з нікнеймом ${rawInput} не знайдено на сайті або в боті! Перевірте правильність написання нікнейму.`);
+          alert(`Гравця з ID ${searchId} не знайдено! Перевірте правильність написання.`);
+          return;
+        }
+        
+        if (data[0].id === user?.id) {
+          alert('Ви не можете запросити самі себе!');
           return;
         }
         
         const dbUser = data[0];
-        const matchedName = dbUser.username || dbUser.telegram_username || cleanUsername;
+        const matchedName = dbUser.username || dbUser.telegram_username || String(dbUser.reg_num);
         const formattedName = matchedName.startsWith('@') ? matchedName : `@${matchedName}`;
         
-        setPlayers([...players, formattedName]);
+        setPlayers([...players, { id: dbUser.id, username: formattedName }]);
         setNewPlayerInput('');
       } catch (err) {
         console.error('[VOLKI] Error checking user:', err);
-        setPlayers([...players, rawInput]);
-        setNewPlayerInput('');
       }
     } else {
-      setPlayers([...players, rawInput]);
+      setPlayers([...players, { id: String(searchId), username: `@player_${searchId}` }]);
       setNewPlayerInput('');
     }
   };
@@ -107,18 +115,17 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
       }
       setStep(2);
     } else if (step === 2) {
-      if (players.length < 2) {
-        alert('Команда повинна містити мінімум 2 гравців!');
-        return;
-      }
       setStep(3);
     } else if (step === 3) {
       const success = registerTeam(tournamentId, {
         name: teamName,
         tag: teamTag.toUpperCase(),
         captain,
-        players: players.map(p => ({ username: p }))
-      });
+        players: [{ username: captain }], // Only captain is in team initially, others are pending
+        joinType,
+        password,
+        invites: players.filter(p => p.username !== captain).map(p => p.id)
+      } as any);
       if (success) {
         onSuccess();
       }
@@ -242,6 +249,48 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ fontSize: '11px', color: '#51515E', fontWeight: '600' }}>
+                Тип команди
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {['invite_only', 'open', 'closed'].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setJoinType(type as any)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      backgroundColor: joinType === type ? 'rgba(255, 92, 0, 0.1)' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${joinType === type ? '#FF5C00' : 'transparent'}`,
+                      borderRadius: '8px',
+                      color: joinType === type ? '#FF5C00' : '#8F8F9B',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {type === 'invite_only' ? 'ЗА ЗАПРОШЕННЯМ' : type === 'open' ? 'ВІДКРИТА' : 'З ПАРОЛЕМ'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {joinType === 'closed' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '11px', color: '#51515E', fontWeight: '600' }}>
+                  Пароль
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Введіть пароль"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '11px', color: '#51515E', fontWeight: '600' }}>
                 Капітан
               </label>
               <input
@@ -280,9 +329,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
                   }}
                 >
                   <span style={{ fontSize: '13px', fontWeight: '600', color: 'white' }}>
-                    {idx + 1}. {player} {player === captain ? '(Капітан)' : ''}
+                    {idx + 1}. {player.username} {player.username === captain ? '(Капітан)' : '(Запрошення)'}
                   </span>
-                  {player !== captain && (
+                  {player.username !== captain && (
                     <button
                       onClick={() => handleRemovePlayer(idx)}
                       style={{
@@ -301,13 +350,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
             </div>
 
             {/* Add player form */}
-            {players.length < 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Введіть @username гравця"
+                    placeholder="Введіть ID гравця (напр. 1005)"
                     value={newPlayerInput}
                     onChange={(e) => setNewPlayerInput(e.target.value)}
                   />
@@ -326,25 +374,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
                     }}
                   >
                     <Plus size={20} />
-                  </button>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#51515E' }}>
-                  <span>Рекомендовано:</span>
-                  <button 
-                    onClick={() => checkAndAddPlayer('@volki_partner')}
-                    style={{
-                      background: 'rgba(255, 92, 0, 0.05)',
-                      border: '1px solid rgba(255, 92, 0, 0.15)',
-                      borderRadius: '6px',
-                      color: '#FF5C00',
-                      padding: '2px 8px',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                      fontWeight: '700'
-                    }}
-                  >
-                    @volki_partner
                   </button>
                 </div>
               </div>
@@ -377,7 +406,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
                   {players.map((p, idx) => (
                     <li key={idx} style={{ fontSize: '13px', fontWeight: '600', color: '#8F8F9B' }}>
-                      {idx + 1}. {p} {p === captain ? '👑' : ''}
+                      {idx + 1}. {p.username} {p.username === captain ? '👑' : '(Запрошено)'}
                     </li>
                   ))}
                 </ul>
