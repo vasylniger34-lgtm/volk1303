@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VOLKI 13:03 — Telegram Bot
+VOLK 13:03 — Telegram Bot
 Надсилає привітання, WebApp кнопку, список турнірів та автоматично
 анонсує нові турніри, створені на сайті!
 
@@ -47,7 +47,7 @@ pending_broadcasts = {}  # chat_id -> {"step": "waiting_text", "preview": str}
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [VOLKI-BOT] %(message)s",
+    format="%(asctime)s [VOLK-BOT] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 log = logging.getLogger("volki-bot")
@@ -399,7 +399,7 @@ def do_broadcast(text: str, sender_chat_id: int = None) -> tuple:
     
     inline_kb = {
         "inline_keyboard": [[{
-            "text": "🎮 Відкрити VOLKI 13:03",
+            "text": "🎮 Відкрити VOLK 13:03",
             "web_app": {"url": WEBAPP_URL}
         }]]
     }
@@ -429,7 +429,7 @@ def do_broadcast(text: str, sender_chat_id: int = None) -> tuple:
             failed += 1
     
     # Also post to channel
-    channel_id = os.environ.get("TELEGRAM_CHANNEL", "@volki1303")
+    channel_id = os.environ.get("TELEGRAM_CHANNEL", "@volk1303")
     try:
         ch_result = tg_request("sendMessage", {
             "chat_id": channel_id,
@@ -453,7 +453,7 @@ def admin_main_menu():
         "keyboard": [
             [{"text": "📢 Зробити розсилку"}],
             [{"text": "📊 Статистика підписників"}, {"text": "👥 Список адмінів"}],
-            [{"text": "🏆 Активні турніри"}, {"text": "🎮 Відкрити VOLKI", "web_app": {"url": WEBAPP_URL}}],
+            [{"text": "🏆 Активні турніри"}, {"text": "🎮 Відкрити VOLK", "web_app": {"url": WEBAPP_URL}}],
             [{"text": "⬅️ Головне меню"}]
         ],
         "resize_keyboard": True
@@ -462,7 +462,7 @@ def admin_main_menu():
 def main_menu():
     return {
         "keyboard": [
-            [{"text": "🎮 Відкрити VOLKI 13:03", "web_app": {"url": WEBAPP_URL}}],
+            [{"text": "🎮 Відкрити VOLK 13:03", "web_app": {"url": WEBAPP_URL}}],
             [{"text": "🏆 Активні турніри"}, {"text": "📱 Наш канал"}]
         ],
         "resize_keyboard": True
@@ -482,24 +482,24 @@ def broadcast_templates_keyboard():
 BROADCAST_TEMPLATES = {
     "tmpl_tournament": (
         "🚨 <b>АНОНС ТУРНІРУ!</b>\n\n"
-        "🏆 Незабаром відбудеться новий турнір VOLKI 1303!\n"
+        "🏆 Незабаром відбудеться новий турнір VOLK 1303!\n"
         "📅 Дата: [ВКАЖІТЬ ДАТУ]\n"
         "💰 Призовий фонд: [ВКАЖІТЬ ФОНД]\n"
         "🗺️ Карта: [ВКАЖІТЬ КАРТУ]\n\n"
-        "Реєструйся зараз у додатку! 👇\n#volki1303"
+        "Реєструйся зараз у додатку! 👇\n#volk1303"
     ),
     "tmpl_maintenance": (
         "⚙️ <b>Технічні роботи</b>\n\n"
-        "Платформа VOLKI 1303 тимчасово недоступна для профілактичних робіт.\n"
+        "Платформа VOLK 1303 тимчасово недоступна для профілактичних робіт.\n"
         "Очікуваний час відновлення: [ЧАС]\n\n"
-        "Дякуємо за розуміння! 🐺\n#volki1303"
+        "Дякуємо за розуміння! 🐺\n#volk1303"
     ),
     "tmpl_results": (
         "🎉 <b>РЕЗУЛЬТАТИ ТУРНІРУ!</b>\n\n"
         "🥇 Переможець: [КОМАНДА]\n"
         "🥈 2-е місце: [КОМАНДА]\n"
         "🥉 3-є місце: [КОМАНДА]\n\n"
-        "Вітаємо всіх учасників! 🏆\n#volki1303"
+        "Вітаємо всіх учасників! 🏆\n#volk1303"
     )
 }
 
@@ -509,13 +509,13 @@ def send_welcome(chat_id: int, first_name: str = "Гравець"):
     """Send welcome message with WebApp button and a reply keyboard"""
     text = (
         f"🐺 <b>Вітаємо, {first_name}!</b>\n\n"
-        f"Ласкаво просимо до <b>VOLKI 13:03</b> — "
+        f"Ласкаво просимо до <b>VOLK 13:03</b> — "
         f"елітної турнірної платформи для кіберспорту CS2.\n\n"
         f"🎮 Турніри 2x2, 3x3, 4x4 та 5x5\n"
         f"🏆 Величезні призові пули\n"
         f"📊 LIVE ставки на матчі віртуальними монетами\n"
         f"⚡ Рівні гравців, статистика та XP рейтинг\n\n"
-        f"Натискай кнопку <b>Відкрити VOLKI</b> нижче, щоб увірватися в гру! 👇"
+        f"Натискай кнопку <b>Відкрити VOLK</b> нижче, щоб увірватися в гру! 👇"
     )
     
     return tg_request("sendMessage", {
@@ -624,7 +624,7 @@ def handle_callback_query(update: dict):
                 f"✅ <b>Розсилку завершено!</b>\n\n"
                 f"📤 Надіслано: <b>{sent}</b> підписників\n"
                 f"❌ Помилок: <b>{failed}</b>\n\n"
-                f"Повідомлення також опубліковано в каналі @volki1303",
+                f"Повідомлення також опубліковано в каналі @volk1303",
                 reply_markup=admin_main_menu()
             )
         
@@ -740,8 +740,8 @@ def handle_update(update: dict):
     
     elif text == "/help":
         help_text = (
-            "🐺 <b>VOLKI 13:03 — Довідка</b>\n\n"
-            "• Натисніть <b>Відкрити VOLKI</b> для входу в додаток\n"
+            "🐺 <b>VOLK 13:03 — Довідка</b>\n\n"
+            "• Натисніть <b>Відкрити VOLK</b> для входу в додаток\n"
             "• <b>🏆 Активні турніри</b> — перегляд списку турнірів\n"
             "• <b>📱 Наш канал</b> — перехід до нашого каналу\n\n"
         )
@@ -789,9 +789,9 @@ def handle_update(update: dict):
         
         send_msg(
             chat_id,
-            "📢 <b>Меню Розсилок VOLKI 1303</b>\n\n"
+            "📢 <b>Меню Розсилок VOLK 1303</b>\n\n"
             "Оберіть шаблон або напишіть своє повідомлення.\n"
-            "Розсилка буде надіслана <b>всім активним підписникам</b> бота та опублікована в каналі @volki1303.\n\n"
+            "Розсилка буде надіслана <b>всім активним підписникам</b> бота та опублікована в каналі @volk1303.\n\n"
             "Підтримується HTML: <code>&lt;b&gt;жирний&lt;/b&gt;</code>, <code>&lt;i&gt;курсив&lt;/i&gt;</code>, <code>&lt;code&gt;код&lt;/code&gt;</code>",
             reply_markup=broadcast_templates_keyboard()
         )
@@ -810,7 +810,7 @@ def handle_update(update: dict):
         
         send_msg(
             chat_id,
-            f"📊 <b>Статистика VOLKI 1303</b>\n\n"
+            f"📊 <b>Статистика VOLK 1303</b>\n\n"
             f"📱 Підписників бота (активних): <b>{bot_subs}</b>\n"
             f"👤 Гравців на платформі: <b>{profile_count}</b>\n"
             f"📤 Охоплення розсилки: <b>{len(all_subs)}</b>\n"
@@ -856,11 +856,11 @@ def handle_update(update: dict):
             send_msg(
                 chat_id,
                 "🐺 <b>Наразі немає активних або запланованих турнірів.</b>\n\nСлідкуйте за оновленнями або зареєструйтесь у застосунку! ⚔️",
-                reply_markup={"inline_keyboard": [[{"text": "🎮 Відкрити VOLKI", "web_app": {"url": WEBAPP_URL}}]]}
+                reply_markup={"inline_keyboard": [[{"text": "🎮 Відкрити VOLK", "web_app": {"url": WEBAPP_URL}}]]}
             )
             return
         
-        response_text = f"🐺 <b>АКТИВНІ ТУРНІРИ VOLKI 13:03:</b>\n\n"
+        response_text = f"🐺 <b>АКТИВНІ ТУРНІРИ VOLK 13:03:</b>\n\n"
         for t in active_tourneys[:3]:
             response_text += format_tournament(t) + "\n\n"
         
@@ -874,7 +874,7 @@ def handle_update(update: dict):
         send_msg(
             chat_id,
             "📱 Приєднуйтесь до нашого офіційного каналу, щоб не пропустити важливі новини, розіграші та стріми матчів!",
-            reply_markup={"inline_keyboard": [[{"text": "🐺 Наш канал", "url": "https://t.me/volki1303"}]]}
+            reply_markup={"inline_keyboard": [[{"text": "🐺 Наш канал", "url": "https://t.me/volk1303"}]]}
         )
     
     else:
@@ -995,7 +995,7 @@ def monitor_new_invites():
 
 def run_polling():
     """Long-polling mode for the bot"""
-    log.info(f"Starting VOLKI bot in POLLING mode...")
+    log.info(f"Starting VOLK bot in POLLING mode...")
     log.info(f"WebApp URL: {WEBAPP_URL}")
     log.info(f"Supabase URL: {SUPABASE_URL}")
     
@@ -1021,7 +1021,7 @@ def run_polling():
     invites_thread = threading.Thread(target=monitor_new_invites, daemon=True)
     invites_thread.start()
     
-    log.info("🐺 VOLKI bot is fully running! Listening for messages...")
+    log.info("🐺 VOLK bot is fully running! Listening for messages...")
     
     offset = 0
     while True:

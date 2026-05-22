@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { ChevronLeft, Star, Swords, Trophy, FileText, CheckCircle2, Coins, Lock, Tv2, ExternalLink, Maximize2, X } from 'lucide-react';
+import { ChevronLeft, Star, Swords, Trophy, FileText, CheckCircle2, Coins, Lock, Unlock, Tv2, ExternalLink, Maximize2, X } from 'lucide-react';
 import { getFormatBadgeStyle } from './TournamentsView';
 
 interface TournamentDetailViewProps {
@@ -41,6 +41,20 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   const [selectedTeamForBet, setSelectedTeamForBet] = useState<any | null>(null);
   const [selectedTeamOdds, setSelectedTeamOdds] = useState<number>(0);
   const [wagerAmount, setWagerAmount] = useState<number>(100);
+  const [selectedTeamForRoster, setSelectedTeamForRoster] = useState<any | null>(null);
+  const [passwordInput, setPasswordInput] = useState('');
+
+  useEffect(() => {
+    setPasswordInput('');
+  }, [selectedTeamForRoster]);
+
+  const getMaxTeamPlayers = (type: string) => {
+    if (type === '5X5') return 5;
+    if (type === '4X4') return 4;
+    if (type === '3X3') return 3;
+    if (type === '2X2') return 2;
+    return 2;
+  };
 
   if (!tourney) return <div style={{ padding: '20px', color: 'white' }}>Турнір не знайдено</div>;
 
@@ -77,17 +91,6 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   const rawUsername = user?.username || 'volki_player';
   const isUserRegistered = tourneyTeams.some(t => isSameUser(t.captain, rawUsername) || t.players?.some((p: any) => isSameUser(p.username, rawUsername)));
 
-  const handleJoinClick = async (team: any) => {
-    if (team.joinType === 'closed') {
-      const pwd = window.prompt('Ця команда закрита. Введіть пароль:');
-      if (!pwd) return;
-      await joinTeam(team.id, pwd);
-    } else if (team.joinType === 'open') {
-      if (window.confirm(`Приєднатися до команди ${team.name}?`)) {
-        await joinTeam(team.id);
-      }
-    }
-  };
 
   return (
     <div className="scroll-container" style={{ position: 'relative', paddingBottom: '120px' }}>
@@ -628,6 +631,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                 <div 
                   key={team.id}
                   className="esports-card"
+                  onClick={() => setSelectedTeamForRoster(team)}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -638,7 +642,8 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                     borderRadius: '16px',
                     padding: '14px 6px',
                     textAlign: 'center',
-                    position: 'relative'
+                    position: 'relative',
+                    cursor: 'pointer'
                   }}
                 >
                   <div style={{
@@ -673,6 +678,15 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                     {team.name}
                   </span>
 
+                  <span style={{
+                    fontSize: '9px',
+                    color: 'var(--text-muted)',
+                    marginTop: '2px',
+                    fontFamily: 'Outfit, sans-serif'
+                  }}>
+                    {team.players?.length || 0}/{getMaxTeamPlayers(tourney.type)} гравців
+                  </span>
+
                   {isMyTeam && (
                     <span style={{
                       position: 'absolute',
@@ -690,24 +704,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                       MY
                     </span>
                   )}
-                  {!isMyTeam && !isUserRegistered && (team.joinType === 'open' || team.joinType === 'closed') && (team.players?.length < 2) && (
-                    <button
-                      onClick={() => handleJoinClick(team)}
-                      style={{
-                        marginTop: '8px',
-                        background: 'rgba(16, 185, 129, 0.1)',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
-                        borderRadius: '6px',
-                        color: 'var(--accent-green)',
-                        fontSize: '10px',
-                        fontWeight: '700',
-                        padding: '4px 8px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {team.joinType === 'closed' ? 'ВСТУПИТИ 🔒' : 'ВСТУПИТИ'}
-                    </button>
-                  )}
+
                 </div>
               );
             })}
@@ -1163,6 +1160,206 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
             />
           </div>
         </div>
+      )}
+
+      {/* TEAM ROSTER BOTTOM SHEET */}
+      {selectedTeamForRoster && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setSelectedTeamForRoster(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.7)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+              zIndex: 100,
+            }}
+          />
+
+          {/* Sheet */}
+          <div style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: '#0D0D14',
+            borderTop: '1px solid rgba(255,92,0,0.2)',
+            borderRadius: '28px 28px 0 0',
+            padding: '24px 20px 40px',
+            zIndex: 101,
+            animation: 'slideUp 0.25s ease',
+          }}>
+            {/* Handle bar */}
+            <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.1)', margin: '0 auto 20px' }} />
+
+            {/* Team details header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '50px',
+                  height: '50px',
+                  borderRadius: '50%',
+                  backgroundColor: selectedTeamForRoster.logoBg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  fontWeight: '900',
+                  color: 'white',
+                  fontFamily: 'Outfit, sans-serif',
+                  border: '2px solid rgba(255,255,255,0.1)'
+                }}>
+                  {selectedTeamForRoster.logoText}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: 'white', margin: 0, fontFamily: 'Outfit, sans-serif' }}>
+                    {selectedTeamForRoster.name}
+                  </h3>
+                  <span style={{ 
+                    fontSize: '10px', 
+                    color: selectedTeamForRoster.joinType === 'closed' ? '#FFD000' : selectedTeamForRoster.joinType === 'open' ? '#10B981' : '#8F8F9B', 
+                    fontWeight: '800',
+                    textTransform: 'uppercase',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    marginTop: '4px'
+                  }}>
+                    {selectedTeamForRoster.joinType === 'closed' ? <><Lock size={10} /> Закрита команда</> : selectedTeamForRoster.joinType === 'open' ? <><Unlock size={10} /> Публічна команда</> : 'Тільки запрошення'}
+                  </span>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => setSelectedTeamForRoster(null)} 
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  color: '#8F8F9B',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Squad section */}
+            <div style={{ marginBottom: '28px' }}>
+              <h4 style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', fontFamily: 'Outfit, sans-serif', fontWeight: '800', marginBottom: '12px' }}>
+                Склад команди ({(selectedTeamForRoster.players || []).length} / {getMaxTeamPlayers(tourney.type)})
+              </h4>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(selectedTeamForRoster.players || []).map((player: any, idx: number) => {
+                  const isCaptain = isSameUser(player.username, selectedTeamForRoster.captain);
+                  return (
+                    <div key={idx} className="esports-card" style={{
+                      padding: '12px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid rgba(255,255,255,0.05)'
+                    }}>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: 'white' }}>
+                        {player.username}
+                      </span>
+                      {isCaptain ? (
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: '800',
+                          color: '#FF5C00',
+                          backgroundColor: 'rgba(255,92,0,0.1)',
+                          border: '1px solid rgba(255,92,0,0.2)',
+                          padding: '3px 8px',
+                          borderRadius: '6px'
+                        }}>
+                          👑 КАПІТАН
+                        </span>
+                      ) : (
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: '800',
+                          color: '#8F8F9B',
+                          backgroundColor: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          padding: '3px 8px',
+                          borderRadius: '6px'
+                        }}>
+                          ГРАВЕЦЬ
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Join button */}
+            {!isSameUser(selectedTeamForRoster.captain, rawUsername) &&
+             !selectedTeamForRoster.players?.some((p: any) => isSameUser(p.username, rawUsername)) &&
+             !isUserRegistered && 
+             (selectedTeamForRoster.joinType === 'open' || selectedTeamForRoster.joinType === 'closed') && 
+             ((selectedTeamForRoster.players?.length || 0) < getMaxTeamPlayers(tourney.type)) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {selectedTeamForRoster.joinType === 'closed' ? (
+                  <>
+                    <input
+                      type="password"
+                      placeholder="Введіть пароль команди"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '10px',
+                        color: 'white',
+                        fontSize: '14px',
+                        outline: 'none',
+                        textAlign: 'center',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                    <button
+                      className="btn-primary"
+                      onClick={async () => {
+                        if (!passwordInput.trim()) {
+                          alert('Будь ласка, введіть пароль команди!');
+                          return;
+                        }
+                        const success = await joinTeam(selectedTeamForRoster.id, passwordInput.trim());
+                        if (success) {
+                          setSelectedTeamForRoster(null);
+                        }
+                      }}
+                      style={{ width: '100%', padding: '16px', fontSize: '14px', fontWeight: '900', letterSpacing: '1px' }}
+                    >
+                      ВСТУПИТИ З ПАРОЛЕМ 🔒
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="btn-primary"
+                    onClick={async () => {
+                      const success = await joinTeam(selectedTeamForRoster.id);
+                      if (success) {
+                        setSelectedTeamForRoster(null);
+                      }
+                    }}
+                    style={{ width: '100%', padding: '16px', fontSize: '14px', fontWeight: '900', letterSpacing: '1px' }}
+                  >
+                    ПРИЄДНАТИСЯ ДО КОМАНДИ
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
     </div>
