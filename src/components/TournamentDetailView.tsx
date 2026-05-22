@@ -67,9 +67,15 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
     return parseFloat((minOdds + normalized * (maxOdds - minOdds)).toFixed(2));
   };
 
+  // Helper to safely compare usernames with or without @
+  const isSameUser = (u1: string, u2: string) => {
+    if (!u1 || !u2) return false;
+    return u1.replace('@', '').toLowerCase() === u2.replace('@', '').toLowerCase();
+  };
+
   // Check if user is registered by inspecting captain names in the team list
-  const userHandle = user?.username ? (user.username.startsWith('@') ? user.username : `@${user.username}`) : '@volki_player';
-  const isUserRegistered = tourneyTeams.some(t => t.captain === userHandle || t.players?.some(p => p.username === userHandle));
+  const rawUsername = user?.username || 'volki_player';
+  const isUserRegistered = tourneyTeams.some(t => isSameUser(t.captain, rawUsername) || t.players?.some((p: any) => isSameUser(p.username, rawUsername)));
 
   const handleJoinClick = async (team: any) => {
     if (team.joinType === 'closed') {
@@ -617,7 +623,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
             gap: '12px'
           }}>
             {tourneyTeams.map((team) => {
-              const isMyTeam = team.captain === userHandle || team.players?.some(p => p.username === userHandle);
+              const isMyTeam = isSameUser(team.captain, rawUsername) || team.players?.some((p: any) => isSameUser(p.username, rawUsername));
               return (
                 <div 
                   key={team.id}
