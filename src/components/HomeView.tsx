@@ -152,14 +152,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   // Find featured tournament: prioritize any active (live) tournament, then the closest upcoming one
   const featuredTourney = sortedTournaments.find(t => t.status === 'active') || 
-                          sortedTournaments.find(t => t.id === '2x2_aim_cup') || 
-                          sortedTournaments[0];
+                          sortedTournaments.find(t => t.status === 'upcoming');
   
   // Find live match
   const liveMatch = matches.find(m => m.status === 'live');
   
-  // Get other tournaments (excluding the featured one)
-  const upcomingTourneys = sortedTournaments.filter(t => t.id !== featuredTourney?.id);
+  // Get other tournaments (excluding the featured one and excluding completed ones)
+  const upcomingTourneys = sortedTournaments.filter(t => 
+    t.id !== featuredTourney?.id && 
+    t.status !== 'completed'
+  );
 
   return (
     <div className="scroll-container" style={{ padding: '16px 20px 120px 20px' }}>
