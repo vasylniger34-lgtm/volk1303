@@ -505,8 +505,13 @@ h1, h2, h3, h4, h5, h6, .font-outfit {
     radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 40%),
     radial-gradient(circle at 50% 50%, rgba(10, 10, 14, 1) 0%, #000 100%);
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
+}
+
+.admin-site-container,
+.admin-site-container *:not(code):not(pre):not(textarea):not(.font-mono) {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
 }
 
 .admin-grid-layout {
