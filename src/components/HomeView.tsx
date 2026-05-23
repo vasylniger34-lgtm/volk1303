@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Trophy, Swords, TrendingUp, User, ChevronRight, Zap } from 'lucide-react';
+import { Trophy, Swords, TrendingUp, User, ChevronRight, Zap, Tv2 } from 'lucide-react';
 import { getFormatBadgeStyle } from './TournamentsView';
 
 interface HomeViewProps {
@@ -163,6 +163,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   
   // Find live match
   const liveMatch = matches.find(m => m.status === 'live');
+  const liveMatchTourney = liveMatch ? tournaments.find(t => t.id === liveMatch.tournamentId) : null;
+  const hasStream = liveMatchTourney?.streamUrl ? true : false;
   
   // Get other tournaments (excluding the featured one and excluding completed ones)
   const upcomingTourneys = sortedTournaments.filter(t => 
@@ -406,9 +408,28 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <span style={{ fontSize: '10px', color: '#8F8F9B', fontWeight: '800', letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'Outfit, sans-serif' }}>
                 {liveMatch.tournamentName} • {liveMatch.roundName.toUpperCase()}
               </span>
-              <span className="badge-live">
-                <span className="badge-live-pulse" /> LIVE
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {hasStream && (
+                  <span className="badge-stream" style={{
+                    backgroundColor: 'rgba(145, 70, 255, 0.15)',
+                    border: '1px solid rgba(145, 70, 255, 0.3)',
+                    color: '#a970ff',
+                    fontSize: '9px',
+                    fontWeight: '800',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontFamily: 'Outfit, sans-serif'
+                  }}>
+                    <Tv2 size={10} color="#a970ff" /> СТРІМ
+                  </span>
+                )}
+                <span className="badge-live">
+                  <span className="badge-live-pulse" /> LIVE
+                </span>
+              </div>
             </div>
 
             {/* Score and teams */}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Trophy, Swords, ArrowLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Trophy, Swords, ArrowLeft, ChevronRight, Calendar, Tv2 } from 'lucide-react';
 import { getFormatBadgeStyle } from './TournamentsView';
 
 interface MatchesViewProps {
@@ -191,26 +191,48 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ onSelectMatch, onSelec
               МАТЧІ В ЛАЙВІ ({liveMatches.length})
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {liveMatches.map((match) => (
-                <div
-                  key={match.id}
-                  onClick={() => onSelectMatch(match.id)}
-                  className="esports-card"
-                  style={{
-                    padding: '16px 18px',
-                    cursor: 'pointer',
-                    border: '1px solid rgba(239, 68, 68, 0.25)',
-                    background: 'linear-gradient(135deg, rgba(16, 16, 22, 0.95) 0%, rgba(28, 16, 18, 0.95) 100%)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '9px', color: '#8F8F9B', fontWeight: '800', letterSpacing: '0.5px', fontFamily: 'Outfit, sans-serif' }}>
-                      {getRoundLabel(match.roundName)}
-                    </span>
-                    <span className="badge-live" style={{ position: 'static', transform: 'none' }}>
-                      <span className="badge-live-pulse" /> LIVE
-                    </span>
-                  </div>
+              {liveMatches.map((match) => {
+                const tourney = tournaments.find(t => t.id === match.tournamentId);
+                const hasStream = tourney?.streamUrl ? true : false;
+                return (
+                  <div
+                    key={match.id}
+                    onClick={() => onSelectMatch(match.id)}
+                    className="esports-card"
+                    style={{
+                      padding: '16px 18px',
+                      cursor: 'pointer',
+                      border: '1px solid rgba(239, 68, 68, 0.25)',
+                      background: 'linear-gradient(135deg, rgba(16, 16, 22, 0.95) 0%, rgba(28, 16, 18, 0.95) 100%)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '9px', color: '#8F8F9B', fontWeight: '800', letterSpacing: '0.5px', fontFamily: 'Outfit, sans-serif' }}>
+                        {getRoundLabel(match.roundName)}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {hasStream && (
+                          <span className="badge-stream" style={{
+                            backgroundColor: 'rgba(145, 70, 255, 0.15)',
+                            border: '1px solid rgba(145, 70, 255, 0.3)',
+                            color: '#a970ff',
+                            fontSize: '8px',
+                            fontWeight: '800',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            fontFamily: 'Outfit, sans-serif'
+                          }}>
+                            <Tv2 size={8} color="#a970ff" /> СТРІМ
+                          </span>
+                        )}
+                        <span className="badge-live" style={{ position: 'static', transform: 'none' }}>
+                          <span className="badge-live-pulse" /> LIVE
+                        </span>
+                      </div>
+                    </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                     {/* Team A */}
@@ -322,7 +344,8 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ onSelectMatch, onSelec
                     </div>
                   </div>
                 </div>
-              ))}
+              )
+            })}
             </div>
           </div>
         )}

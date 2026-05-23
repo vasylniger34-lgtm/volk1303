@@ -7,7 +7,7 @@ import {
   BarChart3, Trophy, Swords, Users, Settings, Activity, 
   Plus, Check, Play, Edit3, X, Save, 
   MapPin, Award, Trash2, PlusCircle, AlertCircle, RefreshCw, Send,
-  MessageSquare, CheckCircle2, Coins
+  MessageSquare, CheckCircle2, Coins, Upload
 } from 'lucide-react';
 
 const MANAGER_ACCESS_CODE = '11111111';
@@ -1975,7 +1975,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                   {/* Photo / Banner configuration */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase' }}>Баннер / Фото Турніру</label>
+                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#8F8F9B', textTransform: 'uppercase', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                      Баннер / Фото Турніру 
+                      <span style={{ color: '#FF5C00', textTransform: 'none', fontWeight: '500', fontSize: '9px' }}>
+                        (Рекомендований розмір: 1920x1080 або 16:9)
+                      </span>
+                    </label>
                     
                     {/* Presets Grid */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '8px' }}>
@@ -2010,7 +2015,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     {/* Custom URL */}
                     <input 
                       type="text" 
-                      placeholder="Вставте URL зображення або виберіть пресет вище"
+                      placeholder="Вставте URL зображення або завантажте власне нижче"
                       value={tourneyForm.imageUrl}
                       onChange={e => setTourneyForm({ ...tourneyForm, imageUrl: e.target.value })}
                       style={{
@@ -2034,16 +2039,17 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                       <label 
                         htmlFor="create-tourney-file-upload"
                         style={{
-                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '8px', padding: '8px 12px', fontSize: '10px', fontWeight: '800',
-                          color: '#fff', cursor: 'pointer', fontFamily: 'Outfit', display: 'inline-block'
+                          background: 'rgba(255, 92, 0, 0.08)', border: '1px solid rgba(255, 92, 0, 0.2)',
+                          borderRadius: '8px', padding: '8px 16px', fontSize: '10px', fontWeight: '800',
+                          color: '#FF5C00', cursor: 'pointer', fontFamily: 'Outfit', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                          transition: 'all 0.2s'
                         }}
                       >
-                        Завантажити файл
+                        <Upload size={12} /> Завантажити фото
                       </label>
                       {tourneyForm.imageUrl && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '700' }}>✓ Зображення готове</span>
+                          <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '700' }}>✓ Готово</span>
                           <button 
                             type="button" 
                             onClick={() => setTourneyForm({ ...tourneyForm, imageUrl: '' })}
@@ -3355,7 +3361,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
               {/* Photo / Banner Manager */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '16px' }}>
-                <label style={{ fontSize: '10px', fontWeight: '800', color: '#FF5C00', textTransform: 'uppercase' }}>Зміна Обкладинки / Банера</label>
+                <label style={{ fontSize: '10px', fontWeight: '800', color: '#FF5C00', textTransform: 'uppercase', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                  Зміна Обкладинки / Банера 
+                  <span style={{ color: '#8F8F9B', textTransform: 'none', fontWeight: '500', fontSize: '9px' }}>
+                    (Рекомендований розмір: 1920x1080 або 16:9)
+                  </span>
+                </label>
                 
                 {/* Presets Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '8px' }}>
@@ -3389,7 +3400,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                 <input 
                   type="text" 
-                  placeholder="Посилання на баннер турніру"
+                  placeholder="Посилання на баннер турніру або завантажте нижче"
                   value={editTourneyForm.imageUrl}
                   onChange={e => setEditTourneyForm({ ...editTourneyForm, imageUrl: e.target.value })}
                   style={{
@@ -3412,12 +3423,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                   <label 
                     htmlFor="edit-tourney-file-upload"
                     style={{
-                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: '8px', padding: '8px 12px', fontSize: '10px', fontWeight: '800',
-                      color: '#fff', cursor: 'pointer', fontFamily: 'Outfit', display: 'inline-block'
+                      background: 'rgba(255, 92, 0, 0.08)', border: '1px solid rgba(255, 92, 0, 0.2)',
+                      borderRadius: '8px', padding: '8px 16px', fontSize: '10px', fontWeight: '800',
+                      color: '#FF5C00', cursor: 'pointer', fontFamily: 'Outfit', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      transition: 'all 0.2s'
                     }}
                   >
-                    Завантажити нове фото
+                    <Upload size={12} /> Завантажити нове фото
                   </label>
                   {editTourneyForm.imageUrl && (
                     <button 
