@@ -832,6 +832,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   // ─── STYLES & LAYOUTS ───
 
   const activeMatch = matches.find(m => m.id === selectedMatchId);
+  const isTbdMatch = activeMatch ? (!activeMatch.teamA || !activeMatch.teamB || activeMatch.teamA.name === 'TBD' || activeMatch.teamB.name === 'TBD') : false;
 
   // Auto-win and Dynamic Odds Handler
   const handleScoreChange = (team: 'A' | 'B', delta: number) => {
@@ -2363,9 +2364,20 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                     {activeMatch.status === 'scheduled' && (
                                       <button 
-                                        onClick={() => startSelectedMatchLive(activeMatch.id)}
+                                        onClick={() => !isTbdMatch && startSelectedMatchLive(activeMatch.id)}
+                                        disabled={isTbdMatch}
                                         className="btn-primary"
-                                        style={{ padding: '12px 20px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer' }}
+                                        style={{ 
+                                          padding: '12px 20px', 
+                                          borderRadius: '10px', 
+                                          fontSize: '12px', 
+                                          cursor: isTbdMatch ? 'not-allowed' : 'pointer',
+                                          opacity: isTbdMatch ? 0.5 : 1,
+                                          background: isTbdMatch ? '#27272A' : undefined,
+                                          borderColor: isTbdMatch ? '#3F3F46' : undefined,
+                                          color: isTbdMatch ? '#A1A1AA' : undefined
+                                        }}
+                                        title={isTbdMatch ? "Неможливо запустити матч з TBD" : undefined}
                                       >
                                         <Play size={12} style={{ marginRight: '6px' }} /> Запустити LIVE Матч
                                       </button>
