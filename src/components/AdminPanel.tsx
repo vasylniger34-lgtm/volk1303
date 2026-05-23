@@ -417,11 +417,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
                                   </>
                                 ) : (
                                   <>
-                                    {m.status === 'scheduled' && (
-                                      <button style={{ ...s.btnSmall, color: '#10B981' }} onClick={() => setMatchLive(m.id)}>
-                                        <Play size={12} /> Start
-                                      </button>
-                                    )}
+                                    {m.status === 'scheduled' && (() => {
+                                      const isTbd = !m.teamA || !m.teamB || m.teamA.name === 'TBD' || m.teamB.name === 'TBD';
+                                      return (
+                                        <button 
+                                          style={{ 
+                                            ...s.btnSmall, 
+                                            color: isTbd ? '#51515E' : '#10B981',
+                                            cursor: isTbd ? 'not-allowed' : 'pointer',
+                                            opacity: isTbd ? 0.5 : 1
+                                          }} 
+                                          onClick={() => !isTbd && setMatchLive(m.id)}
+                                          disabled={isTbd}
+                                          title={isTbd ? "Неможливо запустити матч з TBD" : undefined}
+                                        >
+                                          <Play size={12} /> Start
+                                        </button>
+                                      );
+                                    })()}
                                     <button style={s.btnSmall} onClick={() => startEditMatch(m)}>
                                       <Edit3 size={12} /> Рахунок
                                     </button>
@@ -521,7 +534,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
                         </>
                       ) : (
                         <>
-                          {m.status === 'scheduled' && <button style={{ ...s.btnSmall, color: '#10B981' }} onClick={() => setMatchLive(m.id)}><Play size={12} /></button>}
+                          {m.status === 'scheduled' && (() => {
+                            const isTbd = !m.teamA || !m.teamB || m.teamA.name === 'TBD' || m.teamB.name === 'TBD';
+                            return (
+                              <button 
+                                style={{ 
+                                  ...s.btnSmall, 
+                                  color: isTbd ? '#51515E' : '#10B981',
+                                  cursor: isTbd ? 'not-allowed' : 'pointer',
+                                  opacity: isTbd ? 0.5 : 1
+                                }} 
+                                onClick={() => !isTbd && setMatchLive(m.id)}
+                                disabled={isTbd}
+                                title={isTbd ? "Неможливо запустити матч з TBD" : undefined}
+                              >
+                                <Play size={12} />
+                              </button>
+                            );
+                          })()}
                           <button style={s.btnSmall} onClick={() => startEditMatch(m)}><Edit3 size={12} /></button>
                         </>
                       )}

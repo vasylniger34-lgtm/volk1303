@@ -814,6 +814,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   // ─── STYLES & LAYOUTS ───
 
   const activeMatch = matches.find(m => m.id === selectedMatchId);
+  const isTbdMatch = activeMatch ? (!activeMatch.teamA || !activeMatch.teamB || activeMatch.teamA.name === 'TBD' || activeMatch.teamB.name === 'TBD') : false;
 
   // Auto-win and Dynamic Odds Handler
   const handleScoreChange = (team: 'A' | 'B', delta: number) => {
@@ -1748,27 +1749,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                             <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#FF5C00', fontWeight: '800' }}><Award size={12} /> Фонд: {t.prizePool}</span>
                           </div>
                           
-                          {/* Twitch Stream Preview */}
-                          {t.streamUrl && (
-                            <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '16px' }}>
-                              <a href={t.streamUrl.startsWith('https://') ? t.streamUrl : `https://${t.streamUrl}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginBottom: '12px', background: '#9146FF', color: '#fff', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '12px', fontFamily: 'Outfit' }}>
-                                📺 Дивитись на Twitch
-                              </a>
-                              {t.streamUrl.includes('twitch.tv') ? (
-                                <iframe
-                                  src={`https://player.twitch.tv/?channel=${t.streamUrl.split('twitch.tv/')[1]?.split('?')[0]}&parent=${window.location.hostname}`}
-                                  height="200"
-                                  width="100%"
-                                  allowFullScreen
-                                  style={{ border: 'none', borderRadius: '8px' }}
-                                ></iframe>
-                              ) : (
-                                <div style={{ height: '200px', width: '100%', background: '#1a1a1a', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', border: '1px dashed #333' }}>
-                                  Stream Preview Not Available for non-Twitch URLs
-                                </div>
-                              )}
-                            </div>
-                          )}
+
                         </div>
                       );
                     })}
@@ -2318,9 +2299,20 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                     {activeMatch.status === 'scheduled' && (
                                       <button 
-                                        onClick={() => startSelectedMatchLive(activeMatch.id)}
+                                        onClick={() => !isTbdMatch && startSelectedMatchLive(activeMatch.id)}
+                                        disabled={isTbdMatch}
                                         className="btn-primary"
-                                        style={{ padding: '12px 20px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer' }}
+                                        style={{ 
+                                          padding: '12px 20px', 
+                                          borderRadius: '10px', 
+                                          fontSize: '12px', 
+                                          cursor: isTbdMatch ? 'not-allowed' : 'pointer',
+                                          opacity: isTbdMatch ? 0.5 : 1,
+                                          background: isTbdMatch ? '#27272A' : undefined,
+                                          borderColor: isTbdMatch ? '#3F3F46' : undefined,
+                                          color: isTbdMatch ? '#A1A1AA' : undefined
+                                        }}
+                                        title={isTbdMatch ? "Неможливо запустити матч з TBD" : undefined}
                                       >
                                         <Play size={12} style={{ marginRight: '6px' }} /> Запустити LIVE Матч
                                       </button>
