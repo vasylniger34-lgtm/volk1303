@@ -1847,6 +1847,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .then();
         }
 
+        // 1b. Give tournament winner prize to winning team members
+        const tourney = tournamentsRef.current.find(t => t.id === targetMatch.tournamentId);
+        if (tourney && winnerTeamObj) {
+          const prizeStr = tourney.prizePlaces?.first || tourney.prizePool || '0';
+          const prizeAmount = parseInt(prizeStr.replace(/\D/g, ''), 10) || 0;
+          if (prizeAmount > 0) {
+            const teamPlayers = winnerTeamObj.players || [];
+            const captainName = winnerTeamObj.captain;
+            
+            // Normalize usernames to lowercase without leading @
+            const normalizedPlayers = teamPlayers.map((p: any) => p.username.replace(/^@/, '').toLowerCase());
+            const normalizedCaptain = captainName ? captainName.replace(/^@/, '').toLowerCase() : '';
+            
+            const allUsernames = [...normalizedPlayers];
+            if (normalizedCaptain && !normalizedPlayers.includes(normalizedCaptain)) {
+              allUsernames.push(normalizedCaptain);
+            }
+            
+            const playerCount = allUsernames.length;
+            const splitAmount = playerCount > 0 ? Math.round(prizeAmount / playerCount) : 0;
+            
+            if (splitAmount > 0) {
+              if (useSupabase) {
+                allUsernames.forEach(async (uname) => {
+                  const { data: profile, error: fetchErr } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .ilike('username', uname)
+                    .maybeSingle();
+                  
+                  if (!fetchErr && profile) {
+                    const newBalance = profile.balance + splitAmount;
+                    await supabase.from('profiles').update({ balance: newBalance }).eq('id', profile.id);
+                    
+                    if (profile.id === userRef.current.id) {
+                      setUser(prev => ({
+                        ...prev,
+                        balance: newBalance
+                      }));
+                      setTimeout(() => showToast(`🏆 Вітаємо! Ваша команда виграла турнір! Ви отримали +${splitAmount} 🪙!`, 'success'), 1500);
+                    }
+                  }
+                });
+              } else {
+                // Offline mode
+                const currentNormalized = userRef.current.username ? userRef.current.username.replace(/^@/, '').toLowerCase() : '';
+                if (allUsernames.includes(currentNormalized)) {
+                  setUser(prev => ({
+                    ...prev,
+                    balance: prev.balance + splitAmount
+                  }));
+                  setTimeout(() => showToast(`🏆 Вітаємо! Ваша команда виграла турнір! Ви отримали +${splitAmount} 🪙!`, 'success'), 1500);
+                }
+              }
+            }
+          }
+        }
+
         // 2. Give tournament completion bonus to all users who participated
         const bonusCoins = 1000;
         if (useSupabase) {
