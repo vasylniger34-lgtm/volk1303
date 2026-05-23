@@ -1990,25 +1990,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (error) {
             console.error('[VOLKI] Error inserting tournament to Supabase:', error);
             
-            // Case 1: Foreign key constraint violation on created_by (code 23503)
-            if (error.code === '23503' && data.created_by) {
-              console.log('[VOLKI] Stale user session / foreign key violation detected. Retrying insert with created_by: null...');
-              attemptInsert({
+            // Clean retry: If ANY error occurs (stale session, foreign key violation, RLS, missing columns),
+            // we retry once with a clean payload (no image_url/stream_url, and created_by set to null).
+            const hasExtraFields = 'image_url' in data || 'stream_url' in data || data.created_by !== null;
+            if (hasExtraFields) {
+              console.log('[VOLKI] Retrying tournament insert with clean base data (no image_url/stream_url, created_by: null)...');
+              const cleanedData = { 
                 ...data,
                 created_by: null
-              });
-              return;
-            }
-            
-            // Case 2: Missing image_url or stream_url column in the schema cache (code PGRST204)
-            const errorMsg = error.message || '';
-            const isMissingColumnError = error.code === 'PGRST204' || 
-                                         errorMsg.includes('image_url') || 
-                                         errorMsg.includes('stream_url');
-            
-            if (isMissingColumnError && ('image_url' in data || 'stream_url' in data)) {
-              console.log('[VOLKI] Missing image_url or stream_url column in DB. Retrying insert without them...');
-              const cleanedData = { ...data };
+              };
               delete cleanedData.image_url;
               delete cleanedData.stream_url;
               attemptInsert(cleanedData);

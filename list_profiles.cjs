@@ -17,7 +17,7 @@ async function run() {
     }
 
     console.log('--- PROFILES ---');
-    console.log(profiles.map(p => ({ id: p.id, username: p.username, reg_num: p.reg_num, balance: p.balance })));
+    console.log(profiles.map(p => ({ id: p.id, username: p.username, balance: p.balance, role: p.role })));
   } catch (err) {
     console.error('Fatal error:', err);
   }
