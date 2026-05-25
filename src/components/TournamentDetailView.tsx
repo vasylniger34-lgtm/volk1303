@@ -61,6 +61,9 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   const [activeTab, setActiveTab] = useState<'INFO' | 'BRACKET' | 'PARTICIPANTS' | 'BETS' | 'RULES' | 'STREAM'>('INFO');
   const [fullscreenUrl, setFullscreenUrl] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [bracketZoom, setBracketZoom] = useState<number>(() => {
+    return window.innerWidth < 768 ? 0.7 : 1.0;
+  });
   const [selectedTeamForBet, setSelectedTeamForBet] = useState<any | null>(null);
   const [selectedTeamOdds, setSelectedTeamOdds] = useState<number>(0);
   const [wagerAmount, setWagerAmount] = useState<number>(100);
@@ -457,15 +460,66 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
               const activeRoundNames = roundsOrder.filter(r => tourneyMatches.some(m => m.roundName === r));
               
               return (
-                <div style={{ overflowX: 'auto', width: '100%', padding: '10px 0' }}>
-                  <div className="visual-bracket-tree" style={{ 
+                <div>
+                  {/* Zoom Controls */}
+                  <div style={{ 
                     display: 'flex', 
-                    flexDirection: 'row', 
-                    gap: '32px', 
-                    minWidth: `${activeRoundNames.length * 280}px`,
-                    padding: '20px 10px',
-                    alignItems: 'stretch'
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    marginBottom: '14px', 
+                    padding: '8px 12px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.04)',
+                    borderRadius: '12px'
                   }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🔍 Масштаб сітки
+                    </span>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '4px', 
+                      background: 'rgba(0, 0, 0, 0.2)', 
+                      borderRadius: '8px', 
+                      padding: '2px' 
+                    }}>
+                      {[0.5, 0.7, 0.85, 1.0].map((level) => {
+                        const isActive = bracketZoom === level;
+                        return (
+                          <button
+                            key={level}
+                            onClick={() => setBracketZoom(level)}
+                            style={{
+                              background: isActive ? 'var(--primary-orange, #FF5C00)' : 'transparent',
+                              color: isActive ? 'white' : '#8F8F9B',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '4px 10px',
+                              fontSize: '11px',
+                              fontWeight: '800',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              fontFamily: 'Outfit'
+                            }}
+                          >
+                            {level * 100}%
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div style={{ overflowX: 'auto', width: '100%', padding: '10px 0' }}>
+                    <div className="visual-bracket-tree" style={{ 
+                      display: 'flex', 
+                      flexDirection: 'row', 
+                      gap: '32px', 
+                      minWidth: `${activeRoundNames.length * 280}px`,
+                      padding: '20px 10px',
+                      alignItems: 'stretch',
+                      zoom: bracketZoom,
+                      WebkitZoom: bracketZoom
+                    } as React.CSSProperties}>
                     {activeRoundNames.map((roundName) => {
                       const roundMatches = tourneyMatches
                         .filter(m => m.roundName === roundName)
@@ -570,8 +624,9 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                     })}
                   </div>
                 </div>
-              );
-            })()
+              </div>
+            );
+          })()
           ) : (
             <div style={{
               display: 'flex',
