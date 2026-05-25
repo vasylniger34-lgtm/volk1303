@@ -231,6 +231,18 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     return () => clearInterval(interval);
   }, [isAuthed]);
 
+  // Smooth scroll to match control dashboard when a match is selected
+  useEffect(() => {
+    if (selectedMatchId) {
+      setTimeout(() => {
+        const element = document.getElementById('match-control-dashboard');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [selectedMatchId]);
+
   // ─── AUTHENTICATION HANDLERS ───
 
   const handleExpressActivate = async () => {
@@ -2273,7 +2285,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                         </div>
 
                         {/* Simulation & Listing Container */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '28px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
                           
                           {/* Matches List */}
                           <div className="esports-card" style={{ padding: '24px', overflowX: 'auto', width: '100%', height: 'fit-content' }}>
@@ -2417,8 +2429,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                           </div>
 
                           {/* Match Control Dashboard (Simulation Panel) */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            {activeMatch && activeMatch.tournamentId === selectedTourneyIdForSimulation ? (
+                          {activeMatch && activeMatch.tournamentId === selectedTourneyIdForSimulation && (
+                            <div id="match-control-dashboard" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                               <div className="esports-card" style={{ padding: '28px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '16px', marginBottom: '20px' }}>
                                   <div>
@@ -2707,14 +2719,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
                                 </div>
                               </div>
-                            ) : (
-                              <div className="esports-card" style={{ padding: '60px', textAlign: 'center', color: '#51515E' }}>
-                                <Swords size={48} style={{ margin: '0 auto 16px', opacity: 0.15 }} />
-                                <p style={{ fontSize: '15px', fontWeight: '700', color: '#8F8F9B' }}>Жодної гри не вибрано</p>
-                                <p style={{ fontSize: '11px', marginTop: '4px' }}>Клацніть на матч із лівого списку, щоб отримати доступ до симулятора</p>
-                              </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
 
                         </div>
                       </div>
