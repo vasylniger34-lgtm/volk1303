@@ -16,7 +16,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onSelectMatch,
   onOpenRegister
 }) => {
-  const { tournaments, matches } = useApp();
+  const { tournaments, matches, teams, user } = useApp();
 
   const parseTourneyDate = (dateStr: string): number => {
     if (!dateStr) return Infinity;
@@ -172,6 +172,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
     !isTournamentCompleted(t)
   );
 
+  const rawUsername = user?.username || 'volki_player';
+  const isSameUser = (u1: string, u2: string) => {
+    if (!u1 || !u2) return false;
+    return u1.replace('@', '').toLowerCase() === u2.replace('@', '').toLowerCase();
+  };
+
+  const featuredTourneyTeams = featuredTourney ? (teams[featuredTourney.id] || []) : [];
+  const isUserRegistered = featuredTourneyTeams.some(t => isSameUser(t.captain, rawUsername) || t.players?.some((p: any) => isSameUser(p.username, rawUsername)));
+  const isFull = featuredTourney ? featuredTourney.participantsCount >= featuredTourney.maxParticipants : false;
+
   return (
     <div className="scroll-container" style={{ padding: '16px 20px 120px 20px' }}>
       
@@ -257,11 +267,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <button 
-              className={featuredTourney.status === 'active' ? "btn-primary" : "btn-primary"} 
+              className="btn-primary" 
+              disabled={featuredTourney.status !== 'active' && (isUserRegistered || isFull)}
               onClick={() => {
                 if (featuredTourney.status === 'active') {
                   onSelectTournament(featuredTourney.id);
-                } else {
+                } else if (!isUserRegistered && !isFull) {
                   onOpenRegister(featuredTourney.id);
                 }
               }}
@@ -270,11 +281,29 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 padding: '14px', 
                 fontSize: '13px', 
                 letterSpacing: '1px',
-                background: featuredTourney.status === 'active' ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)' : undefined,
-                borderColor: featuredTourney.status === 'active' ? '#10B981' : undefined
+                background: featuredTourney.status === 'active' 
+                  ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)' 
+                  : (isUserRegistered || isFull) 
+                    ? '#27272A' 
+                    : undefined,
+                borderColor: featuredTourney.status === 'active' 
+                  ? '#10B981' 
+                  : (isUserRegistered || isFull) 
+                    ? '#3F3F46' 
+                    : undefined,
+                color: (featuredTourney.status !== 'active' && (isUserRegistered || isFull)) ? '#8F8F9B' : 'white',
+                cursor: (featuredTourney.status !== 'active' && isFull) ? 'not-allowed' : (featuredTourney.status !== 'active' && isUserRegistered) ? 'default' : 'pointer',
+                boxShadow: (featuredTourney.status !== 'active' && (isUserRegistered || isFull)) ? 'none' : undefined,
+                transform: (featuredTourney.status !== 'active' && (isUserRegistered || isFull)) ? 'none' : undefined
               }}
             >
-              {featuredTourney.status === 'active' ? 'ПЕРЕГЛЯНУТИ МАТЧІ' : 'ЗАРЕЄСТРУВАТИСЬ'}
+              {featuredTourney.status === 'active' 
+                ? 'ПЕРЕГЛЯНУТИ МАТЧІ' 
+                : isUserRegistered 
+                  ? 'ВИ ВЖЕ ЗАРЕЄСТРОВАНІ' 
+                  : isFull 
+                    ? 'РЕЄСТРАЦІЯ ЗАКРИТА' 
+                    : 'ЗАРЕЄСТРУВАТИСЬ'}
             </button>
           </div>
         </div>
