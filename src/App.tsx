@@ -215,6 +215,15 @@ const AppContent: React.FC = () => {
 
   // View selection renderer
   const renderCurrentView = () => {
+    if (selectedMatchId) {
+      return (
+        <MatchDetailView 
+          matchId={selectedMatchId}
+          onBack={() => setSelectedMatchId(null)}
+        />
+      );
+    }
+
     if (selectedTournamentId) {
       return (
         <TournamentDetailView 
@@ -222,15 +231,6 @@ const AppContent: React.FC = () => {
           onBack={() => setSelectedTournamentId(null)}
           onSelectMatch={(id) => setSelectedMatchId(id)}
           onOpenRegister={(id) => setRegisteringTournamentId(id)}
-        />
-      );
-    }
-
-    if (selectedMatchId) {
-      return (
-        <MatchDetailView 
-          matchId={selectedMatchId}
-          onBack={() => setSelectedMatchId(null)}
         />
       );
     }
