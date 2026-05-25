@@ -430,36 +430,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const adminEmail = '11111111@telegram.volki.app';
           const adminPassword = 'volki_tg_11111111_secure';
           
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: adminEmail,
-            password: adminPassword
-          });
+          let signInData: any = null;
+          let signInError: any = null;
 
-          if (!signInError && signInData?.session) {
-            session = signInData.session;
-          } else {
-            // Try to sign up if it doesn't exist
-            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          try {
+            const res = await supabase.auth.signInWithPassword({
               email: adminEmail,
-              password: adminPassword,
-              options: {
-                data: {
-                  username: 'manager',
-                  telegram_id: '11111111',
-                  telegram_username: 'manager'
-                }
-              }
+              password: adminPassword
             });
+            signInData = res.data;
+            signInError = res.error;
+          } catch (err) {
+            signInError = err;
+          }
 
-            if (!signUpError && signUpData?.user) {
-              const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+          // If sign in fails, register the manager via RPC and retry sign in
+          if (signInError) {
+            console.log('[VOLKI] Manager sign-in failed, registering via RPC...', signInError.message || signInError);
+            try {
+              await supabase.rpc('register_telegram_user', {
+                tg_id: '11111111',
+                tg_username: 'manager',
+                tg_first_name: 'manager'
+              });
+              
+              // Retry signing in
+              const retryRes = await supabase.auth.signInWithPassword({
                 email: adminEmail,
                 password: adminPassword
               });
-              if (!retryError && retryData?.session) {
-                session = retryData.session;
-              }
+              signInData = retryRes.data;
+              signInError = retryRes.error;
+            } catch (rpcErr) {
+              console.error('[VOLKI] Manager RPC registration failed:', rpcErr);
             }
+          }
+
+          if (!signInError && signInData?.session) {
+            const managerSession = signInData.session;
+            session = managerSession;
+            console.log('[VOLKI] Manager authenticated successfully.');
+            
+            // Ensure the manager profile has 'admin' role in database
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', managerSession.user.id)
+                .single();
+                
+              if (profile && profile.role !== 'admin') {
+                console.log('[VOLKI] Promoting manager profile to admin role...');
+                await supabase
+                  .from('profiles')
+                  .update({ role: 'admin' })
+                  .eq('id', managerSession.user.id);
+              }
+            } catch (roleErr) {
+              console.warn('[VOLKI] Failed to verify/update manager role:', roleErr);
+            }
+          } else {
+            console.error('[VOLKI] Manager auto-authentication failed:', signInError?.message || signInError);
           }
         }
 
@@ -1988,7 +2019,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const attemptInsert = (data: any) => {
         supabase.from('tournaments').insert(data).then(({ error }) => {
           if (error) {
-            console.error('[VOLKI] Error inserting tournament to Supabase:', error);
+            console.error('[VOLKI] Error inserting tournament to Supabase:', error.message, error.details || '', error.hint || '', error.code || '');
             
             // Clean retry: If ANY error occurs (stale session, foreign key violation, RLS, missing columns),
             // we retry once with a clean payload (no image_url/stream_url, and created_by set to null).
@@ -2005,7 +2036,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               return;
             }
             
-            showToast('❌ Помилка збереження турніру в базі даних!', 'error');
+            // Show clear descriptive error if it's a check constraint violation for formats (e.g. 3X3/5X5 check constraint tournaments_type_check)
+            if (error.message?.includes('tournaments_type_check') || error.code === '23514') {
+              showToast('❌ Помилка: формат (3X3/5X5) не активований у базі даних. Виконайте SQL-міграцію!', 'error');
+            } else {
+              showToast(`❌ Помилка збереження турніру: ${error.message || 'Невідома помилка'}`, 'error');
+            }
           } else {
             console.log('[VOLKI] Tournament successfully saved to Supabase!');
           }

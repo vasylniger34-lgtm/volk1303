@@ -36,6 +36,29 @@ interface ManagerProfile {
   status: 'online' | 'offline';
 }
 
+const getRoundLabel = (roundName: string): string => {
+  switch (roundName) {
+    case '1/8': return '1/8 Фіналу';
+    case 'Quarterfinal': return 'Чвертьфінал';
+    case 'Semifinal': return 'Півфінал';
+    case 'Final': return 'Фінал';
+    default: return roundName;
+  }
+};
+
+const getPlaceholderName = (roundName: string, slot: 'A' | 'B', matchIndex: number): string => {
+  if (roundName === 'Quarterfinal') {
+    return slot === 'A' ? `1/8 #${matchIndex * 2 + 1}` : `1/8 #${matchIndex * 2 + 2}`;
+  }
+  if (roundName === 'Semifinal') {
+    return slot === 'A' ? `Чвертьфінал #${matchIndex * 2 + 1}` : `Чвертьфінал #${matchIndex * 2 + 2}`;
+  }
+  if (roundName === 'Final') {
+    return slot === 'A' ? 'Півфінал 1' : 'Півфінал 2';
+  }
+  return 'TBD';
+};
+
 export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   const { 
     tournaments, matches, teams,
@@ -2253,9 +2276,9 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '28px' }}>
                           
                           {/* Matches List */}
-                          <div className="esports-card" style={{ padding: '24px', height: 'fit-content' }}>
+                          <div className="esports-card" style={{ padding: '24px', overflowX: 'auto', width: '100%', height: 'fit-content' }}>
                             <h3 style={{ fontSize: '13px', fontWeight: '850', textTransform: 'uppercase', fontFamily: 'Outfit', color: '#8F8F9B', marginBottom: '16px' }}>
-                              Список ігор турніру ({tourneyMatches.length})
+                              Сітка турніру ({tourneyMatches.length})
                             </h3>
 
                             {tourneyMatches.length === 0 ? (
@@ -2265,61 +2288,131 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                 <p style={{ fontSize: '11px', marginTop: '4px' }}>Сформуйте сітку у вкладці «Турніри & Сітки»</p>
                               </div>
                             ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {tourneyMatches.map(m => {
-                                  const isSelected = selectedMatchId === m.id;
-                                  return (
-                                    <div 
-                                      key={m.id} 
-                                      onClick={() => {
-                                        setSelectedMatchId(m.id);
-                                        setEditScoreA(m.scoreA);
-                                        setEditScoreB(m.scoreB);
-                                        setEditOddsA(m.oddsA || 1.85);
-                                        setEditOddsB(m.oddsB || 1.85);
-                                      }}
-                                      style={{
-                                        background: isSelected ? 'rgba(255, 92, 0, 0.05)' : 'rgba(255,255,255,0.01)',
-                                        border: isSelected ? '1px solid rgba(255, 92, 0, 0.3)' : '1px solid rgba(255,255,255,0.04)',
-                                        borderRadius: '12px',
-                                        padding: '12px 16px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.15s',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between'
-                                      }}
-                                    >
-                                      <div>
-                                        <div style={{ fontSize: '9px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                          {m.roundName}
-                                        </div>
-                                        <div style={{ fontSize: '13px', fontWeight: '700', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <span>{m.teamA?.name || 'TBD'}</span>
-                                          <span style={{ color: '#FF5C00' }}>vs</span>
-                                          <span>{m.teamB?.name || 'TBD'}</span>
-                                        </div>
-                                      </div>
+                              (() => {
+                                const roundsOrder: ('1/8' | 'Quarterfinal' | 'Semifinal' | 'Final')[] = ['1/8', 'Quarterfinal', 'Semifinal', 'Final'];
+                                const activeRoundNames = roundsOrder.filter(r => tourneyMatches.some(m => m.roundName === r));
+                                
+                                return (
+                                  <div className="visual-bracket-tree" style={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'row', 
+                                    gap: '32px', 
+                                    minWidth: `${activeRoundNames.length * 280}px`,
+                                    padding: '10px 0',
+                                    alignItems: 'stretch'
+                                  }}>
+                                    {activeRoundNames.map((roundName) => {
+                                      const roundMatches = tourneyMatches
+                                        .filter(m => m.roundName === roundName)
+                                        .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
                                       
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <span style={{
-                                          fontFamily: 'Outfit', fontWeight: '900', fontSize: '14px',
-                                          color: m.status === 'live' ? '#EF4444' : m.status === 'finished' ? '#10B981' : '#8F8F9B'
-                                        }}>
-                                          {m.scoreA} : {m.scoreB}
-                                        </span>
-                                        <span style={{
-                                          background: m.status === 'live' ? 'rgba(239, 68, 68, 0.1)' : m.status === 'finished' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 92, 0, 0.05)',
-                                          color: m.status === 'live' ? '#EF4444' : m.status === 'finished' ? '#10B981' : '#FF5C00',
-                                          padding: '2px 6px', borderRadius: '4px', fontSize: '8px', fontWeight: '800'
-                                        }}>
-                                          {m.status === 'live' ? '🔴 LIVE' : m.status === 'finished' ? 'DONE' : 'WAIT'}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                                      return (
+                                        <div key={roundName} className="visual-round-column">
+                                          <span style={{ 
+                                            fontSize: '11px', 
+                                            color: '#8F8F9B', 
+                                            fontWeight: '900', 
+                                            textTransform: 'uppercase', 
+                                            marginBottom: '14px', 
+                                            textAlign: 'center', 
+                                            fontFamily: 'Outfit, sans-serif', 
+                                            letterSpacing: '0.8px' 
+                                          }}>
+                                            {getRoundLabel(roundName)}
+                                          </span>
+                                          
+                                          {roundMatches.map((match, matchIndex) => {
+                                            const isLive = match.status === 'live';
+                                            const isFinished = match.status === 'finished';
+                                            const isSelected = selectedMatchId === match.id;
+                                            
+                                            const teamAName = match.teamA?.name || getPlaceholderName(roundName, 'A', matchIndex);
+                                            const teamBName = match.teamB?.name || getPlaceholderName(roundName, 'B', matchIndex);
+                                            
+                                            const teamALogoBg = match.teamA?.logoBg || '#14141a';
+                                            const teamBLogoBg = match.teamB?.logoBg || '#14141a';
+                                            
+                                            const teamALogoText = match.teamA?.logoText || '?';
+                                            const teamBLogoText = match.teamB?.logoText || '?';
+                                            
+                                            return (
+                                              <div 
+                                                key={match.id}
+                                                className={`visual-matchup-node ${isLive ? 'visual-matchup-node-live' : ''} ${isFinished ? 'visual-matchup-node-finished' : ''}`}
+                                                onClick={() => {
+                                                  setSelectedMatchId(match.id);
+                                                  setEditScoreA(match.scoreA);
+                                                  setEditScoreB(match.scoreB);
+                                                  setEditOddsA(match.oddsA || 1.85);
+                                                  setEditOddsB(match.oddsB || 1.85);
+                                                }}
+                                                style={{
+                                                  cursor: 'pointer',
+                                                  border: isSelected ? '1px solid var(--primary-orange)' : undefined,
+                                                  boxShadow: isSelected ? '0 0 15px rgba(255, 92, 0, 0.2)' : undefined,
+                                                }}
+                                              >
+                                                <div className="visual-matchup-header">
+                                                  <span style={{ fontWeight: '800' }}>Матч #{matchIndex + 1}</span>
+                                                  <span>{match.time || ''}</span>
+                                                </div>
+                                                
+                                                <div className={`visual-team-row ${match.winnerId === match.teamA?.id && isFinished ? 'visual-team-row-winner' : ''}`}>
+                                                  <div className="visual-team-info">
+                                                    <div className="visual-team-tag" style={{ backgroundColor: teamALogoBg }}>
+                                                      {teamALogoText}
+                                                    </div>
+                                                    <span className="visual-team-name" style={{
+                                                      color: match.teamA ? 'white' : '#51515E',
+                                                      fontWeight: match.teamA ? '600' : '400'
+                                                    }}>
+                                                      {teamAName}
+                                                    </span>
+                                                  </div>
+                                                  <span className="visual-score-display">{match.scoreA}</span>
+                                                </div>
+                                                
+                                                <div className={`visual-team-row ${match.winnerId === match.teamB?.id && isFinished ? 'visual-team-row-winner' : ''}`} style={{ marginTop: '4px' }}>
+                                                  <div className="visual-team-info">
+                                                    <div className="visual-team-tag" style={{ backgroundColor: teamBLogoBg }}>
+                                                      {teamBLogoText}
+                                                    </div>
+                                                    <span className="visual-team-name" style={{
+                                                      color: match.teamB ? 'white' : '#51515E',
+                                                      fontWeight: match.teamB ? '600' : '400'
+                                                    }}>
+                                                      {teamBName}
+                                                    </span>
+                                                  </div>
+                                                  <span className="visual-score-display">{match.scoreB}</span>
+                                                </div>
+                                                
+                                                {isLive && (
+                                                  <div style={{
+                                                    position: 'absolute',
+                                                    top: '-8px',
+                                                    right: '8px',
+                                                    backgroundColor: '#EF4444',
+                                                    color: 'white',
+                                                    fontSize: '8px',
+                                                    fontWeight: '900',
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px',
+                                                    boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)',
+                                                    fontFamily: 'Outfit, sans-serif'
+                                                  }}>
+                                                    LIVE
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()
                             )}
                           </div>
 

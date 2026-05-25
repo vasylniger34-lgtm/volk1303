@@ -27,6 +27,29 @@ function getEmbedUrl(url: string): string | null {
   return null; // unsupported platform – we'll show a fallback link
 }
 
+const getRoundLabel = (roundName: string): string => {
+  switch (roundName) {
+    case '1/8': return '1/8 Фіналу';
+    case 'Quarterfinal': return 'Чвертьфінал';
+    case 'Semifinal': return 'Півфінал';
+    case 'Final': return 'Фінал';
+    default: return roundName;
+  }
+};
+
+const getPlaceholderName = (roundName: string, slot: 'A' | 'B', matchIndex: number): string => {
+  if (roundName === 'Quarterfinal') {
+    return slot === 'A' ? `1/8 #${matchIndex * 2 + 1}` : `1/8 #${matchIndex * 2 + 2}`;
+  }
+  if (roundName === 'Semifinal') {
+    return slot === 'A' ? `Чвертьфінал #${matchIndex * 2 + 1}` : `Чвертьфінал #${matchIndex * 2 + 2}`;
+  }
+  if (roundName === 'Final') {
+    return slot === 'A' ? 'Півфінал 1' : 'Півфінал 2';
+  }
+  return 'TBD';
+};
+
 export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   tournamentId,
   onBack,
@@ -429,163 +452,126 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
       {activeTab === 'BRACKET' && (
         <div style={{ padding: '0 20px 24px 20px' }}>
           {tourneyMatches.length > 0 ? (
-            <div className="bracket-container">
-              {/* Round 1: Semifinals */}
-              <div className="bracket-round">
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '900', textTransform: 'uppercase', marginBottom: '14px', textAlign: 'center', fontFamily: 'Outfit, sans-serif', letterSpacing: '0.5px' }}>
-                  Півфінали
-                </span>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', justifyContent: 'center', height: '100%' }}>
-                  {tourneyMatches.filter(m => m.roundName === 'Semifinal').map((match) => {
-                    const isLive = match.status === 'live';
-                    const isFinished = match.status === 'finished';
-
-                    return (
-                      <div 
-                        key={match.id} 
-                        className={`bracket-matchup ${isLive ? 'bracket-matchup-live' : ''}`}
-                        onClick={() => onSelectMatch(match.id)}
-                        style={{
-                          background: 'var(--card-bg)',
-                          border: '1px solid var(--card-border)',
-                          borderRadius: '12px',
-                          padding: '10px'
-                        }}
-                      >
-                        {/* Team A row */}
-                        <div 
-                          className={`bracket-team-row ${match.winnerId === match.teamA?.id && isFinished ? 'bracket-team-row-winner' : isFinished ? 'bracket-team-row-loser' : ''}`}
-                          style={{ marginBottom: '4px' }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div className="bracket-team-logo" style={{ backgroundColor: match.teamA?.logoBg, border: '1px solid rgba(255,255,255,0.06)' }}>
-                              {match.teamA?.logoText}
-                            </div>
-                            <span style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: '700' }}>
-                              {match.teamA?.name || 'Очікування'}
-                            </span>
-                          </div>
-                          <span className="bracket-team-score" style={{ fontSize: '12px', color: match.winnerId === match.teamA?.id && isFinished ? 'var(--primary-orange)' : 'inherit' }}>{match.scoreA}</span>
-                        </div>
-
-                        {/* Team B row */}
-                        <div className={`bracket-team-row ${match.winnerId === match.teamB?.id && isFinished ? 'bracket-team-row-winner' : isFinished ? 'bracket-team-row-loser' : ''}`}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div className="bracket-team-logo" style={{ backgroundColor: match.teamB?.logoBg, border: '1px solid rgba(255,255,255,0.06)' }}>
-                              {match.teamB?.logoText}
-                            </div>
-                            <span style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: '700' }}>
-                              {match.teamB?.name || 'Очікування'}
-                            </span>
-                          </div>
-                          <span className="bracket-team-score" style={{ fontSize: '12px', color: match.winnerId === match.teamB?.id && isFinished ? 'var(--primary-orange)' : 'inherit' }}>{match.scoreB}</span>
-                        </div>
-
-                        {isLive && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '-8px',
-                            right: '8px',
-                            backgroundColor: 'var(--live-color)',
-                            color: 'white',
-                            fontSize: '8px',
-                            fontWeight: '900',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)',
-                            fontFamily: 'Outfit, sans-serif'
+            (() => {
+              const roundsOrder: ('1/8' | 'Quarterfinal' | 'Semifinal' | 'Final')[] = ['1/8', 'Quarterfinal', 'Semifinal', 'Final'];
+              const activeRoundNames = roundsOrder.filter(r => tourneyMatches.some(m => m.roundName === r));
+              
+              return (
+                <div style={{ overflowX: 'auto', width: '100%', padding: '10px 0' }}>
+                  <div className="visual-bracket-tree" style={{ 
+                    display: 'flex', 
+                    flexDirection: 'row', 
+                    gap: '32px', 
+                    minWidth: `${activeRoundNames.length * 280}px`,
+                    padding: '20px 10px',
+                    alignItems: 'stretch'
+                  }}>
+                    {activeRoundNames.map((roundName) => {
+                      const roundMatches = tourneyMatches
+                        .filter(m => m.roundName === roundName)
+                        .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+                      
+                      return (
+                        <div key={roundName} className="visual-round-column">
+                          <span style={{ 
+                            fontSize: '11px', 
+                            color: 'var(--text-muted)', 
+                            fontWeight: '900', 
+                            textTransform: 'uppercase', 
+                            marginBottom: '14px', 
+                            textAlign: 'center', 
+                            fontFamily: 'Outfit, sans-serif', 
+                            letterSpacing: '0.8px' 
                           }}>
-                            LIVE
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Connector Lines representation */}
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '50px', color: 'var(--text-muted)', fontSize: '11px' }}>
-                <ChevronLeft size={18} style={{ transform: 'rotate(180deg)', opacity: 0.2 }} />
-                <ChevronLeft size={18} style={{ transform: 'rotate(180deg)', opacity: 0.2 }} />
-              </div>
-
-              {/* Round 2: Final */}
-              <div className="bracket-round">
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '900', textTransform: 'uppercase', marginBottom: '14px', textAlign: 'center', fontFamily: 'Outfit, sans-serif', letterSpacing: '0.5px' }}>
-                  Фінал
-                </span>
-
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-                  {tourneyMatches.filter(m => m.roundName === 'Final').map((match) => {
-                    const isLive = match.status === 'live';
-                    const isFinished = match.status === 'finished';
-
-                    return (
-                      <div 
-                        key={match.id} 
-                        className={`bracket-matchup ${isLive ? 'bracket-matchup-live' : ''}`}
-                        onClick={() => match.teamA && match.teamB ? onSelectMatch(match.id) : undefined}
-                        style={{
-                          background: 'var(--card-bg)',
-                          border: '1px solid var(--card-border)',
-                          borderRadius: '12px',
-                          padding: '10px'
-                        }}
-                      >
-                        {/* Team A row */}
-                        <div 
-                          className={`bracket-team-row ${match.winnerId === match.teamA?.id && isFinished ? 'bracket-team-row-winner' : isFinished ? 'bracket-team-row-loser' : ''}`}
-                          style={{ marginBottom: '4px' }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div className="bracket-team-logo" style={{ backgroundColor: match.teamA?.logoBg || '#14141a', border: '1px solid rgba(255,255,255,0.06)' }}>
-                              {match.teamA?.logoText || '?'}
-                            </div>
-                            <span style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: '700' }}>
-                              {match.teamA?.name || 'Півфінал 1'}
-                            </span>
-                          </div>
-                          <span className="bracket-team-score" style={{ fontSize: '12px', color: match.winnerId === match.teamA?.id && isFinished ? 'var(--primary-orange)' : 'inherit' }}>{match.scoreA}</span>
+                            {getRoundLabel(roundName)}
+                          </span>
+                          
+                          {roundMatches.map((match, matchIndex) => {
+                            const isLive = match.status === 'live';
+                            const isFinished = match.status === 'finished';
+                            
+                            const teamAName = match.teamA?.name || getPlaceholderName(roundName, 'A', matchIndex);
+                            const teamBName = match.teamB?.name || getPlaceholderName(roundName, 'B', matchIndex);
+                            
+                            const teamALogoBg = match.teamA?.logoBg || '#14141a';
+                            const teamBLogoBg = match.teamB?.logoBg || '#14141a';
+                            
+                            const teamALogoText = match.teamA?.logoText || '?';
+                            const teamBLogoText = match.teamB?.logoText || '?';
+                            
+                            const isClickable = !!(match.teamA && match.teamB);
+                            
+                            return (
+                              <div 
+                                key={match.id}
+                                className={`visual-matchup-node ${isLive ? 'visual-matchup-node-live' : ''} ${isFinished ? 'visual-matchup-node-finished' : ''}`}
+                                onClick={() => isClickable ? onSelectMatch(match.id) : undefined}
+                                style={{
+                                  cursor: isClickable ? 'pointer' : 'default',
+                                }}
+                              >
+                                <div className="visual-matchup-header">
+                                  <span style={{ fontWeight: '800' }}>Матч #{matchIndex + 1}</span>
+                                  <span>{match.time || ''}</span>
+                                </div>
+                                
+                                <div className={`visual-team-row ${match.winnerId === match.teamA?.id && isFinished ? 'visual-team-row-winner' : ''}`}>
+                                  <div className="visual-team-info">
+                                    <div className="visual-team-tag" style={{ backgroundColor: teamALogoBg }}>
+                                      {teamALogoText}
+                                    </div>
+                                    <span className="visual-team-name" style={{
+                                      color: match.teamA ? 'white' : 'var(--text-muted)',
+                                      fontWeight: match.teamA ? '600' : '400'
+                                    }}>
+                                      {teamAName}
+                                    </span>
+                                  </div>
+                                  <span className="visual-score-display">{match.scoreA}</span>
+                                </div>
+                                
+                                <div className={`visual-team-row ${match.winnerId === match.teamB?.id && isFinished ? 'visual-team-row-winner' : ''}`} style={{ marginTop: '4px' }}>
+                                  <div className="visual-team-info">
+                                    <div className="visual-team-tag" style={{ backgroundColor: teamBLogoBg }}>
+                                      {teamBLogoText}
+                                    </div>
+                                    <span className="visual-team-name" style={{
+                                      color: match.teamB ? 'white' : 'var(--text-muted)',
+                                      fontWeight: match.teamB ? '600' : '400'
+                                    }}>
+                                      {teamBName}
+                                    </span>
+                                  </div>
+                                  <span className="visual-score-display">{match.scoreB}</span>
+                                </div>
+                                
+                                {isLive && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '-8px',
+                                    right: '8px',
+                                    backgroundColor: 'var(--live-color)',
+                                    color: 'white',
+                                    fontSize: '8px',
+                                    fontWeight: '900',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)',
+                                    fontFamily: 'Outfit, sans-serif'
+                                  }}>
+                                    LIVE
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-
-                        {/* Team B row */}
-                        <div className={`bracket-team-row ${match.winnerId === match.teamB?.id && isFinished ? 'bracket-team-row-winner' : isFinished ? 'bracket-team-row-loser' : ''}`}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div className="bracket-team-logo" style={{ backgroundColor: match.teamB?.logoBg || '#14141a', border: '1px solid rgba(255,255,255,0.06)' }}>
-                              {match.teamB?.logoText || '?'}
-                            </div>
-                            <span style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: '700' }}>
-                              {match.teamB?.name || 'Півфінал 2'}
-                            </span>
-                          </div>
-                          <span className="bracket-team-score" style={{ fontSize: '12px', color: match.winnerId === match.teamB?.id && isFinished ? 'var(--primary-orange)' : 'inherit' }}>{match.scoreB}</span>
-                        </div>
-
-                        {isLive && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '-8px',
-                            right: '8px',
-                            backgroundColor: 'var(--live-color)',
-                            color: 'white',
-                            fontSize: '8px',
-                            fontWeight: '900',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)',
-                            fontFamily: 'Outfit, sans-serif'
-                          }}>
-                            LIVE
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()
           ) : (
             <div style={{
               display: 'flex',
