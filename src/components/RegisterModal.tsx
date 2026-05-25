@@ -12,6 +12,13 @@ interface RegisterModalProps {
 export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onClose, onSuccess }) => {
   const { registerTeam, tournaments, user } = useApp();
   const tourney = tournaments.find(t => t.id === tournamentId);
+  const maxPlayers = tourney ? (
+    tourney.type === '2X2' ? 2 :
+    tourney.type === '3X3' ? 3 :
+    tourney.type === '4X4' ? 4 :
+    tourney.type === '5X5' ? 5 :
+    tourney.type === 'BCI' ? 5 : 2
+  ) : 2;
 
   const userHandle = user?.username ? (user.username.startsWith('@') ? user.username : `@${user.username}`) : '@volki_player';
 
@@ -29,6 +36,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
   const captain = userHandle;
   const [players, setPlayers] = useState<{ id: string; username: string }[]>([{ id: user?.id || 'local', username: userHandle }]);
   const [newPlayerInput, setNewPlayerInput] = useState('');
+
+  // Custom confirmation modals states (to avoid native blocking confirm/prompt)
+  const [showTeamTypeConfirm, setShowTeamTypeConfirm] = useState(false);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [customPasswordInput, setCustomPasswordInput] = useState('');
 
   // Step 4 Polling Logic
   useEffect(() => {
@@ -49,19 +61,21 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
       const { data, error } = await supabase
         .from('team_invites')
         .select('status')
-        .eq('team_id', createdTeamId)
-        .limit(1)
-        .single();
+        .eq('team_id', createdTeamId);
       
       if (!error && data) {
-        if (data.status === 'accepted') {
+        const hasFailed = data.some(inv => inv.status === 'declined' || inv.status === 'expired');
+        const allAccepted = data.every(inv => inv.status === 'accepted');
+        
+        if (allAccepted && data.length > 0) {
           clearInterval(checkInterval);
           clearInterval(timerInterval);
           onSuccess();
-        } else if (data.status === 'declined' || data.status === 'expired') {
+        } else if (hasFailed) {
           clearInterval(checkInterval);
           clearInterval(timerInterval);
-          alert(data.status === 'declined' ? 'Гравець відхилив запрошення.' : 'Час очікування вичерпано.');
+          const declinedInv = data.find(inv => inv.status === 'declined');
+          alert(declinedInv ? 'Один з гравців відхилив запрошення.' : 'Час очікування вичерпано.');
           await supabase.from('teams').delete().eq('id', createdTeamId);
           setStep(2);
           setCreatedTeamId(null);
@@ -163,6 +177,27 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
     setPlayers(players.filter((_, i) => i !== idx));
   };
 
+  const handleSelectPublic = () => {
+    setJoinType('open');
+    setPassword('');
+    setShowTeamTypeConfirm(false);
+    setStep(3);
+  };
+
+  const handleSelectPrivate = () => {
+    setShowTeamTypeConfirm(false);
+    setShowPasswordPrompt(true);
+    // Autofill with randomized password by default
+    setCustomPasswordInput(Math.random().toString(36).substring(2, 8).toUpperCase());
+  };
+
+  const handleConfirmPassword = () => {
+    setJoinType('closed');
+    setPassword(customPasswordInput.trim());
+    setShowPasswordPrompt(false);
+    setStep(3);
+  };
+
   const handleNext = async () => {
     if (step === 1) {
       if (!teamName.trim()) {
@@ -175,16 +210,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
       }
       setStep(2);
     } else if (step === 2) {
-      if (players.length === 1 && joinType === 'invite_only') {
-        const confirmChange = window.confirm(
-          'Ви не додали жодного гравця у команду по запрошенням.\n\nБажаєте автоматично змінити тип команди на "Закриту" та згенерувати пароль, щоб друг міг приєднатися пізніше?\n\n(ОК - згенерувати пароль, Скасувати - залишити як є)'
-        );
-        if (confirmChange) {
-          setJoinType('closed');
-          setPassword(Math.random().toString(36).substring(2, 8).toUpperCase());
-        }
+      // Dismiss mobile keyboard by removing focus from active input
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
       }
-      setStep(3);
+      
+      if (players.length < maxPlayers) {
+        setShowTeamTypeConfirm(true);
+      } else {
+        setStep(3);
+      }
     } else if (step === 3) {
       const success = await registerTeam(tournamentId, {
         name: teamName,
@@ -381,7 +416,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h4 style={{ fontSize: '11px', color: '#8F8F9B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                СКЛАД КОМАНДИ ({players.length}/2)
+                СКЛАД КОМАНДИ ({players.length}/{maxPlayers})
               </h4>
             </div>
 
@@ -422,7 +457,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
             </div>
 
             {/* Add player form */}
-            {players.length < 2 && (
+            {players.length < maxPlayers && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                 <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
                   <input
@@ -604,7 +639,167 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
           {step === 4 ? 'ОЧІКУВАННЯ...' : step === 3 ? 'ЗАРЕЄСТРУВАТИСЬ' : 'ДАЛІ'}
         </button>
       </div>
-      
+      {/* Custom Team Type Confirmation Overlay */}
+      {showTeamTypeConfirm && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(4, 4, 6, 0.85)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 300,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div className="esports-card orange-glow" style={{
+            width: '100%',
+            maxWidth: '320px',
+            backgroundColor: '#0E0E16',
+            border: '1px solid rgba(255, 92, 0, 0.25)',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            animation: 'modal-scale 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          }}>
+            <style>{`
+              @keyframes modal-scale {
+                from { transform: scale(0.9); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+              }
+            `}</style>
+            
+            <h4 style={{ fontSize: '14px', fontWeight: '800', color: 'white', fontFamily: 'Outfit, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Неповний склад команди ({players.length}/{maxPlayers})
+            </h4>
+            
+            <p style={{ fontSize: '11px', color: '#8F8F9B', lineHeight: '1.5' }}>
+              Ви додали менше гравців, ніж передбачено режимом турніру. Бажаєте зробити команду <strong>Приватною</strong> (доступною лише за паролем) чи <strong>Публічною</strong> (будь-хто зможе доєднатися)?
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              <button
+                onClick={handleSelectPrivate}
+                className="btn-primary"
+                style={{ width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                🔒 Зробити приватною
+              </button>
+              
+              <button
+                onClick={handleSelectPublic}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '12px',
+                  color: '#8F8F9B',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'; e.currentTarget.style.color = 'white'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.color = '#8F8F9B'; }}
+              >
+                🔓 Зробити публічною
+              </button>
+              
+              <button
+                onClick={() => setShowTeamTypeConfirm(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#51515E',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  marginTop: '4px'
+                }}
+              >
+                Скасувати та повернутися
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Password Prompt Overlay */}
+      {showPasswordPrompt && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(4, 4, 6, 0.85)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 300,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div className="esports-card orange-glow" style={{
+            width: '100%',
+            maxWidth: '320px',
+            backgroundColor: '#0E0E16',
+            border: '1px solid rgba(255, 92, 0, 0.25)',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            animation: 'modal-scale 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          }}>
+            <h4 style={{ fontSize: '14px', fontWeight: '800', color: 'white', fontFamily: 'Outfit, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Пароль приватної команди
+            </h4>
+            
+            <p style={{ fontSize: '11px', color: '#8F8F9B', lineHeight: '1.5' }}>
+              Введіть пароль для команди. Ваші друзі зможуть приєднатися до вашого складу, ввівши цей пароль.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Введіть пароль"
+                value={customPasswordInput}
+                onChange={(e) => setCustomPasswordInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              <button
+                onClick={handleConfirmPassword}
+                className="btn-primary"
+                style={{ width: '100%', padding: '12px' }}
+              >
+                ПРОДОВЖИТИ
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowPasswordPrompt(false);
+                  setShowTeamTypeConfirm(true);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#51515E',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase'
+                }}
+              >
+                Назад
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

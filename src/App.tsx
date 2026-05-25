@@ -13,7 +13,161 @@ import { ProfileView } from './components/ProfileView';
 import { AdminPanel } from './components/AdminPanel';
 import { ManagerPanel } from './components/ManagerPanel';
 import { AuthModal } from './components/AuthModal';
-import { ShieldCheck, Loader2 } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
+import { useEffect } from 'react';
+
+const CSLoader: React.FC = () => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 98) {
+          clearInterval(interval);
+          return 98;
+        }
+        const next = prev + Math.floor(Math.random() * 8) + 3;
+        return next > 98 ? 98 : next;
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadingTexts = [
+    { min: 0, text: 'CONNECTING TO VOLK SERVER (203.161.55.65)...' },
+    { min: 25, text: 'ESTABLISHING SECURE DATABASE HANDSHAKE...' },
+    { min: 50, text: 'LOADING TOURNAMENT BRACKETS AND RULES...' },
+    { min: 75, text: 'SYNCHRONIZING USER XP AND WALLET BALANCE...' },
+    { min: 90, text: 'VERIFYING TELEGRAM INTEGRITY AND SESSION...' }
+  ];
+
+  const currentText = loadingTexts.reduce((acc, curr) => {
+    if (progress >= curr.min) return curr.text;
+    return acc;
+  }, loadingTexts[0].text);
+
+  return (
+    <div style={{
+      width: '100vw',
+      height: '100vh',
+      background: '#040406',
+      position: 'relative',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'Outfit, sans-serif'
+    }}>
+      {/* Background CS illustration with overlay */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundImage: 'url("/tactical_soldier.png")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        opacity: 0.12,
+        zIndex: 1
+      }} />
+
+      {/* Dark vignette gradient overlay */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: 'radial-gradient(circle, transparent 20%, #040406 90%)',
+        zIndex: 2
+      }} />
+
+      {/* Center Logo */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '12px',
+        zIndex: 3,
+        marginBottom: '40px'
+      }}>
+        <img 
+          src="/wolf_logo.png" 
+          alt="VOLK Logo" 
+          style={{
+            width: '120px',
+            height: 'auto',
+            filter: 'drop-shadow(0 0 15px rgba(255, 92, 0, 0.45))',
+            animation: 'pulse 2.5s infinite ease-in-out'
+          }} 
+        />
+        <style>{`
+          @keyframes pulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(255, 92, 0, 0.45)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(255, 92, 0, 0.7)); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(255, 92, 0, 0.45)); }
+          }
+        `}</style>
+        <span style={{
+          fontSize: '18px',
+          fontWeight: '900',
+          color: 'white',
+          letterSpacing: '5px',
+          textShadow: '0 2px 10px rgba(0,0,0,0.5)',
+          textTransform: 'uppercase',
+          marginTop: '8px'
+        }}>
+          VOLK 13:03
+        </span>
+      </div>
+
+      {/* Loading CS style section */}
+      <div style={{
+        width: '80%',
+        maxWidth: '320px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        zIndex: 3
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '10px',
+          fontWeight: '800',
+          color: '#8F8F9B',
+          letterSpacing: '1px'
+        }}>
+          <span style={{ animation: 'blink 1.2s infinite' }}>{currentText}</span>
+          <span style={{ color: '#FF5C00', fontFamily: 'monospace', fontSize: '12px' }}>{progress}%</span>
+        </div>
+        <style>{`
+          @keyframes blink {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+          }
+        `}</style>
+
+        {/* CSS Loading Bar */}
+        <div style={{
+          width: '100%',
+          height: '6px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '3px',
+          overflow: 'hidden',
+          padding: '1px'
+        }}>
+          <div style={{
+            width: `${progress}%`,
+            height: '100%',
+            background: 'linear-gradient(90deg, #FF5C00, #FF8C00)',
+            borderRadius: '2px',
+            boxShadow: '0 0 8px rgba(255, 92, 0, 0.6)',
+            transition: 'width 0.15s ease-out'
+          }} />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AppContent: React.FC = () => {
   // Navigation states
@@ -46,41 +200,7 @@ const AppContent: React.FC = () => {
 
   // ─── Loading Screen ───
   if (isLoading) {
-    return (
-      <div style={{
-        width: '100vw',
-        height: '100vh',
-        background: '#050508',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '16px'
-      }}>
-        <div style={{
-          width: '64px',
-          height: '64px',
-          borderRadius: '18px',
-          background: 'linear-gradient(135deg, rgba(255, 92, 0, 0.15), rgba(139, 92, 246, 0.1))',
-          border: '1px solid rgba(255, 92, 0, 0.2)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <Loader2 size={28} color="#FF5C00" style={{ animation: 'spin 1s linear infinite' }} />
-        </div>
-        <span style={{
-          fontFamily: 'Outfit, sans-serif',
-          fontSize: '12px',
-          fontWeight: '800',
-          color: '#51515E',
-          letterSpacing: '3px',
-          textTransform: 'uppercase'
-        }}>
-          VOLK 1303
-        </span>
-      </div>
-    );
+    return <CSLoader />;
   }
 
   // ─── Auth Gate ───
