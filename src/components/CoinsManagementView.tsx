@@ -30,10 +30,16 @@ export const CoinsManagementView: React.FC = () => {
 
       const { data, error } = await query;
       
-      if (error) throw error;
+      if (error) {
+        alert('Помилка завантаження гравців: ' + error.message);
+        throw error;
+      }
       setUsers(data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching users:', err);
+      if (err?.message) {
+        alert('Помилка: ' + err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -55,7 +61,20 @@ export const CoinsManagementView: React.FC = () => {
         amount: numAmount
       });
 
-      if (error) throw error;
+      if (error) {
+        console.warn('RPC failed, falling back to direct update', error);
+        let newBalance = selectedUser.balance || 0;
+        if (action === 'add') newBalance += numAmount;
+        if (action === 'subtract') newBalance -= numAmount;
+        if (action === 'set') newBalance = numAmount;
+        
+        const { error: updateErr } = await supabase
+          .from('profiles')
+          .update({ balance: newBalance })
+          .eq('id', selectedUser.id);
+          
+        if (updateErr) throw updateErr;
+      }
       
       // Refresh the specific user's balance locally
       setUsers(users.map(u => {

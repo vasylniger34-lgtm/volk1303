@@ -1934,11 +1934,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
+    const finalCount = currentTeams.length + countNeeded;
+    const newStatus = finalCount >= tourney.maxParticipants ? 'active' : tourney.status;
+
     if (useSupabase && teamsToInsert.length > 0) {
       const { data: insertedTeams, error } = await supabase
         .from('teams')
         .insert(teamsToInsert)
         .select();
+
+      if (error) {
+         console.error('[VOLKI] Bot insertion error:', error);
+      }
 
       if (!error && insertedTeams) {
         insertedTeams.forEach((inserted: any, idx: number) => {
@@ -1947,23 +1954,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    const finalCount = currentTeams.length + countNeeded;
-
     if (useSupabase) {
       await supabase.from('tournaments')
-        .update({ participants_count: finalCount })
+        .update({ participants_count: finalCount, status: newStatus })
         .eq('id', tournamentId);
     }
 
     setTeams(prev => ({ ...prev, [tournamentId]: [...(prev[tournamentId] || []), ...newTeamsList] }));
     setTournaments(prev => prev.map(t => {
       if (t.id === tournamentId) {
-        return { ...t, participantsCount: finalCount };
+        return { ...t, participantsCount: finalCount, status: newStatus };
       }
       return t;
     }));
 
     showToast(`Зареєстровано ${countNeeded} бот-команд для турніру!`, 'success');
+
+    if (finalCount >= tourney.maxParticipants) {
+      setTimeout(() => generateBracketForTournament(tournamentId), 1000);
+    }
   };
 
   // ─── Reset ───

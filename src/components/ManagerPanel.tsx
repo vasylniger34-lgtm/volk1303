@@ -180,30 +180,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
   }, [terminalLogs]);
 
   // Generate live background simulator logs to make the cover dashboard feel active
+  // Removed fake logs as requested. Logs will now only show actual system events.
   useEffect(() => {
     if (!isAuthed) return;
-
-    const mockActions = [
-      "User @aim_bot placed a bet of 800 🪙 on tournament match",
-      "New player registered on platform: @cs2_enjoyer",
-      "API request received: FetchActiveTournaments (200 OK)",
-      "Resolved prediction bets for match in tournament bracket",
-      "Player request received: JoinTeam (200 OK)",
-      "Server status healthy: CPU 12%, Memory 48%, Active websockets: 28",
-      "Telegram bot ping received from Webhook handler",
-      "Deposited +5000 🪙 to wallet for testing admin role",
-      "Refreshed bracket connector graphics in user application"
-    ];
-
-    const interval = setInterval(() => {
-      const randomAction = mockActions[Math.floor(Math.random() * mockActions.length)];
-      setTerminalLogs(prev => [
-        ...prev, 
-        `[${new Date().toLocaleTimeString()}] ${randomAction}`
-      ].slice(-25)); // Keep last 25 logs
-    }, 4500);
-
-    return () => clearInterval(interval);
+    // Real logs are appended by user actions and system events.
   }, [isAuthed]);
 
   // ─── AUTHENTICATION HANDLERS ───
@@ -727,39 +707,49 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
 
       setBroadcastProgress({ current: 0, total: chatIds.length });
 
-      // 3. Send to all subscribers sequentially
-      for (let i = 0; i < chatIds.length; i++) {
-        const chatId = chatIds[i];
-        setBroadcastProgress({ current: i + 1, total: chatIds.length });
-
-        try {
-          const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: finalMsg,
-              parse_mode: 'HTML',
-              disable_web_page_preview: true,
-              reply_markup: replyMarkup,
-            }),
-          });
-          const result = await r.json();
-          if (result.ok) {
-            sent++;
-          } else {
-            failed++;
-            const desc = result.description || '';
-            if (desc.toLowerCase().includes('blocked') || result.error_code === 403) {
-              blockedIds.push(chatId);
+      // 3. Send to all subscribers sequentially (in small batches to avoid UI freezing for a long time if there are many)
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < chatIds.length; i += BATCH_SIZE) {
+        const batch = chatIds.slice(i, i + BATCH_SIZE);
+        
+        await Promise.all(batch.map(async (chatId) => {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: controller.signal,
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: finalMsg,
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                reply_markup: replyMarkup,
+              }),
+            });
+            clearTimeout(timeoutId);
+            
+            const result = await r.json();
+            if (result.ok) {
+              sent++;
+            } else {
+              failed++;
+              const desc = result.description || '';
+              if (desc.toLowerCase().includes('blocked') || result.error_code === 403) {
+                blockedIds.push(chatId);
+              }
             }
+          } catch (err) {
+            failed++;
           }
-        } catch (err) {
-          failed++;
-        }
-
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 80));
+        }));
+        
+        setBroadcastProgress({ current: Math.min(i + BATCH_SIZE, chatIds.length), total: chatIds.length });
+        
+        // Small delay between batches to respect Telegram's rate limit (~30 msgs per sec broadcast)
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       // 4. Mark blocked users as inactive in Supabase
@@ -779,9 +769,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       let channelOk = false;
       try {
         setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Надсилання анонсу в канал ${CHANNEL_ID}...`]);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
         const chanResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             chat_id: CHANNEL_ID,
             text: finalMsg,
@@ -790,6 +785,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
             reply_markup: replyMarkup,
           }),
         });
+        clearTimeout(timeoutId);
+        
         const chanResult = await chanResp.json();
         channelOk = chanResult.ok;
       } catch (e) {
@@ -1522,10 +1519,10 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {[
-                        { label: 'Навантаження CPU', val: '14%', color: '#10B981' },
-                        { label: 'Використання RAM', val: '54%', color: '#10B981' },
-                        { label: 'Вебсокети сполучення', val: '28 / 200 max', color: '#3B82F6' },
-                        { label: 'Час безперебійної роботи', val: '32d 14h 28m', color: '#FF5C00' }
+                        { label: 'Усього Турнірів', val: tournaments.length, color: '#10B981' },
+                        { label: 'Створено Команд', val: totalRegisteredTeams, color: '#10B981' },
+                        { label: 'Активні Матчі', val: liveMatchesCount, color: '#3B82F6' },
+                        { label: 'Всього Матчів', val: matches.length, color: '#FF5C00' }
                       ].map((item, idx) => (
                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
                           <span style={{ color: '#8F8F9B' }}>{item.label}</span>
