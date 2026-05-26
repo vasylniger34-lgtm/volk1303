@@ -559,10 +559,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       // Load tournaments
-      const { data: tourneysData } = await supabase
+      const { data: tourneysData, error: tourneyError } = await supabase
         .from('tournaments')
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (tourneyError) {
+        const errMsg = (tourneyError.message || '').toLowerCase();
+        const errCode = String(tourneyError.code || '');
+        if (
+          errMsg.includes('jwt') || 
+          errMsg.includes('expired') || 
+          errMsg.includes('signature') || 
+          errMsg.includes('token') ||
+          errMsg.includes('auth') ||
+          errCode === 'PGRST301' || 
+          errCode === 'PGRST302' ||
+          errCode === '401' ||
+          errCode === '403'
+        ) {
+          console.warn('[VOLKI] Expired/Invalid JWT detected during tournaments fetch. Clearing session...', tourneyError);
+          await supabase.auth.signOut();
+          localStorage.removeItem('volk_session');
+          localStorage.removeItem('volk_user');
+          localStorage.removeItem('volk_manager_session');
+          localStorage.removeItem('volk_manager_profile');
+          window.location.reload();
+          return;
+        }
+        throw tourneyError;
+      }
 
       if (tourneysData) {
         if (tourneysData.length > 0) {
@@ -592,7 +618,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // Load teams
-      const { data: teamsData } = await supabase.from('teams').select('*');
+      const { data: teamsData, error: teamsError } = await supabase.from('teams').select('*');
+      if (teamsError) {
+        const errMsg = (teamsError.message || '').toLowerCase();
+        const errCode = String(teamsError.code || '');
+        if (
+          errMsg.includes('jwt') || 
+          errMsg.includes('expired') || 
+          errMsg.includes('signature') || 
+          errMsg.includes('token') ||
+          errMsg.includes('auth') ||
+          errCode === 'PGRST301' || 
+          errCode === 'PGRST302' ||
+          errCode === '401' ||
+          errCode === '403'
+        ) {
+          console.warn('[VOLKI] Expired/Invalid JWT detected during teams fetch. Clearing session...', teamsError);
+          await supabase.auth.signOut();
+          localStorage.removeItem('volk_session');
+          localStorage.removeItem('volk_user');
+          localStorage.removeItem('volk_manager_session');
+          localStorage.removeItem('volk_manager_profile');
+          window.location.reload();
+          return;
+        }
+        throw teamsError;
+      }
+
       if (teamsData) {
         if (teamsData.length > 0) {
           const grouped: Record<string, Team[]> = {};
@@ -608,7 +660,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // Load matches (with team data)
-      const { data: matchesData } = await supabase.from('matches').select('*');
+      const { data: matchesData, error: matchesError } = await supabase.from('matches').select('*');
+      if (matchesError) {
+        const errMsg = (matchesError.message || '').toLowerCase();
+        const errCode = String(matchesError.code || '');
+        if (
+          errMsg.includes('jwt') || 
+          errMsg.includes('expired') || 
+          errMsg.includes('signature') || 
+          errMsg.includes('token') ||
+          errMsg.includes('auth') ||
+          errCode === 'PGRST301' || 
+          errCode === 'PGRST302' ||
+          errCode === '401' ||
+          errCode === '403'
+        ) {
+          console.warn('[VOLKI] Expired/Invalid JWT detected during matches fetch. Clearing session...', matchesError);
+          await supabase.auth.signOut();
+          localStorage.removeItem('volk_session');
+          localStorage.removeItem('volk_user');
+          localStorage.removeItem('volk_manager_session');
+          localStorage.removeItem('volk_manager_profile');
+          window.location.reload();
+          return;
+        }
+        throw matchesError;
+      }
+
       if (matchesData) {
         if (matchesData.length > 0) {
           // We need teams to hydrate match data
@@ -2086,24 +2164,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Tournament Management ───
 
-  const deleteTournament = (tournamentId: string) => {
+  const deleteTournament = async (tournamentId: string) => {
     const tourneyObj = tournaments.find(t => t.id === tournamentId);
     const matchIds = matches.filter(m => m.tournamentId === tournamentId).map(m => m.id);
 
     if (useSupabase) {
-      if (matchIds.length > 0) {
-        supabase.from('predictions').delete().in('match_id', matchIds).then();
-      }
-      if (tourneyObj) {
-        supabase.from('predictions').delete().eq('tournament_name', tourneyObj.name).then();
-      }
-      supabase.from('matches').delete().eq('tournament_id', tournamentId).then();
-      supabase.from('teams').delete().eq('tournament_id', tournamentId).then();
-      supabase.from('tournaments').delete().eq('id', tournamentId).then(({ error }) => {
+      try {
+        if (matchIds.length > 0) {
+          await supabase.from('predictions').delete().in('match_id', matchIds);
+        }
+        if (tourneyObj) {
+          await supabase.from('predictions').delete().eq('tournament_name', tourneyObj.name);
+        }
+        await supabase.from('matches').delete().eq('tournament_id', tournamentId);
+        await supabase.from('teams').delete().eq('tournament_id', tournamentId);
+        const { error } = await supabase.from('tournaments').delete().eq('id', tournamentId);
         if (error) {
           console.error('[VOLKI] Error deleting tournament in Supabase:', error);
+          showToast('Не вдалося видалити з бази даних: ' + error.message, 'error');
+          return;
         }
-      });
+      } catch (err: any) {
+        console.error('[VOLKI] Error in deleteTournament:', err);
+        showToast('Помилка з\'єднання: ' + err.message, 'error');
+        return;
+      }
     }
 
     setTournaments(prev => prev.filter(t => t.id !== tournamentId));

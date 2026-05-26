@@ -453,7 +453,7 @@ def admin_main_menu():
         "keyboard": [
             [{"text": "📢 Зробити розсилку"}],
             [{"text": "📊 Статистика підписників"}, {"text": "👥 Список адмінів"}],
-            [{"text": "🏆 Активні турніри"}, {"text": "🎮 Відкрити VOLK", "web_app": {"url": WEBAPP_URL}}],
+            [{"text": "🏆 Активні турніри"}, {"text": "🎮 Відкрити VOLK"}],
             [{"text": "⬅️ Головне меню"}]
         ],
         "resize_keyboard": True
@@ -462,7 +462,7 @@ def admin_main_menu():
 def main_menu():
     return {
         "keyboard": [
-            [{"text": "🎮 Відкрити VOLK 13:03", "web_app": {"url": WEBAPP_URL}}],
+            [{"text": "🎮 Відкрити VOLK 13:03"}],
             [{"text": "🏆 Активні турніри"}, {"text": "📱 Наш канал"}]
         ],
         "resize_keyboard": True
@@ -661,9 +661,22 @@ def handle_callback_query(update: dict):
             
             # Notify inviter
             if inviter_tg_id:
+                pending_count = 0
+                try:
+                    pending_data = supabase_request("GET", "team_invites", query=f"?team_id=eq.{team_id}&status=eq.pending")
+                    if pending_data:
+                        pending_count = len(pending_data)
+                except Exception as ex:
+                    log.warning(f"Error checking remaining invites: {ex}")
+                
+                if pending_count > 0:
+                    text = f"🎉 Гравець прийняв запрошення у команду <b>{team_name}</b>! Очікуємо підтвердження ще від {pending_count} гравців."
+                else:
+                    text = f"🎉 Всі гравці прийняли запрошення! Команда <b>{team_name}</b> повністю сформована і зареєстрована на турнір."
+                
                 tg_request("sendMessage", {
                     "chat_id": inviter_tg_id,
-                    "text": f"🎉 Ваш друг прийняв запрошення у команду <b>{team_name}</b>!\n\nКоманда повністю сформована і зареєстрована на турнір.",
+                    "text": text,
                     "parse_mode": "HTML"
                 })
         else:
@@ -842,6 +855,14 @@ def handle_update(update: dict):
     elif text == "⬅️ Головне меню":
         send_welcome(chat_id, first_name)
     
+    elif text == "🎮 Відкрити VOLK 13:03" or text == "🎮 Відкрити VOLK":
+        send_msg(
+            chat_id,
+            "🐺 <b>VOLK 13:03 — Вхід на платформу</b>\n\n"
+            "Натисніть на кнопку нижче, щоб увійти та почати грати 👇",
+            reply_markup={"inline_keyboard": [[{"text": "🎮 Відкрити додаток", "web_app": {"url": WEBAPP_URL}}]]}
+        )
+    
     # ─── STANDARD MENU BUTTONS ───
     
     elif text == "🏆 Активні турніри" or text == "/tournaments":
@@ -952,8 +973,22 @@ def monitor_new_invites():
             for inv in invites:
                 invite_id = inv.get("id")
                 tg_id = inv.get("profiles", {}).get("telegram_id")
-                team_name = inv.get("teams", {}).get("name", "Команда")
-                tournament_name = inv.get("tournaments", {}).get("name", "Турнір")
+                
+                # Fetch team name
+                team_id = inv.get("team_id")
+                team_name = "Команда"
+                if team_id:
+                    team_data = supabase_request("GET", "teams", query=f"?id=eq.{team_id}&select=name")
+                    if team_data and len(team_data) > 0:
+                        team_name = team_data[0].get("name", "Команда")
+                
+                # Fetch tournament name
+                tournament_id = inv.get("tournament_id")
+                tournament_name = "Турнір"
+                if tournament_id:
+                    tourney_data = supabase_request("GET", "tournaments", query=f"?id=eq.{tournament_id}&select=name")
+                    if tourney_data and len(tourney_data) > 0:
+                        tournament_name = tourney_data[0].get("name", "Турнір")
                 
                 if tg_id:
                     try:
@@ -1007,6 +1042,19 @@ def run_polling():
     bot_name = me["result"]["username"]
     log.info(f"Bot connected: @{bot_name}")
     
+    # Configure the bottom-left Menu Button to open the WebApp
+    try:
+        menu_res = tg_request("setChatMenuButton", {
+            "menu_button": {
+                "type": "web_app",
+                "text": "Відкрити додаток",
+                "web_app": {"url": WEBAPP_URL}
+            }
+        })
+        log.info(f"Set chat menu button to WebApp {WEBAPP_URL}: {menu_res}")
+    except Exception as e:
+        log.error(f"Failed to set chat menu button: {e}")
+        
     admin_ids = load_admin_ids()
     log.info(f"Admin IDs loaded: {admin_ids if admin_ids else 'None (use /myid to get your chat_id, then add to admin_chat_ids.json)'}")
     

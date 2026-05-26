@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
-import { Search, Plus, Minus, RefreshCw, TrendingUp, Users, Coins, Award, BarChart3, ChevronUp, ChevronDown } from 'lucide-react';
+import { supabase, supabaseUrl } from '../lib/supabase';
+import { Search, Plus, Minus, RefreshCw, TrendingUp, Users, Coins, Award, BarChart3, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
 
 interface UserRow {
   id: string;
@@ -31,6 +31,7 @@ export const CoinsManagementView: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [errorState, setErrorState] = useState<string | null>(null);
 
   // Quick action panel state
   const [quickNick, setQuickNick] = useState('');
@@ -43,11 +44,38 @@ export const CoinsManagementView: React.FC = () => {
 
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
+    setErrorState(null);
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('balance, wins, losses, predictions_won');
-      if (error || !data) return;
+      
+      if (error) {
+        const errMsg = (error.message || '').toLowerCase();
+        const errCode = String(error.code || '');
+        if (
+          errMsg.includes('jwt') || 
+          errMsg.includes('expired') || 
+          errMsg.includes('signature') || 
+          errMsg.includes('token') ||
+          errMsg.includes('auth') ||
+          errCode === 'PGRST301' || 
+          errCode === 'PGRST302' ||
+          errCode === '401' ||
+          errCode === '403'
+        ) {
+          console.warn('JWT/Auth expired or invalid in CoinsManagementView (stats). Auto-repairing session...', error);
+          await supabase.auth.signOut();
+          localStorage.removeItem('volk_session');
+          localStorage.removeItem('volk_user');
+          localStorage.removeItem('volk_manager_session');
+          localStorage.removeItem('volk_manager_profile');
+          window.location.reload();
+          return;
+        }
+        throw error;
+      }
+      if (!data) return;
 
       const totalCoins = data.reduce((s, u) => s + (u.balance || 0), 0);
       const totalBets = data.reduce((s, u) => s + (u.wins || 0) + (u.losses || 0), 0);
@@ -62,6 +90,9 @@ export const CoinsManagementView: React.FC = () => {
         totalBets,
         totalWins,
       });
+    } catch (err: any) {
+      console.error('Error fetching stats:', err);
+      setErrorState(err.message || String(err));
     } finally {
       setStatsLoading(false);
     }
@@ -69,6 +100,7 @@ export const CoinsManagementView: React.FC = () => {
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
+    setErrorState(null);
     try {
       let query = supabase
         .from('profiles')
@@ -92,10 +124,35 @@ export const CoinsManagementView: React.FC = () => {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        const errMsg = (error.message || '').toLowerCase();
+        const errCode = String(error.code || '');
+        if (
+          errMsg.includes('jwt') || 
+          errMsg.includes('expired') || 
+          errMsg.includes('signature') || 
+          errMsg.includes('token') ||
+          errMsg.includes('auth') ||
+          errCode === 'PGRST301' || 
+          errCode === 'PGRST302' ||
+          errCode === '401' ||
+          errCode === '403'
+        ) {
+          console.warn('JWT/Auth expired or invalid in CoinsManagementView (users). Auto-repairing session...', error);
+          await supabase.auth.signOut();
+          localStorage.removeItem('volk_session');
+          localStorage.removeItem('volk_user');
+          localStorage.removeItem('volk_manager_session');
+          localStorage.removeItem('volk_manager_profile');
+          window.location.reload();
+          return;
+        }
+        throw error;
+      }
       setUsers((data || []) as UserRow[]);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching users:', err);
+      setErrorState(err.message || String(err));
     } finally {
       setLoading(false);
     }
@@ -108,6 +165,23 @@ export const CoinsManagementView: React.FC = () => {
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  const handleForceReset = async () => {
+    try {
+      console.log('Force resetting session and local cache...');
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Signout exception:', e);
+    }
+    localStorage.removeItem('volk_session');
+    localStorage.removeItem('volk_user');
+    localStorage.removeItem('volk_manager_session');
+    localStorage.removeItem('volk_manager_profile');
+    localStorage.removeItem('volk_tg_id');
+    localStorage.removeItem('volk_tg_username');
+    localStorage.removeItem('volk_tg_first_name');
+    window.location.reload();
+  };
 
   // Quick action: find user by nick, ID or reg_num and add/remove coins
   const handleQuickAction = async (action: 'add' | 'subtract') => {
@@ -236,6 +310,95 @@ export const CoinsManagementView: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: '4px 0' }}>
+
+      {/* ── DIAGNOSTIC / SELF-HEAL PANEL ── */}
+      {errorState && (
+        <div className="esports-card" style={{
+          padding: '24px',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(6, 6, 10, 0.4) 100%)',
+          borderRadius: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.2)',
+              borderRadius: '50%',
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <AlertCircle size={20} color="#EF4444" />
+            </div>
+            <div>
+              <h4 style={{ fontSize: '14px', fontWeight: '850', color: '#fff', fontFamily: 'Outfit', margin: 0 }}>
+                ⚠️ Виявлено помилку з'єднання з базою даних
+              </h4>
+              <p style={{ fontSize: '11px', color: '#8F8F9B', margin: '4px 0 0' }}>
+                Браузер не зміг отримати дані з Supabase.
+              </p>
+            </div>
+          </div>
+
+          <div style={{
+            background: 'rgba(0,0,0,0.3)',
+            border: '1px solid rgba(255,255,255,0.04)',
+            borderRadius: '10px',
+            padding: '12px 16px',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            color: '#FCA5A5',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all'
+          }}>
+            <strong>Помилка:</strong> {errorState}
+            <br />
+            <strong>Supabase URL:</strong> {supabaseUrl}
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleForceReset}
+              style={{
+                padding: '12px 20px',
+                background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                border: 'none',
+                borderRadius: '10px',
+                color: 'white',
+                fontWeight: '800',
+                fontSize: '12px',
+                cursor: 'pointer',
+                fontFamily: 'Outfit',
+                boxShadow: '0 4px 15px rgba(239, 68, 68, 0.2)',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+            >
+              🔄 Очистити сесію & перезавантажити (Force Reset Session)
+            </button>
+            <button
+              onClick={() => { fetchStats(); fetchUsers(); }}
+              style={{
+                padding: '12px 16px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '10px',
+                color: '#fff',
+                fontWeight: '700',
+                fontSize: '12px',
+                cursor: 'pointer',
+                fontFamily: 'Outfit'
+              }}
+            >
+              Спробувати ще раз
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── STATS GRID ── */}
       <div style={{

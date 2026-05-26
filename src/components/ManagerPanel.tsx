@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, supabaseUrl } from '../lib/supabase';
 import { CoinsManagementView } from './CoinsManagementView';
 import { 
   Shield, Key, Mail, User, Lock, Eye, EyeOff, LogOut, 
@@ -203,6 +203,39 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
       terminalBottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [terminalLogs]);
+
+  // Supabase connection diagnostic log
+  useEffect(() => {
+    if (!isAuthed) return;
+    const runDiagnostics = async () => {
+      if (!useSupabase) {
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ℹ️ Supabase not configured or in local mockup mode.`]);
+        return;
+      }
+      try {
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🔍 Діагностика з'єднання...`]);
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🔗 Supabase URL: ${supabaseUrl || 'unknown'}`]);
+        
+        const { data: tourneys, error } = await supabase
+          .from('tournaments')
+          .select('id, name, status');
+        
+        if (error) {
+          setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Помилка запиту турнірів: ${error.message} (код: ${error.code})`]);
+        } else {
+          setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ✅ Отримано ${tourneys?.length || 0} турнірів з бази даних.`]);
+          if (tourneys) {
+            tourneys.forEach(t => {
+              setTerminalLogs(prev => [...prev, `   • [${t.status}] ${t.name} (ID: ${t.id.substring(0,8)}...)`]);
+            });
+          }
+        }
+      } catch (err: any) {
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Фатальна помилка діагностики: ${err.message}`]);
+      }
+    };
+    runDiagnostics();
+  }, [useSupabase, isAuthed]);
 
   // Generate live background simulator logs to make the cover dashboard feel active
   useEffect(() => {
@@ -767,94 +800,34 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
         setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ⚠️ Не знайдено підписників або користувачів з Telegram ID для розсилки.`]);
       }
 
-      const BOT_TOKEN = '8873845823:AAErjQiXP7InePLKku-MOhbqNPe-bMvt3LU';
-      const CHANNEL_ID = '@volki1303';
       const finalMsg = broadcastMsg;
-      const replyMarkup = {
-        inline_keyboard: [[{ text: '🎮 В БОТ VOLK 1303', web_app: { url: 'https://volk1303.vercel.app' } }]]
-      };
 
-      let sent = 0;
-      let failed = 0;
-      const blockedIds: number[] = [];
+      setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Надсилання запиту до API розсилки Vercel...`]);
 
-      setBroadcastProgress({ current: 0, total: chatIds.length });
-
-      // 3. Send to all subscribers sequentially
-      for (let i = 0; i < chatIds.length; i++) {
-        const chatId = chatIds[i];
-        setBroadcastProgress({ current: i + 1, total: chatIds.length });
-
-        try {
-          const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: finalMsg,
-              parse_mode: 'HTML',
-              disable_web_page_preview: true,
-              reply_markup: replyMarkup,
-            }),
-          });
-          const result = await r.json();
-          if (result.ok) {
-            sent++;
-          } else {
-            failed++;
-            const desc = result.description || '';
-            if (desc.toLowerCase().includes('blocked') || result.error_code === 403) {
-              blockedIds.push(chatId);
-            }
-          }
-        } catch (err) {
-          failed++;
-        }
-
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 80));
+      const r = await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: finalMsg }),
+      });
+      
+      if (!r.ok) {
+        const errData = await r.json().catch(() => ({ error: 'HTTP error ' + r.status }));
+        throw new Error(errData.error || 'Server error');
       }
 
-      // 4. Mark blocked users as inactive in Supabase
-      if (blockedIds.length > 0) {
-        for (const blockedId of blockedIds) {
-          try {
-            await supabase
-              .from('bot_subscribers')
-              .update({ is_active: false })
-              .eq('chat_id', blockedId);
-          } catch (_) {}
-        }
-        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Позначено ${blockedIds.length} заблокованих чатів як неактивні.`]);
-      }
+      const result = await r.json();
 
-      // 5. Send to Channel
-      let channelOk = false;
-      try {
-        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Надсилання анонсу в канал ${CHANNEL_ID}...`]);
-        const chanResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: CHANNEL_ID,
-            text: finalMsg,
-            parse_mode: 'HTML',
-            disable_web_page_preview: true,
-            reply_markup: replyMarkup,
-          }),
-        });
-        const chanResult = await chanResp.json();
-        channelOk = chanResult.ok;
-      } catch (e) {
-        console.error('Failed to post to channel:', e);
+      if (result.ok) {
+        const { sent, failed, total, channel } = result;
+        setBroadcastResult({ sent, failed });
+        setTerminalLogs(prev => [...prev,
+          `[${new Date().toLocaleTimeString()}] Розсилка завершена: ✅ ${sent}/${total} доставлено, ❌ ${failed} помилок. Канал: ${channel ? '✅' : '❌'}`
+        ]);
+        showToast(`Розсилку виконано! ✅ ${sent} надіслано, ❌ ${failed} помилок`, sent > 0 ? 'success' : 'error');
+        if (sent > 0) setBroadcastMsg('');
+      } else {
+        throw new Error(result.error || 'Unknown error');
       }
-
-      setBroadcastResult({ sent, failed });
-      setTerminalLogs(prev => [...prev,
-        `[${new Date().toLocaleTimeString()}] Розсилка завершена: ✅ ${sent}/${chatIds.length} доставлено, ❌ ${failed} помилок. Канал: ${channelOk ? '✅' : '❌'}`
-      ]);
-      showToast(`Розсилку виконано! ✅ ${sent} надіслано, ❌ ${failed} помилок`, sent > 0 ? 'success' : 'error');
-      if (sent > 0) setBroadcastMsg('');
     } catch (err: any) {
       showToast('Помилка розсилки: ' + err.message, 'error');
       setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Помилка розсилки: ${err.message}`]);
@@ -1641,9 +1614,15 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                     <button
                       onClick={() => {
                         if (confirm('Ви впевнені, що хочете видалити ВСІ турніри? Це також видалить усі пов\'язані матчі, команди та ставки.')) {
-                          tournaments.forEach(t => deleteTournament(t.id));
-                          setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Deleted all tournaments.`]);
-                          showToast('Усі турніри видалено', 'info');
+                          (async () => {
+                            setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🛑 Запуск повного видалення турнірів...`]);
+                            const list = [...tournaments];
+                            for (const t of list) {
+                              await deleteTournament(t.id);
+                            }
+                            setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ✅ Усі турніри видалено з бази даних.`]);
+                            showToast('Усі турніри видалено', 'info');
+                          })();
                         }
                       }}
                       style={{
@@ -1777,10 +1756,11 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
                                 <Edit3 size={12} />
                               </button>
                               <button 
-                                onClick={() => {
+                                onClick={async () => {
                                   if (confirm(`Ви впевнені, що хочете видалити турнір "${t.name}"?`)) {
-                                    deleteTournament(t.id);
-                                    setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Deleted tournament: "${t.name}"`]);
+                                    setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🗑️ Видалення турніру "${t.name}"...`]);
+                                    await deleteTournament(t.id);
+                                    setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ✅ Турнір "${t.name}" успішно видалено.`]);
                                   }
                                 }}
                                 style={{
