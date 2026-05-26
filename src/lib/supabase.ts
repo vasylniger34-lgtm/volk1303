@@ -4,8 +4,14 @@ import { createClient } from '@supabase/supabase-js';
 const DEFAULT_URL = atob('aHR0cHM6Ly9uYmpubXpyamx2amJlamdlb2djZS5zdXBhYmFzZS5jbw==');
 const DEFAULT_KEY = atob('c2JfcHVibGlzaGFibGVfd3FSY05UOXlLSk5pMTZFSWVxcHduUV9iZmlhQV92dg==');
 
-export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || DEFAULT_URL;
-export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_KEY;
+const envUrl = import.meta.env.VITE_SUPABASE_URL;
+const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+const cleanUrl = typeof envUrl === 'string' ? envUrl.replace(/^["']|["']$/g, '').trim() : '';
+const cleanKey = typeof envKey === 'string' ? envKey.replace(/^["']|["']$/g, '').trim() : '';
+
+export const supabaseUrl = cleanUrl && cleanUrl !== 'https://placeholder.supabase.co' ? cleanUrl : DEFAULT_URL;
+export const supabaseAnonKey = cleanKey && cleanKey !== 'your_anon_key' ? cleanKey : DEFAULT_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
