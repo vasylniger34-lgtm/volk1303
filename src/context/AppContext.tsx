@@ -1051,7 +1051,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ─── Generate Bracket ───
 
   const generateBracketForTournament = async (tournamentId: string) => {
-    const list = teams[tournamentId] || [];
+    // FIX: use teamsRef.current to avoid stale closures from setTimeout
+    const list = teamsRef.current[tournamentId] || [];
     if (list.length < 2) {
       showToast('Потрібно мінімум 2 команди!', 'error');
       return;
