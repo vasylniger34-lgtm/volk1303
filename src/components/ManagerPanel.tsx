@@ -843,10 +843,32 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     setMatchScore(activeMatch.id, newA, newB, 'live', null);
     updateMatchOdds(activeMatch.id, newOddsA, newOddsB);
 
-    // Auto-finish at 13
-    if (newA >= 13 || newB >= 13) {
+    // Auto-finish with CS2 Overtime logic
+    const maxScore = Math.max(newA, newB);
+    const minScore = Math.min(newA, newB);
+    let isFinished = false;
+    let finishReason = '';
+
+    if (maxScore >= 13) {
+      if (maxScore === 13 && minScore <= 11) {
+        isFinished = true;
+        finishReason = `Матч завершено: рахунок ${newA}:${newB}!`;
+      } else if (maxScore > 13 || (newA === 12 && newB === 12)) {
+        let T = 12;
+        while (minScore >= T + 3) {
+          T = T + 3;
+        }
+        const target = T + 4;
+        if (maxScore >= target && minScore <= T + 2) {
+          isFinished = true;
+          finishReason = `Матч завершено в овертаймі: рахунок ${newA}:${newB}!`;
+        }
+      }
+    }
+
+    if (isFinished) {
       finishMatchWithScore(activeMatch.id, newA, newB);
-      showToast(`Матч автоматично завершено: 13 раундів!`, 'success');
+      showToast(finishReason, 'success');
     }
   };
 

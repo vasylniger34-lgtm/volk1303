@@ -66,39 +66,45 @@ export default async function handler(req: any, res: any) {
     inline_keyboard: [[{ text: '🎮 Відкрити VOLKI 13:03', web_app: { url: 'https://volk1303.vercel.app' } }]],
   });
 
-  // 4. Send to all subscribers
+  // 4. Send to all subscribers in batches of 10 to avoid timeouts and rate limits
   let sent = 0;
   let failed = 0;
   const blockedIds: number[] = [];
 
-  for (const chatId of chatIds) {
-    try {
-      const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-          reply_markup: replyMarkup,
-        }),
-      });
-      const result = await r.json();
-      if (result.ok) {
-        sent++;
-      } else {
-        failed++;
-        const desc: string = result.description || '';
-        if (desc.toLowerCase().includes('blocked') || result.error_code === 403) {
-          blockedIds.push(chatId);
+  const batchSize = 10;
+  for (let i = 0; i < chatIds.length; i += batchSize) {
+    const batch = chatIds.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (chatId) => {
+        try {
+          const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text,
+              parse_mode: 'HTML',
+              disable_web_page_preview: true,
+              reply_markup: replyMarkup,
+            }),
+          });
+          const result = await r.json();
+          if (result.ok) {
+            sent++;
+          } else {
+            failed++;
+            const desc: string = result.description || '';
+            if (desc.toLowerCase().includes('blocked') || result.error_code === 403) {
+              blockedIds.push(chatId);
+            }
+          }
+        } catch {
+          failed++;
         }
-      }
-    } catch {
-      failed++;
-    }
-    // Small delay to avoid Telegram rate limit
-    await new Promise((resolve) => setTimeout(resolve, 60));
+      })
+    );
+    // 350ms delay between batches of 10 to stay safely below 30 messages/sec limit
+    await new Promise((resolve) => setTimeout(resolve, 350));
   }
 
   // 5. Mark blocked users as inactive in Supabase

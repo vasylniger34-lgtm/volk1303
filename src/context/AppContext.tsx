@@ -806,36 +806,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return copy;
           });
         }
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'profiles',
-        filter: `id=eq.${user.id}`
-      }, (payload) => {
-        const { new: newRow } = payload;
-        if (newRow) {
-          setUser(profileToUser(newRow as ProfileRow));
-        }
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'predictions',
-        filter: `user_id=eq.${user.id}`
-      }, (payload) => {
-        const { eventType, new: newRow, old: oldRow } = payload;
-        if (eventType === 'INSERT' && newRow) {
-          const mapped = dbPredictionToApp(newRow);
-          setPredictions(prev => prev.some(p => p.id === mapped.id) ? prev : [mapped, ...prev]);
-        } else if (eventType === 'UPDATE' && newRow) {
-          const mapped = dbPredictionToApp(newRow);
-          setPredictions(prev => prev.map(p => p.id === mapped.id ? mapped : p));
-        } else if (eventType === 'DELETE' && oldRow) {
-          setPredictions(prev => prev.filter(p => p.id !== oldRow.id));
-        }
-      })
-      .subscribe();
+      });
+
+    const isUuid = typeof user.id === 'string' && user.id.length === 36 && user.id.includes('-');
+    if (isUuid) {
+      channel
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        }, (payload) => {
+          const { new: newRow } = payload;
+          if (newRow) {
+            setUser(profileToUser(newRow as ProfileRow));
+          }
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'predictions',
+          filter: `user_id=eq.${user.id}`
+        }, (payload) => {
+          const { eventType, new: newRow, old: oldRow } = payload;
+          if (eventType === 'INSERT' && newRow) {
+            const mapped = dbPredictionToApp(newRow);
+            setPredictions(prev => prev.some(p => p.id === mapped.id) ? prev : [mapped, ...prev]);
+          } else if (eventType === 'UPDATE' && newRow) {
+            const mapped = dbPredictionToApp(newRow);
+            setPredictions(prev => prev.map(p => p.id === mapped.id ? mapped : p));
+          } else if (eventType === 'DELETE' && oldRow) {
+            setPredictions(prev => prev.filter(p => p.id !== oldRow.id));
+          }
+        });
+    }
+
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
