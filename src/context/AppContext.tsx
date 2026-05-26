@@ -579,12 +579,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           errCode === '403'
         ) {
           console.warn('[VOLKI] Expired/Invalid JWT detected during tournaments fetch. Clearing session...', tourneyError);
-          await supabase.auth.signOut();
-          localStorage.removeItem('volk_session');
-          localStorage.removeItem('volk_user');
-          localStorage.removeItem('volk_manager_session');
-          localStorage.removeItem('volk_manager_profile');
-          window.location.reload();
+          supabase.auth.signOut().then(() => {
+            localStorage.removeItem('volk_session');
+            localStorage.removeItem('volk_user');
+            localStorage.removeItem('volk_manager_session');
+            localStorage.removeItem('volk_manager_profile');
+            setIsAuthenticated(false);
+            setUser(DEFAULT_USER);
+          });
           return;
         }
         throw tourneyError;
@@ -634,12 +636,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           errCode === '403'
         ) {
           console.warn('[VOLKI] Expired/Invalid JWT detected during teams fetch. Clearing session...', teamsError);
-          await supabase.auth.signOut();
-          localStorage.removeItem('volk_session');
-          localStorage.removeItem('volk_user');
-          localStorage.removeItem('volk_manager_session');
-          localStorage.removeItem('volk_manager_profile');
-          window.location.reload();
+          supabase.auth.signOut().then(() => {
+            localStorage.removeItem('volk_session');
+            localStorage.removeItem('volk_user');
+            localStorage.removeItem('volk_manager_session');
+            localStorage.removeItem('volk_manager_profile');
+            setIsAuthenticated(false);
+            setUser(DEFAULT_USER);
+          });
           return;
         }
         throw teamsError;
@@ -676,12 +680,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           errCode === '403'
         ) {
           console.warn('[VOLKI] Expired/Invalid JWT detected during matches fetch. Clearing session...', matchesError);
-          await supabase.auth.signOut();
-          localStorage.removeItem('volk_session');
-          localStorage.removeItem('volk_user');
-          localStorage.removeItem('volk_manager_session');
-          localStorage.removeItem('volk_manager_profile');
-          window.location.reload();
+          supabase.auth.signOut().then(() => {
+            localStorage.removeItem('volk_session');
+            localStorage.removeItem('volk_user');
+            localStorage.removeItem('volk_manager_session');
+            localStorage.removeItem('volk_manager_profile');
+            setIsAuthenticated(false);
+            setUser(DEFAULT_USER);
+          });
           return;
         }
         throw matchesError;
@@ -993,36 +999,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return copy;
           });
         }
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'profiles',
-        filter: `id=eq.${user.id}`
-      }, (payload) => {
-        const { new: newRow } = payload;
-        if (newRow) {
-          setUser(profileToUser(newRow as ProfileRow));
-        }
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'predictions',
-        filter: `user_id=eq.${user.id}`
-      }, (payload) => {
-        const { eventType, new: newRow, old: oldRow } = payload;
-        if (eventType === 'INSERT' && newRow) {
-          const mapped = dbPredictionToApp(newRow);
-          setPredictions(prev => prev.some(p => p.id === mapped.id) ? prev : [mapped, ...prev]);
-        } else if (eventType === 'UPDATE' && newRow) {
-          const mapped = dbPredictionToApp(newRow);
-          setPredictions(prev => prev.map(p => p.id === mapped.id ? mapped : p));
-        } else if (eventType === 'DELETE' && oldRow) {
-          setPredictions(prev => prev.filter(p => p.id !== oldRow.id));
-        }
-      })
-      .subscribe();
+      });
+
+    const isUuid = typeof user.id === 'string' && user.id.length === 36 && user.id.includes('-');
+    if (isUuid) {
+      channel
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        }, (payload) => {
+          const { new: newRow } = payload;
+          if (newRow) {
+            setUser(profileToUser(newRow as ProfileRow));
+          }
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'predictions',
+          filter: `user_id=eq.${user.id}`
+        }, (payload) => {
+          const { eventType, new: newRow, old: oldRow } = payload;
+          if (eventType === 'INSERT' && newRow) {
+            const mapped = dbPredictionToApp(newRow);
+            setPredictions(prev => prev.some(p => p.id === mapped.id) ? prev : [mapped, ...prev]);
+          } else if (eventType === 'UPDATE' && newRow) {
+            const mapped = dbPredictionToApp(newRow);
+            setPredictions(prev => prev.map(p => p.id === mapped.id ? mapped : p));
+          } else if (eventType === 'DELETE' && oldRow) {
+            setPredictions(prev => prev.filter(p => p.id !== oldRow.id));
+          }
+        });
+    }
+
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
