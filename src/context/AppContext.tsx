@@ -2179,6 +2179,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteTournament = async (tournamentId: string) => {
     const tourneyObj = tournaments.find(t => t.id === tournamentId);
     const matchIds = matches.filter(m => m.tournamentId === tournamentId).map(m => m.id);
+    const tourneyTeams = teams[tournamentId] || [];
+    const teamIds = tourneyTeams.map(t => t.id);
 
     if (useSupabase) {
       try {
@@ -2187,6 +2189,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         if (tourneyObj) {
           await supabase.from('predictions').delete().eq('tournament_name', tourneyObj.name);
+        }
+        if (teamIds.length > 0) {
+          await supabase.from('team_invites').delete().in('team_id', teamIds);
         }
         await supabase.from('matches').delete().eq('tournament_id', tournamentId);
         await supabase.from('teams').delete().eq('tournament_id', tournamentId);
