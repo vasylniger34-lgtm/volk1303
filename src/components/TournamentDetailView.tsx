@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { ChevronLeft, Star, Swords, Trophy, FileText, CheckCircle2, Coins, Lock, Unlock, Tv2, ExternalLink, Maximize2, X } from 'lucide-react';
 import { getFormatBadgeStyle } from './TournamentsView';
@@ -70,9 +70,10 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
   const [selectedTeamForRoster, setSelectedTeamForRoster] = useState<any | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
 
-  useEffect(() => {
+  const changeSelectedTeamForRoster = (team: any) => {
+    setSelectedTeamForRoster(team);
     setPasswordInput('');
-  }, [selectedTeamForRoster]);
+  };
 
   const getMaxTeamPlayers = (type: string) => {
     if (type === '5X5') return 5;
@@ -672,7 +673,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                 <div 
                   key={team.id}
                   className="esports-card"
-                  onClick={() => setSelectedTeamForRoster(team)}
+                  onClick={() => changeSelectedTeamForRoster(team)}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -1208,7 +1209,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
         <>
           {/* Backdrop */}
           <div
-            onClick={() => setSelectedTeamForRoster(null)}
+            onClick={() => changeSelectedTeamForRoster(null)}
             style={{
               position: 'fixed',
               inset: 0,
@@ -1274,7 +1275,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
               </div>
               
               <button 
-                onClick={() => setSelectedTeamForRoster(null)} 
+                onClick={() => changeSelectedTeamForRoster(null)} 
                 style={{ 
                   background: 'none', 
                   border: 'none', 
@@ -1375,7 +1376,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                         }
                         const success = await joinTeam(selectedTeamForRoster.id, passwordInput.trim());
                         if (success) {
-                          setSelectedTeamForRoster(null);
+                          changeSelectedTeamForRoster(null);
                         }
                       }}
                       style={{ width: '100%', padding: '16px', fontSize: '14px', fontWeight: '900', letterSpacing: '1px' }}
@@ -1389,7 +1390,7 @@ export const TournamentDetailView: React.FC<TournamentDetailViewProps> = ({
                     onClick={async () => {
                       const success = await joinTeam(selectedTeamForRoster.id);
                       if (success) {
-                        setSelectedTeamForRoster(null);
+                        changeSelectedTeamForRoster(null);
                       }
                     }}
                     style={{ width: '100%', padding: '16px', fontSize: '14px', fontWeight: '900', letterSpacing: '1px' }}

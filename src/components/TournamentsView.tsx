@@ -85,7 +85,7 @@ export const TournamentsView: React.FC<TournamentsViewProps> = ({ onSelectTourna
 
     // Numerical date parsing
     if (!dateParsed) {
-      const numericMatch = lower.match(/\b(\d{1,2})[\.\-\/](\d{1,2})(?:[\.\-\/](\d{2,4}))?\b/);
+      const numericMatch = lower.match(/\b(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2,4}))?\b/);
       if (numericMatch) {
         day = parseInt(numericMatch[1], 10);
         month = parseInt(numericMatch[2], 10) - 1;

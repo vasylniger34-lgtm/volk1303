@@ -181,7 +181,7 @@ function generateUUID() {
     return window.crypto.randomUUID();
   }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 }
@@ -344,11 +344,208 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Toast
   const [toast, setToast] = useState<ToastMessage>({ show: false, message: '', type: 'success' });
 
+  // ─── Supabase Data Loader ───
+
+  const loadSupabaseData = useCallback(async () => {
+    if (!useSupabase) return;
+
+    try {
+      // Load tournaments
+      const { data: tourneysData, error: tourneyError } = await supabase
+        .from('tournaments')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (tourneyError) {
+        const errMsg = (tourneyError.message || '').toLowerCase();
+        const errCode = String(tourneyError.code || '');
+        if (
+          errMsg.includes('jwt') || 
+          errMsg.includes('expired') || 
+          errMsg.includes('signature') || 
+          errMsg.includes('token') ||
+          errMsg.includes('auth') ||
+          errCode === 'PGRST301' || 
+          errCode === 'PGRST302' ||
+          errCode === '401' ||
+          errCode === '403'
+        ) {
+          console.warn('[VOLKI] Expired/Invalid JWT detected during tournaments fetch. Clearing session...', tourneyError);
+          supabase.auth.signOut().then(() => {
+            localStorage.removeItem('volk_session');
+            localStorage.removeItem('volk_user');
+            localStorage.removeItem('volk_manager_session');
+            localStorage.removeItem('volk_manager_profile');
+            setIsAuthenticated(false);
+            setUser(DEFAULT_USER);
+            window.location.reload();
+          });
+          return;
+        }
+        throw tourneyError;
+      }
+
+      if (tourneysData) {
+        if (tourneysData.length > 0) {
+          const mapped = tourneysData.map(t => ({
+            id: t.id,
+            name: t.name,
+            type: t.type as '2X2' | '3X3' | '4X4' | '5X5' | 'BCI',
+            date: t.date,
+            prizePool: t.prize_pool,
+            prizePlaces: {
+              first: t.prize_first || '',
+              second: t.prize_second || '',
+              third: t.prize_third || ''
+            },
+            participantsCount: t.participants_count,
+            maxParticipants: t.max_participants,
+            status: t.status as 'upcoming' | 'active' | 'completed',
+            map: t.map,
+            system: t.system,
+            rules: t.rules || [],
+            imageUrl: t.image_url || '',
+            streamUrl: t.stream_url || ''
+          }));
+          setTournaments(prev => JSON.stringify(prev) !== JSON.stringify(mapped) ? mapped : prev);
+        } else {
+          setTournaments(prev => prev.length > 0 ? [] : prev);
+        }
+      }
+
+      // Load teams
+      const { data: teamsData, error: teamsError } = await supabase.from('teams').select('*');
+      if (teamsError) {
+        const errMsg = (teamsError.message || '').toLowerCase();
+        const errCode = String(teamsError.code || '');
+        if (
+          errMsg.includes('jwt') || 
+          errMsg.includes('expired') || 
+          errMsg.includes('signature') || 
+          errMsg.includes('token') ||
+          errMsg.includes('auth') ||
+          errCode === 'PGRST301' || 
+          errCode === 'PGRST302' ||
+          errCode === '401' ||
+          errCode === '403'
+        ) {
+          console.warn('[VOLKI] Expired/Invalid JWT detected during teams fetch. Clearing session...', teamsError);
+          supabase.auth.signOut().then(() => {
+            localStorage.removeItem('volk_session');
+            localStorage.removeItem('volk_user');
+            localStorage.removeItem('volk_manager_session');
+            localStorage.removeItem('volk_manager_profile');
+            setIsAuthenticated(false);
+            setUser(DEFAULT_USER);
+            window.location.reload();
+          });
+          return;
+        }
+        throw teamsError;
+      }
+
+      if (teamsData) {
+        if (teamsData.length > 0) {
+          const grouped: Record<string, Team[]> = {};
+          teamsData.forEach(t => {
+            const team = dbTeamToApp(t as TeamRow);
+            if (!grouped[t.tournament_id]) grouped[t.tournament_id] = [];
+            grouped[t.tournament_id].push(team);
+          });
+          setTeams(prev => JSON.stringify(prev) !== JSON.stringify(grouped) ? grouped : prev);
+        } else {
+          setTeams(prev => Object.keys(prev).length > 0 ? {} : prev);
+        }
+      }
+
+      // Load matches (with team data)
+      const { data: matchesData, error: matchesError } = await supabase.from('matches').select('*');
+      if (matchesError) {
+        const errMsg = (matchesError.message || '').toLowerCase();
+        const errCode = String(matchesError.code || '');
+        if (
+          errMsg.includes('jwt') || 
+          errMsg.includes('expired') || 
+          errMsg.includes('signature') || 
+          errMsg.includes('token') ||
+          errMsg.includes('auth') ||
+          errCode === 'PGRST301' || 
+          errCode === 'PGRST302' ||
+          errCode === '401' ||
+          errCode === '403'
+        ) {
+          console.warn('[VOLKI] Expired/Invalid JWT detected during matches fetch. Clearing session...', matchesError);
+          supabase.auth.signOut().then(() => {
+            localStorage.removeItem('volk_session');
+            localStorage.removeItem('volk_user');
+            localStorage.removeItem('volk_manager_session');
+            localStorage.removeItem('volk_manager_profile');
+            setIsAuthenticated(false);
+            setUser(DEFAULT_USER);
+            window.location.reload();
+          });
+          return;
+        }
+        throw matchesError;
+      }
+
+      if (matchesData) {
+        if (matchesData.length > 0) {
+          // We need teams to hydrate match data
+          const { data: allTeamsData } = await supabase.from('teams').select('*');
+          const teamsMap: Record<string, Team> = {};
+          (allTeamsData || []).forEach(t => {
+            teamsMap[t.id] = dbTeamToApp(t as TeamRow);
+          });
+
+          const mapped = matchesData.map((m: MatchRow) => ({
+            id: m.id,
+            tournamentId: m.tournament_id,
+            tournamentName: m.tournament_name,
+            roundName: m.round_name,
+            teamA: m.team_a_id ? teamsMap[m.team_a_id] || null : null,
+            teamB: m.team_b_id ? teamsMap[m.team_b_id] || null : null,
+            scoreA: m.score_a,
+            scoreB: m.score_b,
+            status: m.status as 'scheduled' | 'live' | 'finished',
+            winnerId: m.winner_id,
+            oddsA: Number(m.odds_a),
+            oddsB: Number(m.odds_b),
+            map: m.map,
+            time: m.time || '',
+            currentMap: m.current_map,
+            mapScores: (m.map_scores || []) as { scoreA: number; scoreB: number }[],
+            liveLogs: m.live_logs || []
+          }));
+          setMatches(prev => JSON.stringify(prev) !== JSON.stringify(mapped) ? mapped : prev);
+        } else {
+          setMatches(prev => prev.length > 0 ? [] : prev);
+        }
+      }
+
+      // Load predictions for current user
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.user?.id) {
+        const { data: predictionsData } = await supabase
+          .from('predictions')
+          .select('*')
+          .eq('user_id', currentSession.user.id)
+          .order('created_at', { ascending: false });
+
+        if (predictionsData) {
+          const mapped = predictionsData.map(dbPredictionToApp);
+          setPredictions(prev => JSON.stringify(prev) !== JSON.stringify(mapped) ? mapped : prev);
+        }
+      }
+    } catch (err) {
+      console.error('[VOLKI] Data load error:', err);
+    }
+  }, [useSupabase]);
+
   // ─── Supabase Init: check session & load data ───
 
   useEffect(() => {
     if (!useSupabase) {
-      setIsLoading(false);
       return;
     }
 
@@ -550,212 +747,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clearTimeout(timeoutTimer);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadSupabaseData, useSupabase]);
 
-  // ─── Supabase Data Loader ───
 
-  const loadSupabaseData = useCallback(async () => {
-    if (!useSupabase) return;
-
-    try {
-      // Load tournaments
-      const { data: tourneysData, error: tourneyError } = await supabase
-        .from('tournaments')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (tourneyError) {
-        const errMsg = (tourneyError.message || '').toLowerCase();
-        const errCode = String(tourneyError.code || '');
-        if (
-          errMsg.includes('jwt') || 
-          errMsg.includes('expired') || 
-          errMsg.includes('signature') || 
-          errMsg.includes('token') ||
-          errMsg.includes('auth') ||
-          errCode === 'PGRST301' || 
-          errCode === 'PGRST302' ||
-          errCode === '401' ||
-          errCode === '403'
-        ) {
-          console.warn('[VOLKI] Expired/Invalid JWT detected during tournaments fetch. Clearing session...', tourneyError);
-          supabase.auth.signOut().then(() => {
-            localStorage.removeItem('volk_session');
-            localStorage.removeItem('volk_user');
-            localStorage.removeItem('volk_manager_session');
-            localStorage.removeItem('volk_manager_profile');
-            setIsAuthenticated(false);
-            setUser(DEFAULT_USER);
-            window.location.reload();
-          });
-          return;
-        }
-        throw tourneyError;
-      }
-
-      if (tourneysData) {
-        if (tourneysData.length > 0) {
-          const mapped = tourneysData.map(t => ({
-            id: t.id,
-            name: t.name,
-            type: t.type as '2X2' | '3X3' | '4X4' | '5X5' | 'BCI',
-            date: t.date,
-            prizePool: t.prize_pool,
-            prizePlaces: {
-              first: t.prize_first || '',
-              second: t.prize_second || '',
-              third: t.prize_third || ''
-            },
-            participantsCount: t.participants_count,
-            maxParticipants: t.max_participants,
-            status: t.status as 'upcoming' | 'active' | 'completed',
-            map: t.map,
-            system: t.system,
-            rules: t.rules || [],
-            imageUrl: t.image_url || '',
-            streamUrl: t.stream_url || ''
-          }));
-          setTournaments(prev => JSON.stringify(prev) !== JSON.stringify(mapped) ? mapped : prev);
-        } else {
-          setTournaments(prev => prev.length > 0 ? [] : prev);
-        }
-      }
-
-      // Load teams
-      const { data: teamsData, error: teamsError } = await supabase.from('teams').select('*');
-      if (teamsError) {
-        const errMsg = (teamsError.message || '').toLowerCase();
-        const errCode = String(teamsError.code || '');
-        if (
-          errMsg.includes('jwt') || 
-          errMsg.includes('expired') || 
-          errMsg.includes('signature') || 
-          errMsg.includes('token') ||
-          errMsg.includes('auth') ||
-          errCode === 'PGRST301' || 
-          errCode === 'PGRST302' ||
-          errCode === '401' ||
-          errCode === '403'
-        ) {
-          console.warn('[VOLKI] Expired/Invalid JWT detected during teams fetch. Clearing session...', teamsError);
-          supabase.auth.signOut().then(() => {
-            localStorage.removeItem('volk_session');
-            localStorage.removeItem('volk_user');
-            localStorage.removeItem('volk_manager_session');
-            localStorage.removeItem('volk_manager_profile');
-            setIsAuthenticated(false);
-            setUser(DEFAULT_USER);
-            window.location.reload();
-          });
-          return;
-        }
-        throw teamsError;
-      }
-
-      if (teamsData) {
-        if (teamsData.length > 0) {
-          const grouped: Record<string, Team[]> = {};
-          teamsData.forEach(t => {
-            const team = dbTeamToApp(t as TeamRow);
-            if (!grouped[t.tournament_id]) grouped[t.tournament_id] = [];
-            grouped[t.tournament_id].push(team);
-          });
-          setTeams(prev => JSON.stringify(prev) !== JSON.stringify(grouped) ? grouped : prev);
-        } else {
-          setTeams(prev => Object.keys(prev).length > 0 ? {} : prev);
-        }
-      }
-
-      // Load matches (with team data)
-      const { data: matchesData, error: matchesError } = await supabase.from('matches').select('*');
-      if (matchesError) {
-        const errMsg = (matchesError.message || '').toLowerCase();
-        const errCode = String(matchesError.code || '');
-        if (
-          errMsg.includes('jwt') || 
-          errMsg.includes('expired') || 
-          errMsg.includes('signature') || 
-          errMsg.includes('token') ||
-          errMsg.includes('auth') ||
-          errCode === 'PGRST301' || 
-          errCode === 'PGRST302' ||
-          errCode === '401' ||
-          errCode === '403'
-        ) {
-          console.warn('[VOLKI] Expired/Invalid JWT detected during matches fetch. Clearing session...', matchesError);
-          supabase.auth.signOut().then(() => {
-            localStorage.removeItem('volk_session');
-            localStorage.removeItem('volk_user');
-            localStorage.removeItem('volk_manager_session');
-            localStorage.removeItem('volk_manager_profile');
-            setIsAuthenticated(false);
-            setUser(DEFAULT_USER);
-            window.location.reload();
-          });
-          return;
-        }
-        throw matchesError;
-      }
-
-      if (matchesData) {
-        if (matchesData.length > 0) {
-          // We need teams to hydrate match data
-          const { data: allTeamsData } = await supabase.from('teams').select('*');
-          const teamsMap: Record<string, Team> = {};
-          (allTeamsData || []).forEach(t => {
-            teamsMap[t.id] = dbTeamToApp(t as TeamRow);
-          });
-
-          const mapped = matchesData.map((m: MatchRow) => ({
-            id: m.id,
-            tournamentId: m.tournament_id,
-            tournamentName: m.tournament_name,
-            roundName: m.round_name,
-            teamA: m.team_a_id ? teamsMap[m.team_a_id] || null : null,
-            teamB: m.team_b_id ? teamsMap[m.team_b_id] || null : null,
-            scoreA: m.score_a,
-            scoreB: m.score_b,
-            status: m.status as 'scheduled' | 'live' | 'finished',
-            winnerId: m.winner_id,
-            oddsA: Number(m.odds_a),
-            oddsB: Number(m.odds_b),
-            map: m.map,
-            time: m.time || '',
-            currentMap: m.current_map,
-            mapScores: (m.map_scores || []) as { scoreA: number; scoreB: number }[],
-            liveLogs: m.live_logs || []
-          }));
-          setMatches(prev => JSON.stringify(prev) !== JSON.stringify(mapped) ? mapped : prev);
-        } else {
-          setMatches(prev => prev.length > 0 ? [] : prev);
-        }
-      }
-
-      // Load predictions for current user
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      if (currentSession?.user?.id) {
-        const { data: predictionsData } = await supabase
-          .from('predictions')
-          .select('*')
-          .eq('user_id', currentSession.user.id)
-          .order('created_at', { ascending: false });
-
-        if (predictionsData) {
-          const mapped = predictionsData.map(dbPredictionToApp);
-          setPredictions(prev => JSON.stringify(prev) !== JSON.stringify(mapped) ? mapped : prev);
-        }
-      }
-    } catch (err) {
-      console.error('[VOLKI] Data load error:', err);
-    }
-  }, [useSupabase]);
 
   // ─── 5-Second Background Sync Polling (Core Data) ───
   useEffect(() => {
     if (!useSupabase) return;
 
     // Initial silent load
-    loadSupabaseData();
+    Promise.resolve().then(() => {
+      loadSupabaseData();
+    });
 
     const interval = setInterval(async () => {
       await loadSupabaseData();

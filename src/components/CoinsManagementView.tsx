@@ -24,6 +24,22 @@ interface Stats {
   totalWins: number;
 }
 
+const SortIcon = ({ col, sortBy, sortAsc }: { col: 'username' | 'balance' | 'wins' | 'level'; sortBy: 'username' | 'balance' | 'wins' | 'level'; sortAsc: boolean }) => {
+  if (sortBy !== col) return null;
+  return sortAsc
+    ? <ChevronUp size={11} style={{ display: 'inline', marginLeft: 3 }} />
+    : <ChevronDown size={11} style={{ display: 'inline', marginLeft: 3 }} />;
+};
+
+const statItem = (icon: React.ReactNode, label: string, value: string | number, color = '#FF5C00') => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#8F8F9B', fontSize: 10, fontWeight: 800, textTransform: 'uppercase' }}>
+      {icon} {label}
+    </div>
+    <span style={{ fontSize: 22, fontWeight: 950, fontFamily: 'Outfit', color }}>{value}</span>
+  </div>
+);
+
 export const CoinsManagementView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -43,6 +59,7 @@ export const CoinsManagementView: React.FC = () => {
   const [sortAsc, setSortAsc] = useState(false);
 
   const fetchStats = useCallback(async () => {
+    await Promise.resolve();
     setStatsLoading(true);
     setErrorState(null);
     try {
@@ -99,6 +116,7 @@ export const CoinsManagementView: React.FC = () => {
   }, []);
 
   const fetchUsers = useCallback(async () => {
+    await Promise.resolve();
     setLoading(true);
     setErrorState(null);
     try {
@@ -159,11 +177,15 @@ export const CoinsManagementView: React.FC = () => {
   }, [searchQuery, sortBy, sortAsc]);
 
   useEffect(() => {
-    fetchUsers();
+    Promise.resolve().then(() => {
+      fetchUsers();
+    });
   }, [fetchUsers]);
 
   useEffect(() => {
-    fetchStats();
+    Promise.resolve().then(() => {
+      fetchStats();
+    });
   }, [fetchStats]);
 
   const handleForceReset = async () => {
@@ -235,7 +257,7 @@ export const CoinsManagementView: React.FC = () => {
       setQuickAmount('');
       fetchUsers();
       fetchStats();
-    } catch (err) {
+    } catch {
       setQuickResult({ ok: false, msg: 'Помилка оновлення' });
     } finally {
       setActionLoading(false);
@@ -280,7 +302,7 @@ export const CoinsManagementView: React.FC = () => {
       setQuickAmount('');
       fetchUsers();
       fetchStats();
-    } catch (err) {
+    } catch {
       setQuickResult({ ok: false, msg: 'Помилка оновлення' });
     } finally {
       setActionLoading(false);
@@ -292,21 +314,7 @@ export const CoinsManagementView: React.FC = () => {
     else { setSortBy(col); setSortAsc(false); }
   };
 
-  const SortIcon = ({ col }: { col: typeof sortBy }) => {
-    if (sortBy !== col) return null;
-    return sortAsc
-      ? <ChevronUp size={11} style={{ display: 'inline', marginLeft: 3 }} />
-      : <ChevronDown size={11} style={{ display: 'inline', marginLeft: 3 }} />;
-  };
 
-  const statItem = (icon: React.ReactNode, label: string, value: string | number, color = '#FF5C00') => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#8F8F9B', fontSize: 10, fontWeight: 800, textTransform: 'uppercase' }}>
-        {icon} {label}
-      </div>
-      <span style={{ fontSize: 22, fontWeight: 950, fontFamily: 'Outfit', color }}>{value}</span>
-    </div>
-  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: '4px 0' }}>
@@ -545,16 +553,16 @@ export const CoinsManagementView: React.FC = () => {
           borderBottom: '1px solid rgba(255,255,255,0.03)', marginBottom: 6
         }}>
           <button onClick={() => toggleSort('username')} style={{ background: 'none', border: 'none', color: sortBy === 'username' ? '#8F8F9B' : '#51515E', cursor: 'pointer', textAlign: 'left', fontWeight: 800, fontSize: 10, textTransform: 'uppercase', padding: 0 }}>
-            Гравець <SortIcon col="username" />
+            Гравець <SortIcon col="username" sortBy={sortBy} sortAsc={sortAsc} />
           </button>
           <button onClick={() => toggleSort('balance')} style={{ background: 'none', border: 'none', color: sortBy === 'balance' ? '#FF5C00' : '#51515E', cursor: 'pointer', textAlign: 'right', fontWeight: 800, fontSize: 10, textTransform: 'uppercase', padding: 0 }}>
-            Монети <SortIcon col="balance" />
+            Монети <SortIcon col="balance" sortBy={sortBy} sortAsc={sortAsc} />
           </button>
           <button onClick={() => toggleSort('wins')} style={{ background: 'none', border: 'none', color: sortBy === 'wins' ? '#10B981' : '#51515E', cursor: 'pointer', textAlign: 'center', fontWeight: 800, fontSize: 10, textTransform: 'uppercase', padding: 0 }}>
-            Перем <SortIcon col="wins" />
+            Перем <SortIcon col="wins" sortBy={sortBy} sortAsc={sortAsc} />
           </button>
           <button onClick={() => toggleSort('level')} style={{ background: 'none', border: 'none', color: sortBy === 'level' ? '#F59E0B' : '#51515E', cursor: 'pointer', textAlign: 'center', fontWeight: 800, fontSize: 10, textTransform: 'uppercase', padding: 0 }}>
-            Рівень <SortIcon col="level" />
+            Рівень <SortIcon col="level" sortBy={sortBy} sortAsc={sortAsc} />
           </button>
           <span style={{ textAlign: 'center' }}>Winrate</span>
         </div>

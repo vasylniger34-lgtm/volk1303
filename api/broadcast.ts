@@ -61,7 +61,9 @@ export default async function handler(req: any, res: any) {
         chatIds.push(tgId);
       }
     }
-  } catch (_) {}
+  } catch {
+    // subscriber fetch fallback error ignored
+  }
 
   // 3. Inline button linking to webapp
   const replyMarkup = JSON.stringify({
@@ -121,7 +123,9 @@ export default async function handler(req: any, res: any) {
         },
         body: JSON.stringify({ is_active: false }),
       });
-    } catch (_) {}
+    } catch {
+      // subscriber status update error ignored
+    }
   }
 
   // 6. Also post to channel
@@ -140,7 +144,9 @@ export default async function handler(req: any, res: any) {
     });
     const chanResult = await chanResp.json();
     channelOk = chanResult.ok;
-  } catch (_) {}
+  } catch {
+    // channel broadcast error ignored
+  }
 
   return res.status(200).json({
     ok: true,

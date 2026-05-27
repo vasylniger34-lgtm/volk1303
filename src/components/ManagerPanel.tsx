@@ -468,7 +468,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
               status: 'online'
             };
           } else {
-            throw new Error('Невірний email/пароль. Якщо ви щойно зареєстрували акаунт — просто натисніть "Вхід" з тими самими даними.');
+            throw new Error('Невірний email/пароль. Якщо ви щойно зареєстрували акаунт — просто натисніть "Вхід" з тими самими даними.', { cause: signInErr });
           }
         }
 
@@ -756,7 +756,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ onExitAdmin }) => {
     setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Запуск розсилки в Telegram...`]);
 
     try {
-      let chatIds: number[] = [8472692319, 6239669001]; // Hardcoded fallbacks so user and managers always receive it
+      const chatIds: number[] = [8472692319, 6239669001]; // Hardcoded fallbacks so user and managers always receive it
 
       // 1. Fetch active subscribers from Supabase bot_subscribers
       try {

@@ -83,7 +83,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
         }
       }
     }, 3000);
-
     return () => {
       clearInterval(timerInterval);
       clearInterval(checkInterval);
@@ -101,8 +100,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
     }
   }, [timeLeft, step, createdTeamId]);
 
-  if (!tourney) return null;
-
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -112,14 +109,22 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
     const searchId = parseInt(newPlayerInput.replace(/\D/g, ''), 10);
     
     if (!searchId || isNaN(searchId)) {
-      setSearchResults([]);
-      setIsSearching(false);
-      setSearchError(null);
+      Promise.resolve().then(() => {
+        if (isMounted) {
+          setSearchResults([]);
+          setIsSearching(false);
+          setSearchError(null);
+        }
+      });
       return;
     }
     
-    setIsSearching(true);
-    setSearchError(null);
+    Promise.resolve().then(() => {
+      if (isMounted) {
+        setIsSearching(true);
+        setSearchError(null);
+      }
+    });
     
     const timeoutId = setTimeout(async () => {
       try {
@@ -155,6 +160,8 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ tournamentId, onCl
       clearTimeout(timeoutId);
     };
   }, [newPlayerInput]);
+
+  if (!tourney) return null;
 
   const handleAddPlayer = (dbUser: any) => {
     if (dbUser.id === user?.id) {

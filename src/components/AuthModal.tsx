@@ -32,9 +32,13 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isLoading = false }) => {
-  const [isTelegram, setIsTelegram] = useState(false);
+  const [isTelegram] = useState(() => {
+    return typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initDataUnsafe?.user;
+  });
   const [contactRequested, setContactRequested] = useState(false);
-  const [telegramUser, setTelegramUser] = useState<{ id: number; username?: string; first_name: string } | null>(null);
+  const [telegramUser] = useState<{ id: number; username?: string; first_name: string } | null>(() => {
+    return (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user) || null;
+  });
 
   // Detect Telegram WebApp environment
   useEffect(() => {
@@ -45,9 +49,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isLoading = false
       
       const user = tg.initDataUnsafe?.user;
       if (user) {
-        setIsTelegram(true);
-        setTelegramUser(user);
-        
         // If they have shared their contact before, auto-login them immediately
         const hasSharedContact = localStorage.getItem('volk_contact_shared') === 'true';
         if (hasSharedContact) {

@@ -58,7 +58,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     if (!dateParsed) {
       // Look for DD.MM.YYYY or DD.MM.YY or DD.MM (separated by dots, slashes, or dashes)
       // Matches DD.MM.YYYY or DD.MM.YY or DD.MM
-      const numericMatch = lower.match(/\b(\d{1,2})[\.\-\/](\d{1,2})(?:[\.\-\/](\d{2,4}))?\b/);
+      const numericMatch = lower.match(/\b(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2,4}))?\b/);
       if (numericMatch) {
         day = parseInt(numericMatch[1], 10);
         month = parseInt(numericMatch[2], 10) - 1; // Month is 0-indexed in JS Date

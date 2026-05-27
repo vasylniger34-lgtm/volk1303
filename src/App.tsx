@@ -196,7 +196,7 @@ const AppContent: React.FC = () => {
       }, 3500);
       return () => clearTimeout(timer);
     }
-  }, [toast.show]);
+  }, [toast.show, hideToast]);
 
   // ─── Loading Screen ───
   if (isLoading) {
