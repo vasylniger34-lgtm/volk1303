@@ -1039,3 +1039,14 @@ h1, h2, h3, h4, h5, h6, .font-outfit {
 .admin-login-card .auth-orb-1 {
   background: radial-gradient(circle, rgba(239, 68, 68, 0.08), transparent 70%);
 }
+
+/* Custom Select Dropdown options dark styling to prevent white-on-white text rendering */
+select {
+  color-scheme: dark !important;
+}
+
+select option, option {
+  background-color: #0c0c12 !important;
+  color: #ffffff !important;
+}
+

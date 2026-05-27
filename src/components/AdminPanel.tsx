@@ -168,7 +168,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
     input: {
       background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px',
       padding: '10px 14px', color: 'white', fontSize: '13px', fontWeight: '500', outline: 'none', width: '100%',
-      fontFamily: 'Outfit, sans-serif', transition: 'border-color 0.2s'
+      fontFamily: 'Outfit, sans-serif', transition: 'border-color 0.2s', colorScheme: 'dark'
     },
     label: { fontSize: '11px', color: '#8F8F9B', fontWeight: '700', textTransform: 'uppercase' as const, letterSpacing: '0.5px', marginBottom: '6px', display: 'block' },
     btnPrimary: {
@@ -579,17 +579,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
                     <label style={s.label}>Формат</label>
                     <select style={{ ...s.input, cursor: 'pointer' }} value={form.type}
                       onChange={e => setForm({ ...form, type: e.target.value as any })}>
-                      <option value="2X2">2x2</option>
-                      <option value="3X3">3x3</option>
-                      <option value="4X4">4x4</option>
-                      <option value="5X5">5x5</option>
+                      <option value="2X2" style={{ background: '#0F0F16', color: 'white' }}>2x2</option>
+                      <option value="3X3" style={{ background: '#0F0F16', color: 'white' }}>3x3</option>
+                      <option value="4X4" style={{ background: '#0F0F16', color: 'white' }}>4x4</option>
+                      <option value="5X5" style={{ background: '#0F0F16', color: 'white' }}>5x5</option>
                     </select>
                   </div>
                   <div>
                     <label style={s.label}>Карта</label>
                     <select style={{ ...s.input, cursor: 'pointer' }} value={form.map}
                       onChange={e => setForm({ ...form, map: e.target.value })}>
-                      {MAPS.map(m => <option key={m} value={m}>{m}</option>)}
+                      {MAPS.map(m => <option key={m} value={m} style={{ background: '#0F0F16', color: 'white' }}>{m}</option>)}
                     </select>
                   </div>
                   <div>
@@ -602,7 +602,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExitAdmin }) => {
                     <select style={{ ...s.input, cursor: 'pointer' }} value={form.maxParticipants}
                       onChange={e => setForm({ ...form, maxParticipants: Number(e.target.value) })}>
                       {[2, 4, 8, 16, 32].map(n => (
-                        <option key={n} value={n}>
+                        <option key={n} value={n} style={{ background: '#0F0F16', color: 'white' }}>
                           {n} {n === 2 || n === 4 ? 'команди' : 'команд'}
                         </option>
                       ))}
