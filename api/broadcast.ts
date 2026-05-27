@@ -65,7 +65,7 @@ export default async function handler(req: any, res: any) {
 
   // 3. Inline button linking to webapp
   const replyMarkup = JSON.stringify({
-    inline_keyboard: [[{ text: '🎮 Відкрити VOLKI 13:03', web_app: { url: 'https://volk1303.vercel.app' } }]],
+    inline_keyboard: [[{ text: '🎮 Відкрити VOLKI 13:03', web_app: { url: 'https://volk1303.vercel.app/?v=1.0.1' } }]],
   });
 
   // 4. Send to all subscribers in batches of 10 to avoid timeouts and rate limits

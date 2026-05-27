@@ -17,7 +17,7 @@ async function run() {
     }
 
     console.log('--- TOURNAMENTS IN DB ---');
-    console.log(tournaments.map(t => ({ id: t.id, name: t.name, status: t.status, created_at: t.created_at })));
+    console.log(JSON.stringify(tournaments, null, 2));
   } catch (err) {
     console.error('Fatal error:', err);
   }

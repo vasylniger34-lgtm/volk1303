@@ -10,7 +10,7 @@ ExecStart=/usr/bin/python3 /opt/bots/volki1303/volki_bot.py
 Restart=always
 RestartSec=5
 Environment=BOT_TOKEN=8873845823:AAErjQiXP7InePLKku-MOhbqNPe-bMvt3LU
-Environment=WEBAPP_URL=https://volk1303.vercel.app
+Environment=WEBAPP_URL=https://volk1303.vercel.app/?v=1.0.1
 
 [Install]
 WantedBy=multi-user.target
