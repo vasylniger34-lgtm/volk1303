@@ -25,7 +25,7 @@ import time
 
 # ─── Config ───
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8873845823:AAErjQiXP7InePLKku-MOhbqNPe-bMvt3LU")
-WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://volk1303.vercel.app/?v=1.0.1")
+WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://volk1303-nine.vercel.app/?v=1.0.1")
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 # Supabase credentials
