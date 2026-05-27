@@ -586,6 +586,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.removeItem('volk_manager_profile');
             setIsAuthenticated(false);
             setUser(DEFAULT_USER);
+            window.location.reload();
           });
           return;
         }
@@ -643,6 +644,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.removeItem('volk_manager_profile');
             setIsAuthenticated(false);
             setUser(DEFAULT_USER);
+            window.location.reload();
           });
           return;
         }
@@ -687,6 +689,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.removeItem('volk_manager_profile');
             setIsAuthenticated(false);
             setUser(DEFAULT_USER);
+            window.location.reload();
           });
           return;
         }
@@ -2199,12 +2202,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (error) {
           console.error('[VOLKI] Error deleting tournament in Supabase:', error);
           showToast('Не вдалося видалити з бази даних: ' + error.message, 'error');
-          return;
         }
       } catch (err: any) {
         console.error('[VOLKI] Error in deleteTournament:', err);
         showToast('Помилка з\'єднання: ' + err.message, 'error');
-        return;
       }
     }
 
