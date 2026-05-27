@@ -3,7 +3,7 @@ declare const process: { env: Record<string, string | undefined> };
 const BOT_TOKEN = process.env.BOT_TOKEN || '8873845823:AAErjQiXP7InePLKku-MOhbqNPe-bMvt3LU';
 const SUPABASE_URL = 'https://nbjnmzrjlvjbejgeogce.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_wqRcNT9yKJNi16EIeqpwnQ_bfiaA_vv';
-const CHANNEL_ID = process.env.TELEGRAM_CHANNEL || '@volk1303';
+const CHANNEL_ID = process.env.TELEGRAM_CHANNEL || '@volki13033';
 
 export default async function handler(req: any, res: any) {
   // CORS headers

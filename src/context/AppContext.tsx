@@ -595,7 +595,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (tourneysData) {
         if (tourneysData.length > 0) {
-          setTournaments(tourneysData.map(t => ({
+          const mapped = tourneysData.map(t => ({
             id: t.id,
             name: t.name,
             type: t.type as '2X2' | '3X3' | '4X4' | '5X5' | 'BCI',
@@ -614,9 +614,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             rules: t.rules || [],
             imageUrl: t.image_url || '',
             streamUrl: t.stream_url || ''
-          })));
+          }));
+          setTournaments(prev => JSON.stringify(prev) !== JSON.stringify(mapped) ? mapped : prev);
         } else {
-          setTournaments([]);
+          setTournaments(prev => prev.length > 0 ? [] : prev);
         }
       }
 
@@ -659,9 +660,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (!grouped[t.tournament_id]) grouped[t.tournament_id] = [];
             grouped[t.tournament_id].push(team);
           });
-          setTeams(grouped);
+          setTeams(prev => JSON.stringify(prev) !== JSON.stringify(grouped) ? grouped : prev);
         } else {
-          setTeams({});
+          setTeams(prev => Object.keys(prev).length > 0 ? {} : prev);
         }
       }
 
@@ -705,7 +706,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             teamsMap[t.id] = dbTeamToApp(t as TeamRow);
           });
 
-          setMatches(matchesData.map((m: MatchRow) => ({
+          const mapped = matchesData.map((m: MatchRow) => ({
             id: m.id,
             tournamentId: m.tournament_id,
             tournamentName: m.tournament_name,
@@ -723,9 +724,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             currentMap: m.current_map,
             mapScores: (m.map_scores || []) as { scoreA: number; scoreB: number }[],
             liveLogs: m.live_logs || []
-          })));
+          }));
+          setMatches(prev => JSON.stringify(prev) !== JSON.stringify(mapped) ? mapped : prev);
         } else {
-          setMatches([]);
+          setMatches(prev => prev.length > 0 ? [] : prev);
         }
       }
 
@@ -739,7 +741,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .order('created_at', { ascending: false });
 
         if (predictionsData) {
-          setPredictions(predictionsData.map(dbPredictionToApp));
+          const mapped = predictionsData.map(dbPredictionToApp);
+          setPredictions(prev => JSON.stringify(prev) !== JSON.stringify(mapped) ? mapped : prev);
         }
       }
     } catch (err) {
@@ -747,35 +750,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [useSupabase]);
 
-  // ─── 5-Second Background Sync Polling ───
+  // ─── 5-Second Background Sync Polling (Core Data) ───
   useEffect(() => {
     if (!useSupabase) return;
 
+    // Initial silent load
+    loadSupabaseData();
+
     const interval = setInterval(async () => {
-      // 1. Refresh tournaments, matches, teams quietly in background
       await loadSupabaseData();
+    }, 5000);
 
-      // 2. Refresh current user's profile (balance, XP, level, wins, losses)
-      if (isAuthenticated && user.id && user.id !== 'local_user') {
-        try {
-          const targetId = user.id.includes('-') ? user.id : getDeterministicUUID(user.id);
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', targetId)
-            .single();
+    return () => clearInterval(interval);
+  }, [useSupabase, loadSupabaseData]);
 
-          if (profile && !error) {
-            setUser(profileToUser(profile as ProfileRow));
-          }
-        } catch (e) {
-          console.warn('[VOLKI] Quiet background profile sync failed:', e);
+  // ─── 5-Second Profile Sync Polling ───
+  useEffect(() => {
+    if (!useSupabase || !isAuthenticated || !user.id || user.id === 'local_user') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const targetId = user.id.includes('-') ? user.id : getDeterministicUUID(user.id);
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', targetId)
+          .single();
+
+        if (profile && !error) {
+          const updated = profileToUser(profile as ProfileRow);
+          setUser(prev => JSON.stringify(prev) !== JSON.stringify(updated) ? updated : prev);
         }
+      } catch (e) {
+        console.warn('[VOLKI] Quiet background profile sync failed:', e);
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [useSupabase, isAuthenticated, user.id, loadSupabaseData]);
+  }, [useSupabase, isAuthenticated, user.id]);
 
   // ─── Supabase Realtime: subscribe to match updates ───
 

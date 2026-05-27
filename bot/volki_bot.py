@@ -429,7 +429,7 @@ def do_broadcast(text: str, sender_chat_id: int = None) -> tuple:
             failed += 1
     
     # Also post to channel
-    channel_id = os.environ.get("TELEGRAM_CHANNEL", "@volk1303")
+    channel_id = os.environ.get("TELEGRAM_CHANNEL", "@volki13033")
     try:
         ch_result = tg_request("sendMessage", {
             "chat_id": channel_id,
@@ -624,7 +624,7 @@ def handle_callback_query(update: dict):
                 f"✅ <b>Розсилку завершено!</b>\n\n"
                 f"📤 Надіслано: <b>{sent}</b> підписників\n"
                 f"❌ Помилок: <b>{failed}</b>\n\n"
-                f"Повідомлення також опубліковано в каналі @volk1303",
+                f"Повідомлення також опубліковано в каналі @volki13033",
                 reply_markup=admin_main_menu()
             )
         
@@ -804,7 +804,7 @@ def handle_update(update: dict):
             chat_id,
             "📢 <b>Меню Розсилок VOLK 1303</b>\n\n"
             "Оберіть шаблон або напишіть своє повідомлення.\n"
-            "Розсилка буде надіслана <b>всім активним підписникам</b> бота та опублікована в каналі @volk1303.\n\n"
+            "Розсилка буде надіслана <b>всім активним підписникам</b> бота та опублікована в каналі @volki13033.\n\n"
             "Підтримується HTML: <code>&lt;b&gt;жирний&lt;/b&gt;</code>, <code>&lt;i&gt;курсив&lt;/i&gt;</code>, <code>&lt;code&gt;код&lt;/code&gt;</code>",
             reply_markup=broadcast_templates_keyboard()
         )
@@ -895,7 +895,7 @@ def handle_update(update: dict):
         send_msg(
             chat_id,
             "📱 Приєднуйтесь до нашого офіційного каналу, щоб не пропустити важливі новини, розіграші та стріми матчів!",
-            reply_markup={"inline_keyboard": [[{"text": "🐺 Наш канал", "url": "https://t.me/volk1303"}]]}
+            reply_markup={"inline_keyboard": [[{"text": "🐺 Наш канал", "url": "https://t.me/volki13033"}]]}
         )
     
     else:
