@@ -10,8 +10,20 @@ const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const cleanUrl = typeof envUrl === 'string' ? envUrl.replace(/^["']|["']$/g, '').trim() : '';
 const cleanKey = typeof envKey === 'string' ? envKey.replace(/^["']|["']$/g, '').trim() : '';
 
-export const supabaseUrl = cleanUrl && cleanUrl !== 'https://placeholder.supabase.co' ? cleanUrl : DEFAULT_URL;
-export const supabaseAnonKey = cleanKey && cleanKey !== 'your_anon_key' ? cleanKey : DEFAULT_KEY;
+const isPlaceholder = (str: string): boolean => {
+  const s = str.toLowerCase().trim();
+  return !s || 
+         s.includes('placeholder') || 
+         s.includes('your_') || 
+         s.includes('your-') || 
+         s === 'your_supabase_url' || 
+         s === 'your_anon_key' ||
+         s === 'undefined' || 
+         s === 'null';
+};
+
+export const supabaseUrl = cleanUrl && !isPlaceholder(cleanUrl) ? cleanUrl : DEFAULT_URL;
+export const supabaseAnonKey = cleanKey && !isPlaceholder(cleanKey) ? cleanKey : DEFAULT_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -22,6 +34,6 @@ export const isSupabaseConfigured = (): boolean => {
   return Boolean(
     supabaseUrl &&
     supabaseAnonKey &&
-    supabaseUrl !== 'https://placeholder.supabase.co'
+    !isPlaceholder(supabaseUrl)
   );
 };
